@@ -1,160 +1,163 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using System;
 using System.Globalization;
 
-using global::TestFramework.ForTestingMSTest;
+using FluentAssertions;
 
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+using TestFramework.ForTestingMSTest;
 
 namespace Microsoft.VisualStudio.TestPlatform.TestFramework.UnitTests;
 public partial class AssertTests : TestContainer
 {
     public void AreNotEqualShouldFailWhenNotEqualType()
     {
-        static void Action() => Assert.AreNotEqual(null, null);
-        var ex = VerifyThrows(Action);
-        Verify(ex is AssertFailedException);
+        Action action = () => Assert.AreNotEqual(null, null);
+
+        action.Should().ThrowExactly<AssertFailedException>();
     }
 
     public void AreNotEqualShouldFailWhenNotEqualTypeWithMessage()
     {
-        var ex = VerifyThrows(() => Assert.AreNotEqual(null, null, "A Message"));
-        Verify(ex != null);
-        Verify(ex.Message.Contains("A Message"));
+        Action action = () => Assert.AreNotEqual(null, null, "A Message");
+
+        action.Should().Throw<Exception>().And.Message.Should().Contain("A Message");
     }
 
     public void AreNotEqualShouldFailWhenNotEqualString()
     {
-        static void Action() => Assert.AreNotEqual("A", "A");
-        var ex = VerifyThrows(Action);
-        Verify(ex is AssertFailedException);
+        Action action = () => Assert.AreNotEqual("A", "A");
+
+        action.Should().ThrowExactly<AssertFailedException>();
     }
 
     public void AreNotEqualShouldFailWhenNotEqualStringWithMessage()
     {
-        var ex = VerifyThrows(() => Assert.AreNotEqual("A", "A", "A Message"));
-        Verify(ex != null);
-        Verify(ex.Message.Contains("A Message"));
+        Action action = () => Assert.AreNotEqual("A", "A", "A Message");
+
+        action.Should().Throw<Exception>().And.Message.Should().Contain("A Message");
     }
 
     public void AreNotEqualShouldFailWhenNotEqualStringAndCaseIgnored()
     {
-        static void Action() => Assert.AreNotEqual("A", "a", true);
-        var ex = VerifyThrows(Action);
-        Verify(ex is AssertFailedException);
+        Action action = () => Assert.AreNotEqual("A", "a", true);
+
+        action.Should().ThrowExactly<AssertFailedException>();
     }
 
     public void AreNotEqualShouldFailWhenNotEqualInt()
     {
-        static void Action() => Assert.AreNotEqual(1, 1);
-        var ex = VerifyThrows(Action);
-        Verify(ex is AssertFailedException);
+        Action action = () => Assert.AreNotEqual(1, 1);
+
+        action.Should().ThrowExactly<AssertFailedException>();
     }
 
     public void AreNotEqualShouldFailWhenNotEqualIntWithMessage()
     {
-        var ex = VerifyThrows(() => Assert.AreNotEqual(1, 1, "A Message"));
-        Verify(ex is not null);
-        Verify(ex.Message.Contains("A Message"));
+        Action action = () => Assert.AreNotEqual(1, 1, "A Message");
+
+        action.Should().Throw<Exception>().And.Message.Should().Contain("A Message");
     }
 
     public void AreNotEqualShouldFailWhenNotEqualLong()
     {
-        static void Action() => Assert.AreNotEqual(1L, 1L);
-        var ex = VerifyThrows(Action);
-        Verify(ex is AssertFailedException);
+        Action action = () => Assert.AreNotEqual(1L, 1L);
+
+        action.Should().ThrowExactly<AssertFailedException>();
     }
 
     public void AreNotEqualShouldFailWhenNotEqualLongWithMessage()
     {
-        var ex = VerifyThrows(() => Assert.AreNotEqual(1L, 1L, "A Message"));
-        Verify(ex is not null);
-        Verify(ex.Message.Contains("A Message"));
+        Action action = () => Assert.AreNotEqual(1L, 1L, "A Message");
+
+        action.Should().Throw<Exception>().And.Message.Should().Contain("A Message");
     }
 
     public void AreNotEqualShouldFailWhenNotEqualLongWithDelta()
     {
-        static void Action() => Assert.AreNotEqual(1L, 2L, 1L);
-        var ex = VerifyThrows(Action);
-        Verify(ex is AssertFailedException);
+        Action action = () => Assert.AreNotEqual(1L, 2L, 1L);
+
+        action.Should().ThrowExactly<AssertFailedException>();
     }
 
     public void AreNotEqualShouldFailWhenNotEqualDecimal()
     {
-        static void Action() => Assert.AreNotEqual(0.1M, 0.1M);
-        var ex = VerifyThrows(Action);
-        Verify(ex is AssertFailedException);
+        Action action = () => Assert.AreNotEqual(0.1M, 0.1M);
+
+        action.Should().ThrowExactly<AssertFailedException>();
     }
 
     public void AreNotEqualShouldFailWhenNotEqualDecimalWithMessage()
     {
-        var ex = VerifyThrows(() => Assert.AreNotEqual(0.1M, 0.1M, "A Message"));
-        Verify(ex is not null);
-        Verify(ex.Message.Contains("A Message"));
+        Action action = () => Assert.AreNotEqual(0.1M, 0.1M, "A Message");
+
+        action.Should().Throw<Exception>().And.Message.Should().Contain("A Message");
     }
 
     public void AreNotEqualShouldFailWhenNotEqualDecimalWithDelta()
     {
-        static void Action() => Assert.AreNotEqual(0.1M, 0.2M, 0.1M);
-        var ex = VerifyThrows(Action);
-        Verify(ex is AssertFailedException);
+        Action action = () => Assert.AreNotEqual(0.1M, 0.2M, 0.1M);
+
+        action.Should().ThrowExactly<AssertFailedException>();
     }
 
     public void AreNotEqualShouldFailWhenNotEqualDouble()
     {
-        static void Action() => Assert.AreNotEqual(0.1, 0.1);
-        var ex = VerifyThrows(Action);
-        Verify(ex is AssertFailedException);
+        Action action = () => Assert.AreNotEqual(0.1, 0.1);
+
+        action.Should().ThrowExactly<AssertFailedException>();
     }
 
     public void AreNotEqualShouldFailWhenNotEqualDoubleWithMessage()
     {
-        var ex = VerifyThrows(() => Assert.AreNotEqual(0.1, 0.1, "A Message"));
-        Verify(ex is not null);
-        Verify(ex.Message.Contains("A Message"));
+        Action action = () => Assert.AreNotEqual(0.1, 0.1, "A Message");
+
+        action.Should().Throw<Exception>().And.Message.Should().Contain("A Message");
     }
 
     public void AreNotEqualShouldFailWhenNotEqualDoubleWithDelta()
     {
-        static void Action() => Assert.AreNotEqual(0.1, 0.2, 0.1);
-        var ex = VerifyThrows(Action);
-        Verify(ex is AssertFailedException);
+        Action action = () => Assert.AreNotEqual(0.1, 0.2, 0.1);
+
+        action.Should().ThrowExactly<AssertFailedException>();
     }
 
     public void AreNotEqualShouldFailWhenFloatDouble()
     {
-        static void Action() => Assert.AreNotEqual(100E-2, 100E-2);
-        var ex = VerifyThrows(Action);
-        Verify(ex is AssertFailedException);
+        Action action = () => Assert.AreNotEqual(100E-2, 100E-2);
+
+        action.Should().ThrowExactly<AssertFailedException>();
     }
 
     public void AreNotEqualShouldFailWhenFloatDoubleWithMessage()
     {
-        var ex = VerifyThrows(() => Assert.AreNotEqual(100E-2, 100E-2, "A Message"));
-        Verify(ex is not null);
-        Verify(ex.Message.Contains("A Message"));
+        Action action = () => Assert.AreNotEqual(100E-2, 100E-2, "A Message");
+
+        action.Should().Throw<Exception>().And.Message.Should().Contain("A Message");
     }
 
     public void AreNotEqualShouldFailWhenNotEqualFloatWithDelta()
     {
-        static void Action() => Assert.AreNotEqual(100E-2, 200E-2, 100E-2);
-        var ex = VerifyThrows(Action);
-        Verify(ex is AssertFailedException);
+        Action action = () => Assert.AreNotEqual(100E-2, 200E-2, 100E-2);
+
+        action.Should().ThrowExactly<AssertFailedException>();
     }
 
     public void AreEqualShouldFailWhenNotEqualType()
     {
-        static void Action() => Assert.AreEqual(null, "string");
-        var ex = VerifyThrows(Action);
-        Verify(ex is AssertFailedException);
+        Action action = () => Assert.AreEqual(null, "string");
+
+        action.Should().ThrowExactly<AssertFailedException>();
     }
 
     public void AreEqualShouldFailWhenNotEqualTypeWithMessage()
     {
-        var ex = VerifyThrows(() => Assert.AreEqual(null, "string", "A Message"));
-        Verify(ex is not null);
-        Verify(ex.Message.Contains("A Message"));
+        Action action = () => Assert.AreEqual(null, "string", "A Message");
+
+        action.Should().Throw<Exception>().And.Message.Should().Contain("A Message");
     }
 
     public void AreEqual_WithTurkishCultureAndIgnoreCase_Throws()
@@ -164,8 +167,8 @@ public partial class AssertTests : TestContainer
         var turkishCulture = new CultureInfo("tr-TR");
 
         // In the tr-TR culture, "i" and "I" are not considered equal when doing a case-insensitive comparison.
-        var ex = VerifyThrows(() => Assert.AreEqual(expected, actual, true, turkishCulture));
-        Verify(ex is not null);
+        Action action = () => Assert.AreEqual(expected, actual, true, turkishCulture);
+        action.Should().Throw<AssertFailedException>();
     }
 
     public void AreEqual_WithEnglishCultureAndIgnoreCase_DoesNotThrow()
@@ -185,8 +188,8 @@ public partial class AssertTests : TestContainer
         var englishCulture = new CultureInfo("en-EN");
 
         // Won't ignore case.
-        var ex = VerifyThrows(() => Assert.AreEqual(expected, actual, false, englishCulture));
-        Verify(ex is not null);
+        Action action = () => Assert.AreEqual(expected, actual, false, englishCulture);
+        action.Should().Throw<AssertFailedException>();
     }
 
     public void AreEqual_WithTurkishCultureAndDoesNotIgnoreCase_Throws()
@@ -196,119 +199,119 @@ public partial class AssertTests : TestContainer
         var turkishCulture = new CultureInfo("tr-TR");
 
         // Won't ignore case.
-        var ex = VerifyThrows(() => Assert.AreEqual(expected, actual, false, turkishCulture));
-        Verify(ex is not null);
+        Action action = () => Assert.AreEqual(expected, actual, false, turkishCulture);
+        action.Should().Throw<AssertFailedException>();
     }
 
     public void AreEqualShouldFailWhenNotEqualStringWithMessage()
     {
-        var ex = VerifyThrows(() => Assert.AreEqual("A", "a", "A Message"));
-        Verify(ex is not null);
-        Verify(ex.Message.Contains("A Message"));
+        Action action = () => Assert.AreEqual("A", "a", "A Message");
+
+        action.Should().Throw<Exception>().And.Message.Should().Contain("A Message");
     }
 
     public void AreEqualShouldFailWhenNotEqualStringAndCaseIgnored()
     {
-        static void Action() => Assert.AreEqual("A", "a", false);
-        var ex = VerifyThrows(Action);
-        Verify(ex is AssertFailedException);
+        Action action = () => Assert.AreEqual("A", "a", false);
+
+        action.Should().ThrowExactly<AssertFailedException>();
     }
 
     public void AreEqualShouldFailWhenNotEqualInt()
     {
-        static void Action() => Assert.AreEqual(1, 2);
-        var ex = VerifyThrows(Action);
-        Verify(ex is AssertFailedException);
+        Action action = () => Assert.AreEqual(1, 2);
+
+        action.Should().ThrowExactly<AssertFailedException>();
     }
 
     public void AreEqualShouldFailWhenNotEqualIntWithMessage()
     {
-        var ex = VerifyThrows(() => Assert.AreEqual(1, 2, "A Message"));
-        Verify(ex is not null);
-        Verify(ex.Message.Contains("A Message"));
+        Action action = () => Assert.AreEqual(1, 2, "A Message");
+
+        action.Should().Throw<Exception>().And.Message.Should().Contain("A Message");
     }
 
     public void AreEqualShouldFailWhenNotEqualLong()
     {
-        static void Action() => Assert.AreEqual(1L, 2L);
-        var ex = VerifyThrows(Action);
-        Verify(ex is AssertFailedException);
+        Action action = () => Assert.AreEqual(1L, 2L);
+
+        action.Should().ThrowExactly<AssertFailedException>();
     }
 
     public void AreEqualShouldFailWhenNotEqualLongWithMessage()
     {
-        var ex = VerifyThrows(() => Assert.AreEqual(1L, 2L, "A Message"));
-        Verify(ex is not null);
-        Verify(ex.Message.Contains("A Message"));
+        Action action = () => Assert.AreEqual(1L, 2L, "A Message");
+
+        action.Should().Throw<Exception>().And.Message.Should().Contain("A Message");
     }
 
     public void AreEqualShouldFailWhenNotEqualLongWithDelta()
     {
-        static void Action() => Assert.AreEqual(10L, 20L, 5L);
-        var ex = VerifyThrows(Action);
-        Verify(ex is AssertFailedException);
+        Action action = () => Assert.AreEqual(10L, 20L, 5L);
+
+        action.Should().ThrowExactly<AssertFailedException>();
     }
 
     public void AreEqualShouldFailWhenNotEqualDouble()
     {
-        static void Action() => Assert.AreEqual(0.1, 0.2);
-        var ex = VerifyThrows(Action);
-        Verify(ex is AssertFailedException);
+        Action action = () => Assert.AreEqual(0.1, 0.2);
+
+        action.Should().ThrowExactly<AssertFailedException>();
     }
 
     public void AreEqualShouldFailWhenNotEqualDoubleWithMessage()
     {
-        var ex = VerifyThrows(() => Assert.AreEqual(0.1, 0.2, "A Message"));
-        Verify(ex is not null);
-        Verify(ex.Message.Contains("A Message"));
+        Action action = () => Assert.AreEqual(0.1, 0.2, "A Message");
+
+        action.Should().Throw<Exception>().And.Message.Should().Contain("A Message");
     }
 
     public void AreEqualShouldFailWhenNotEqualDoubleWithDelta()
     {
-        static void Action() => Assert.AreEqual(0.1, 0.2, 0.05);
-        var ex = VerifyThrows(Action);
-        Verify(ex is AssertFailedException);
+        Action action = () => Assert.AreEqual(0.1, 0.2, 0.05);
+
+        action.Should().ThrowExactly<AssertFailedException>();
     }
 
     public void AreEqualShouldFailWhenNotEqualDecimal()
     {
-        static void Action() => Assert.AreEqual(0.1M, 0.2M);
-        var ex = VerifyThrows(Action);
-        Verify(ex is AssertFailedException);
+        Action action = () => Assert.AreEqual(0.1M, 0.2M);
+
+        action.Should().ThrowExactly<AssertFailedException>();
     }
 
     public void AreEqualShouldFailWhenNotEqualDecimalWithMessage()
     {
-        var ex = VerifyThrows(() => Assert.AreEqual(0.1M, 0.2M, "A Message"));
-        Verify(ex is not null);
-        Verify(ex.Message.Contains("A Message"));
+        Action action = () => Assert.AreEqual(0.1M, 0.2M, "A Message");
+
+        action.Should().Throw<Exception>().And.Message.Should().Contain("A Message");
     }
 
     public void AreEqualShouldFailWhenNotEqualDecimalWithDelta()
     {
-        static void Action() => Assert.AreEqual(0.1M, 0.2M, 0.05M);
-        var ex = VerifyThrows(Action);
-        Verify(ex is AssertFailedException);
+        Action action = () => Assert.AreEqual(0.1M, 0.2M, 0.05M);
+
+        action.Should().ThrowExactly<AssertFailedException>();
     }
 
     public void AreEqualShouldFailWhenFloatDouble()
     {
-        static void Action() => Assert.AreEqual(100E-2, 200E-2);
-        var ex = VerifyThrows(Action);
-        Verify(ex is AssertFailedException);
+        Action action = () => Assert.AreEqual(100E-2, 200E-2);
+
+        action.Should().ThrowExactly<AssertFailedException>();
     }
 
     public void AreEqualShouldFailWhenFloatDoubleWithMessage()
     {
-        var ex = VerifyThrows(() => Assert.AreEqual(100E-2, 200E-2, "A Message"));
-        Verify(ex is not null);
-        Verify(ex.Message.Contains("A Message"));
+        Action action = () => Assert.AreEqual(100E-2, 200E-2, "A Message");
+
+        action.Should().Throw<Exception>().And.Message.Should().Contain("A Message");
     }
 
     public void AreEqualShouldFailWhenNotEqualFloatWithDelta()
     {
-        static void Action() => Assert.AreEqual(100E-2, 200E-2, 50E-2);
-        var ex = VerifyThrows(Action);
-        Verify(ex is AssertFailedException);
+        Action action = () => Assert.AreEqual(100E-2, 200E-2, 50E-2);
+
+        action.Should().ThrowExactly<AssertFailedException>();
     }
 }

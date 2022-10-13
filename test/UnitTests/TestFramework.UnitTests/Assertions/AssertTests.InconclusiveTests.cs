@@ -3,6 +3,8 @@
 
 using System;
 
+using FluentAssertions;
+
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace Microsoft.VisualStudio.TestPlatform.TestFramework.UnitTests;
@@ -11,19 +13,16 @@ public partial class AssertTests
     // See https://github.com/dotnet/sdk/issues/25373
     public void InconclusiveDoesNotThrowWhenMessageContainsInvalidStringFormatCompositeAndNoArgumentsPassed()
     {
-        var ex = VerifyThrows(() => Assert.Inconclusive("{"));
+        Action action = () => Assert.Inconclusive("{");
 
-        Verify(ex is not null);
-        Verify(typeof(AssertInconclusiveException) == ex.GetType());
-        Verify(ex.Message.Contains("Assert.Inconclusive failed. {"));
+        action.Should().ThrowExactly<AssertFailedException>().And.Message.Should().Contain("Assert.Inconclusive failed. {");
     }
 
     // See https://github.com/dotnet/sdk/issues/25373
     public void InconclusiveThrowsWhenMessageContainsInvalidStringFormatComposite()
     {
-        var ex = VerifyThrows(() => Assert.Inconclusive("{", "arg"));
+        Action action = () => Assert.Inconclusive("{", "arg");
 
-        Verify(ex is not null);
-        Verify(ex is FormatException);
+        action.Should().ThrowExactly<FormatException>();
     }
 }

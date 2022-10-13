@@ -3,6 +3,8 @@
 
 using System;
 
+using FluentAssertions;
+
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 using TestFramework.ForTestingMSTest;
@@ -26,45 +28,42 @@ public class GenericParameterHelperTests : TestContainer
         GenericParameterHelper firstObject = new();
         GenericParameterHelper secondObject = new();
 
-        Verify(!firstObject.Equals(secondObject));
+        firstObject.Should().NotBe(secondObject);
     }
 
     public void EqualsShouldReturnTrueIfTwoObjectHasSameDataValue()
     {
         GenericParameterHelper objectToCompare = new(10);
 
-        Verify(_sut.Equals(objectToCompare));
+        _sut.Should().Be(objectToCompare);
     }
 
     public void EqualsShouldReturnFalseIfTwoObjectDoesNotHaveSameDataValue()
     {
         GenericParameterHelper objectToCompare = new(5);
 
-        Verify(!_sut.Equals(objectToCompare));
+        _sut.Should().NotBe(objectToCompare);
     }
 
     public void CompareToShouldReturnZeroIfTwoObjectHasSameDataValue()
     {
         GenericParameterHelper objectToCompare = new(10);
 
-        Verify(_sut.CompareTo(objectToCompare) == 0);
+        _sut.CompareTo(objectToCompare).Should().Be(0);
     }
 
     public void CompareToShouldThrowExceptionIfSpecifiedObjectIsNotOfTypeGenericParameterHelper()
     {
-        int objectToCompare = 5;
+        Action action = () => _sut.CompareTo(5);
 
-        void A() => _sut.CompareTo(objectToCompare);
-
-        var ex = VerifyThrows(A);
-        Verify(ex is NotSupportedException);
+        action.Should().ThrowExactly<NotSupportedException>();
     }
 
     public void GenericParameterHelperShouldImplementIEnumerator()
     {
         _sut = new GenericParameterHelper(15);
 
-        int expectedLenghtOfList = 5;  // (15%10)
+        int expectedLengthOfList = 5;  // (15%10)
         int result = 0;
 
         foreach (var x in _sut)
@@ -72,6 +71,6 @@ public class GenericParameterHelperTests : TestContainer
             result++;
         }
 
-        Verify(result == expectedLenghtOfList);
+        result.Should().Be(expectedLengthOfList);
     }
 }

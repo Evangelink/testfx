@@ -3,6 +3,8 @@
 
 using System;
 
+using FluentAssertions;
+
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 using TestFramework.ForTestingMSTest;
@@ -19,10 +21,9 @@ public class ExpectedExceptionAttributeTests : TestContainer
     /// </summary>
     public void ExpectedExceptionAttributeConstructerShouldThrowArgumentNullExceptionWhenExceptionTypeIsNull()
     {
-        static void A() => _ = new ExpectedExceptionAttribute(null, "Dummy");
+        Action action = () => _ = new ExpectedExceptionAttribute(null, "Dummy");
 
-        var ex = VerifyThrows(A);
-        Verify(ex is ArgumentNullException);
+        action.Should().ThrowExactly<ArgumentNullException>();
     }
 
     /// <summary>
@@ -30,10 +31,9 @@ public class ExpectedExceptionAttributeTests : TestContainer
     /// </summary>
     public void ExpectedExceptionAttributeConstructerShouldThrowArgumentException()
     {
-        static void A() => _ = new ExpectedExceptionAttribute(typeof(ExpectedExceptionAttributeTests), "Dummy");
+        Action action = () => _ = new ExpectedExceptionAttribute(typeof(ExpectedExceptionAttributeTests), "Dummy");
 
-        var ex = VerifyThrows(A);
-        Verify(ex is ArgumentException);
+        action.Should().ThrowExactly<ArgumentException>();
     }
 
     /// <summary>
@@ -41,15 +41,16 @@ public class ExpectedExceptionAttributeTests : TestContainer
     /// </summary>
     public void ExpectedExceptionAttributeConstructerShouldNotThrowAnyException()
     {
-        ExpectedExceptionAttribute sut = new(typeof(DummyTestClassDerivedFromException), "Dummy");
+        Action action = () => _ = new ExpectedExceptionAttribute(typeof(DummyTestClassDerivedFromException), "Dummy");
+        action.Should().NotThrow();
     }
 
     public void GetExceptionMsgShouldReturnExceptionMessage()
     {
         Exception ex = new("Dummy Exception");
         var actualMessage = UtfHelper.GetExceptionMsg(ex);
-        var expectedMessage = "System.Exception: Dummy Exception";
-        Verify(expectedMessage == actualMessage);
+
+        actualMessage.Should().Be("System.Exception: Dummy Exception");
     }
 
     public void GetExceptionMsgShouldReturnInnerExceptionMessageAsWellIfPresent()
@@ -57,8 +58,8 @@ public class ExpectedExceptionAttributeTests : TestContainer
         Exception innerException = new DivideByZeroException();
         Exception ex = new("Dummy Exception", innerException);
         var actualMessage = UtfHelper.GetExceptionMsg(ex);
-        var expectedMessage = "System.Exception: Dummy Exception ---> System.DivideByZeroException: Attempted to divide by zero.";
-        Verify(expectedMessage == actualMessage);
+
+        actualMessage.Should().Be("System.Exception: Dummy Exception ---> System.DivideByZeroException: Attempted to divide by zero.");
     }
 
     public void GetExceptionMsgShouldReturnInnerExceptionMessageRecursivelyIfPresent()
@@ -67,8 +68,8 @@ public class ExpectedExceptionAttributeTests : TestContainer
         Exception innerException = new DivideByZeroException("SecondLevel Exception", recursiveInnerException);
         Exception ex = new("FirstLevelException", innerException);
         var actualMessage = UtfHelper.GetExceptionMsg(ex);
-        var expectedMessage = "System.Exception: FirstLevelException ---> System.DivideByZeroException: SecondLevel Exception ---> System.IndexOutOfRangeException: ThirdLevelException";
-        Verify(expectedMessage == actualMessage);
+
+        actualMessage.Should().Be("System.Exception: FirstLevelException ---> System.DivideByZeroException: SecondLevel Exception ---> System.IndexOutOfRangeException: ThirdLevelException");
     }
 }
 

@@ -3,6 +3,8 @@
 
 using System;
 
+using FluentAssertions;
+
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace Microsoft.VisualStudio.TestPlatform.TestFramework.UnitTests;
@@ -11,25 +13,25 @@ public partial class AssertTests
     #region That tests
     public void ThatShouldReturnAnInstanceOfAssert()
     {
-        Verify(Assert.That is not null);
+        Assert.That.Should().NotBeNull();
     }
 
     public void ThatShouldCacheAssertInstance()
     {
-        Verify(object.ReferenceEquals(Assert.That, Assert.That));
+        Assert.That.Should().BeSameAs(Assert.That);
     }
     #endregion
 
     #region ReplaceNullChars tests
     public void ReplaceNullCharsShouldReturnStringIfNullOrEmpty()
     {
-        Verify(Assert.ReplaceNullChars(null) == null);
-        Verify(Assert.ReplaceNullChars(string.Empty) == string.Empty);
+        Assert.ReplaceNullChars(null).Should().Be(null);
+        Assert.ReplaceNullChars(string.Empty).Should().Be(string.Empty);
     }
 
     public void ReplaceNullCharsShouldReplaceNullCharsInAString()
     {
-        Verify(Assert.ReplaceNullChars("The quick brown fox \0 jumped over the la\0zy dog\0") == "The quick brown fox \\0 jumped over the la\\0zy dog\\0");
+        Assert.ReplaceNullChars("The quick brown fox \0 jumped over the la\0zy dog\0").Should().Be("The quick brown fox \\0 jumped over the la\\0zy dog\\0");
     }
     #endregion
 
@@ -38,17 +40,16 @@ public partial class AssertTests
     // See https://github.com/dotnet/sdk/issues/25373
     public void BuildUserMessageThrowsWhenMessageContainsInvalidStringFormatComposite()
     {
-        var ex = VerifyThrows(() => Assert.BuildUserMessage("{", "arg"));
+        Action action = () => Assert.BuildUserMessage("{", "arg");
 
-        Verify(ex is not null);
-        Verify(ex is FormatException);
+        action.Should().ThrowExactly<FormatException>();
     }
 
     // See https://github.com/dotnet/sdk/issues/25373
     public void BuildUserMessageDoesNotThrowWhenMessageContainsInvalidStringFormatCompositeAndNoArgumentsPassed()
     {
         string message = Assert.BuildUserMessage("{");
-        Verify(message == "{");
+        message.Should().Be("{");
     }
     #endregion
 }

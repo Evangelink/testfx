@@ -3,6 +3,8 @@
 
 using System;
 
+using FluentAssertions;
+
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 using TestFramework.ForTestingMSTest;
@@ -26,10 +28,9 @@ public class ExpectedExceptionBaseAttributeTests : TestContainer
     /// </summary>
     public void RethrowIfAssertExceptionThrowsExceptionOnAssertFailure()
     {
-        void A() => _sut.RethrowIfAssertException(new AssertFailedException());
+        Action action = () => _sut.RethrowIfAssertException(new AssertFailedException());
 
-        var ex = VerifyThrows(A);
-        Verify(ex is AssertFailedException);
+        action.Should().ThrowExactly<AssertFailedException>();
     }
 
     /// <summary>
@@ -37,29 +38,24 @@ public class ExpectedExceptionBaseAttributeTests : TestContainer
     /// </summary>
     public void RethrowIfAssertExceptionThrowsExceptionOnAssertInconclusive()
     {
-        void A() => _sut.RethrowIfAssertException(new AssertInconclusiveException());
+        Action action = () => _sut.RethrowIfAssertException(new AssertInconclusiveException());
 
-        var ex = VerifyThrows(A);
-        Verify(ex is AssertInconclusiveException);
+        action.Should().ThrowExactly<AssertInconclusiveException>();
     }
 
-    public void VerifyCorrectMessageIsGettingSetInVariablenoExceptionMessage()
+    public void VerifyCorrectMessageIsGettingSetInVariableNoExceptionMessage()
     {
         string expected = "DummyString";
         _sut = new TestableExpectedExceptionBaseAttributeClass(expected);
 
-        string result = _sut.GetNoExceptionMessage();
-
-        Verify(expected == result);
+        _sut.GetNoExceptionMessage().Should().Be(expected);
     }
 
-    public void VerifyEmptyMessageIsGettingSetInVariablenoExceptionMessage()
+    public void VerifyEmptyMessageIsGettingSetInVariableNoExceptionMessage()
     {
         _sut = new TestableExpectedExceptionBaseAttributeClass(null);
 
-        string result = _sut.GetNoExceptionMessage();
-
-        Verify(string.IsNullOrEmpty(result));
+        _sut.GetNoExceptionMessage().Should().BeNullOrEmpty();
     }
 }
 

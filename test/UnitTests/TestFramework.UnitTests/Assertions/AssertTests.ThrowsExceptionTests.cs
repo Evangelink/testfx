@@ -4,6 +4,8 @@
 using System;
 using System.Threading.Tasks;
 
+using FluentAssertions;
+
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace Microsoft.VisualStudio.TestPlatform.TestFramework.UnitTests;
@@ -13,35 +15,25 @@ public partial class AssertTests
     // See https://github.com/dotnet/sdk/issues/25373
     public void ThrowAssertFailedDoesNotThrowIfMessageContainsInvalidStringFormatComposite()
     {
-        var ex = VerifyThrows(() => Assert.ThrowAssertFailed("name", "{"));
+        Action action = () => Assert.ThrowAssertFailed("name", "{");
 
-        Verify(ex is not null);
-        Verify(typeof(AssertFailedException) == ex.GetType());
-        Verify(ex.Message.Contains("name failed. {"));
+        action.Should().ThrowExactly<AssertFailedException>().And.Message.Should().Contain("name failed. {");
     }
     #endregion
 
     #region ThrowsException tests
     public void ThrowsExceptionWithLambdaExpressionsShouldThrowAssertionOnNoException()
     {
-        var ex = VerifyThrows(() => Assert.ThrowsException<ArgumentException>(() => { }));
+        Action action = () => Assert.ThrowsException<ArgumentException>(() => { });
 
-        Verify(ex is not null);
-        Verify(typeof(AssertFailedException) == ex.GetType());
-        Verify(ex.Message.Contains("Assert.ThrowsException failed. No exception thrown. ArgumentException exception was expected."));
+        action.Should().ThrowExactly<AssertFailedException>().And.Message.Should().Contain("Assert.ThrowsException failed. No exception thrown. ArgumentException exception was expected.");
     }
 
     public void ThrowsExceptionWithLambdaExpressionsShouldThrowAssertionOnWrongException()
     {
-        var ex = VerifyThrows(() => Assert.ThrowsException<ArgumentException>(
-             () =>
-             {
-                 throw new FormatException();
-             }));
+        Action action = () => Assert.ThrowsException<ArgumentException>(() => throw new FormatException());
 
-        Verify(ex is not null);
-        Verify(typeof(AssertFailedException) == ex.GetType());
-        Verify(ex.Message.Contains("Assert.ThrowsException failed. Threw exception FormatException, but exception ArgumentException was expected."));
+        action.Should().ThrowExactly<AssertFailedException>().And.Message.Should().Contain("Assert.ThrowsException failed. Threw exception FormatException, but exception ArgumentException was expected.");
     }
     #endregion
 
@@ -66,15 +58,9 @@ public partial class AssertTests
             {
                 await Task.Delay(5).ConfigureAwait(false);
             });
-        var ex = VerifyThrows(() => t.Wait());
+        Action action = t.Wait;
 
-        Verify(ex is not null);
-
-        var innerException = ex.InnerException;
-
-        Verify(innerException is not null);
-        Verify(typeof(AssertFailedException) == innerException.GetType());
-        Verify(innerException.Message.Contains("Assert.ThrowsException failed. No exception thrown. ArgumentException exception was expected."));
+        action.Should().Throw<Exception>().And.InnerException.Should().BeOfType<AssertFailedException>().Which.Message.Should().Contain("Assert.ThrowsExceptionAsync failed. No exception thrown. ArgumentException exception was expected.");
     }
 
     public void ThrowsExceptionAsyncShouldThrowAssertionOnWrongException()
@@ -85,15 +71,9 @@ public partial class AssertTests
                 await Task.Delay(5).ConfigureAwait(false);
                 throw new FormatException();
             });
-        var ex = VerifyThrows(() => t.Wait());
+        Action action = t.Wait;
 
-        Verify(ex is not null);
-
-        var innerException = ex.InnerException;
-
-        Verify(innerException is not null);
-        Assert.AreEqual(typeof(AssertFailedException), innerException.GetType());
-        Verify(innerException.Message.Contains("Assert.ThrowsException failed. Threw exception FormatException, but exception ArgumentException was expected."));
+        action.Should().Throw<Exception>().And.InnerException.Should().BeOfType<AssertFailedException>().Which.Message.Should().Contain("Assert.ThrowsExceptionAsync failed. Threw exception FormatException, but exception ArgumentException was expected.");
     }
 
     public void ThrowsExceptionAsyncWithMessageShouldThrowAssertionOnNoException()
@@ -104,15 +84,9 @@ public partial class AssertTests
                 await Task.Delay(5).ConfigureAwait(false);
             },
             "The world is not on fire.");
-        var ex = VerifyThrows(() => t.Wait());
+        Action action = t.Wait;
 
-        Verify(ex is not null);
-
-        var innerException = ex.InnerException;
-
-        Verify(innerException is not null);
-        Assert.AreEqual(typeof(AssertFailedException), innerException.GetType());
-        Verify(innerException.Message.Contains("Assert.ThrowsException failed. No exception thrown. ArgumentException exception was expected. The world is not on fire."));
+        action.Should().Throw<Exception>().And.InnerException.Should().BeOfType<AssertFailedException>().Which.Message.Should().Contain("Assert.ThrowsExceptionAsync failed. No exception thrown. ArgumentException exception was expected. The world is not on fire.");
     }
 
     public void ThrowsExceptionAsyncWithMessageShouldThrowAssertionOnWrongException()
@@ -124,51 +98,31 @@ public partial class AssertTests
                 throw new FormatException();
             },
             "Happily ever after.");
-        var ex = VerifyThrows(() => t.Wait());
+        Action action = t.Wait;
 
-        Verify(ex is not null);
-
-        var innerException = ex.InnerException;
-
-        Verify(innerException is not null);
-        Assert.AreEqual(typeof(AssertFailedException), innerException.GetType());
-        Verify(innerException.Message.Contains("Assert.ThrowsException failed. Threw exception FormatException, but exception ArgumentException was expected. Happily ever after."));
+        action.Should().Throw<Exception>().And.InnerException.Should().BeOfType<AssertFailedException>().Which.Message.Should().Contain("Assert.ThrowsExceptionAsync failed. Threw exception FormatException, but exception ArgumentException was expected. Happily ever after.");
     }
 
     public void ThrowsExceptionAsyncWithMessageAndParamsShouldThrowOnNullAction()
     {
-        static void A()
+        Action action = () =>
         {
             Task t = Assert.ThrowsExceptionAsync<ArgumentException>(null, null, null);
             t.Wait();
-        }
+        };
 
-        var ex = VerifyThrows(A);
-
-        Verify(ex is not null);
-
-        var innerException = ex.InnerException;
-
-        Verify(innerException is not null);
-        Verify(typeof(ArgumentNullException) == innerException.GetType());
+        action.Should().Throw<Exception>().And.InnerException.Should().BeOfType<ArgumentNullException>();
     }
 
     public void ThrowsExceptionAsyncWithMessageAndParamsShouldThrowOnNullMessage()
     {
-        static void A()
+        Action action = () =>
         {
             Task t = Assert.ThrowsExceptionAsync<ArgumentException>(async () => { await Task.FromResult(true).ConfigureAwait(false); }, null, null);
             t.Wait();
-        }
+        };
 
-        var ex = VerifyThrows(A);
-
-        Verify(ex is not null);
-
-        var innerException = ex.InnerException;
-
-        Verify(innerException is not null);
-        Verify(typeof(ArgumentNullException) == innerException.GetType());
+        action.Should().Throw<Exception>().And.InnerException.Should().BeOfType<ArgumentNullException>();
     }
 
     public void ThrowsExceptionAsyncWithMessageAndParamsShouldThrowAssertionOnNoException()
@@ -182,15 +136,9 @@ public partial class AssertTests
             "ta",
             "da",
             123);
-        var ex = VerifyThrows(() => t.Wait());
+        Action action = t.Wait;
 
-        Verify(ex is not null);
-
-        var innerException = ex.InnerException;
-
-        Verify(innerException is not null);
-        Assert.AreEqual(typeof(AssertFailedException), innerException.GetType());
-        Verify(innerException.Message.Contains("Assert.ThrowsException failed. No exception thrown. ArgumentException exception was expected. The world is not on fire ta.da-123."));
+        action.Should().Throw<Exception>().And.InnerException.Should().BeOfType<AssertFailedException>().Which.Message.Should().Contain("Assert.ThrowsExceptionAsync failed. No exception thrown. ArgumentException exception was expected. The world is not on fire ta.da-123.");
     }
 
     public void ThrowsExceptionAsyncWithMessageAndParamsShouldThrowAssertionOnWrongException()
@@ -204,15 +152,9 @@ public partial class AssertTests
             "Happily ever after. {0} {1}.",
             "The",
             "End");
-        var ex = VerifyThrows(() => t.Wait());
+        Action action = t.Wait;
 
-        Verify(ex is not null);
-
-        var innerException = ex.InnerException;
-
-        Verify(innerException is not null);
-        Assert.AreEqual(typeof(AssertFailedException), innerException.GetType());
-        Verify(innerException.Message.Contains("Assert.ThrowsException failed. Threw exception FormatException, but exception ArgumentException was expected. Happily ever after. The End."));
+        action.Should().Throw<Exception>().And.InnerException.Should().BeOfType<AssertFailedException>().Which.Message.Should().Contain("Assert.ThrowsExceptionAsync failed. Threw exception FormatException, but exception ArgumentException was expected. Happily ever after. The End.");
     }
     #endregion
 }

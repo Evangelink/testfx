@@ -4,6 +4,8 @@
 using System.Linq;
 using System.Reflection;
 
+using FluentAssertions;
+
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 using Moq;
@@ -17,42 +19,42 @@ public class DataRowAttributeTests : TestContainer
     {
         var dataRow = new DataRowAttribute();
 
-        Verify(System.Array.Empty<object>().SequenceEqual(dataRow.Data));
+        dataRow.Data.Should().BeEmpty();
     }
 
     public void ConstructorShouldSetDataPassed()
     {
         var dataRow = new DataRowAttribute("mercury");
 
-        Verify(new object[] { "mercury" }.SequenceEqual(dataRow.Data));
+        dataRow.Data.Should().Equal(new object[] { "mercury" });
     }
 
     public void ConstructorShouldSetNullDataPassed()
     {
         var dataRow = new DataRowAttribute(null);
 
-        Verify(new object[] { null }.SequenceEqual(dataRow.Data));
+        dataRow.Data.Should().Equal(new object[] { null });
     }
 
     public void ConstructorShouldSetMultipleDataValuesPassed()
     {
         var dataRow = new DataRowAttribute("mercury", "venus", "earth");
 
-        Verify(new object[] { "mercury", "venus", "earth" }.SequenceEqual(dataRow.Data));
+        dataRow.Data.Should().Equal(new object[] { "mercury", "venus", "earth" });
     }
 
     public void ConstructorShouldSetANullDataValuePassedInParams()
     {
         var dataRow = new DataRowAttribute("neptune", null);
 
-        Verify(new object[] { "neptune", null }.SequenceEqual(dataRow.Data));
+        dataRow.Data.Should().Equal(new object[] { "neptune", null });
     }
 
     public void ConstructorShouldSetANullDataValuePassedInAsADataArg()
     {
         var dataRow = new DataRowAttribute(null, "logos");
 
-        Verify(new object[] { null, "logos" }.SequenceEqual(dataRow.Data));
+        dataRow.Data.Should().Equal(new object[] { null, "logos" });
     }
 
     public void ConstructorShouldSetMultipleDataArrays()
@@ -60,16 +62,16 @@ public class DataRowAttributeTests : TestContainer
         // Fixes https://github.com/microsoft/testfx/issues/1180
         var dataRow = new DataRowAttribute(new[] { "a" }, new[] { "b" });
 
-        Verify(dataRow.Data.Length == 2);
-        Verify(dataRow.Data[0] is string[] array1 && array1.SequenceEqual(new[] { "a" }));
-        Verify(dataRow.Data[1] is string[] array2 && array2.SequenceEqual(new[] { "b" }));
+        dataRow.Data.Should().HaveCount(2);
+        dataRow.Data[0].As<string[]>().Should().Equal(new[] { "a" });
+        dataRow.Data[1].As<string[]>().Should().Equal(new[] { "b" });
     }
 
     public void GetDataShouldReturnDataPassed()
     {
         var dataRow = new DataRowAttribute("mercury");
 
-        Verify(new object[] { "mercury" }.SequenceEqual(dataRow.GetData(null).Single()));
+        dataRow.GetData(null).Single().Should().Equal(new object[] { "mercury" });
     }
 
     public void GetDisplayNameShouldReturnAppropriateName()
@@ -84,13 +86,13 @@ public class DataRowAttributeTests : TestContainer
         var data2 = new string[] { "First", null, "Second" };
 
         var displayName = dataRowAttribute.GetDisplayName(testMethodInfo, data);
-        Verify(displayName == "DataRowTestMethod (First,Second,)");
+        displayName.Should().Be("DataRowTestMethod (First,Second,)");
 
         displayName = dataRowAttribute.GetDisplayName(testMethodInfo, data1);
-        Verify(displayName == "DataRowTestMethod (,First,Second)");
+        displayName.Should().Be("DataRowTestMethod (,First,Second)");
 
         displayName = dataRowAttribute.GetDisplayName(testMethodInfo, data2);
-        Verify(displayName == "DataRowTestMethod (First,,Second)");
+        displayName.Should().Be("DataRowTestMethod (First,,Second)");
     }
 
     public void GetDisplayNameShouldReturnSpecifiedDisplayName()
@@ -106,7 +108,7 @@ public class DataRowAttributeTests : TestContainer
         var data = new string[] { "First", "Second", null };
 
         var displayName = dataRowAttribute.GetDisplayName(testMethodInfo, data);
-        Verify(displayName == "DataRowTestWithDisplayName");
+        displayName.Should().Be("DataRowTestWithDisplayName");
     }
 
     public void GetDisplayNameForArrayOfOneItem()
@@ -120,7 +122,7 @@ public class DataRowAttributeTests : TestContainer
         var displayName = dataRow.GetDisplayName(methodInfoMock.Object, dataRow.Data);
 
         // Assert
-        Verify(displayName == "MyMethod (a)");
+        displayName.Should().Be("MyMethod (a)");
     }
 
     public void GetDisplayNameForArrayOfMultipleItems()
@@ -134,7 +136,7 @@ public class DataRowAttributeTests : TestContainer
         var displayName = dataRow.GetDisplayName(methodInfoMock.Object, dataRow.Data);
 
         // Assert
-        Verify(displayName == "MyMethod (a,b,c)");
+        displayName.Should().Be("MyMethod (a,b,c)");
     }
 
     public void GetDisplayNameForMultipleArraysOfOneItem()
@@ -148,7 +150,7 @@ public class DataRowAttributeTests : TestContainer
         var displayName = dataRow.GetDisplayName(methodInfoMock.Object, dataRow.Data);
 
         // Assert
-        Verify(displayName == "MyMethod (System.String[],System.String[])");
+        displayName.Should().Be("MyMethod (System.String[],System.String[])");
     }
 
     public void GetDisplayNameForMultipleArraysOfMultipleItems()
@@ -162,6 +164,6 @@ public class DataRowAttributeTests : TestContainer
         var displayName = dataRow.GetDisplayName(methodInfoMock.Object, dataRow.Data);
 
         // Assert
-        Verify(displayName == "MyMethod (System.String[],System.String[])");
+        displayName.Should().Be("MyMethod (System.String[],System.String[])");
     }
 }

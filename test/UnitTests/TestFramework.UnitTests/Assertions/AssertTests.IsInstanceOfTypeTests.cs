@@ -1,92 +1,104 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using System;
+
+using FluentAssertions;
+
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+using static System.Collections.Specialized.BitVector32;
 
 namespace Microsoft.VisualStudio.TestPlatform.TestFramework.UnitTests;
 public partial class AssertTests
 {
     public void InstanceOfTypeShouldFailWhenValueIsNull()
     {
-        static void Action() => Assert.IsInstanceOfType(null, typeof(AssertTests));
-        var ex = VerifyThrows(Action);
-        Verify(ex is AssertFailedException);
+        Action action = () => Assert.IsInstanceOfType(null, typeof(AssertTests));
+        action.Should().ThrowExactly<AssertFailedException>();
     }
 
     public void InstanceOfTypeShouldFailWhenTypeIsNull()
     {
-        static void Action() => Assert.IsInstanceOfType(5, null);
-        var ex = VerifyThrows(Action);
-        Verify(ex is AssertFailedException);
+        Action action = () => Assert.IsInstanceOfType(5, null);
+        action.Should().ThrowExactly<AssertFailedException>();
     }
 
     public void InstanceOfTypeShouldPassOnSameInstance()
     {
-        Assert.IsInstanceOfType(5, typeof(int));
+        Action action = () => Assert.IsInstanceOfType(5, typeof(int));
+        action.Should().NotThrow();
     }
 
     public void InstanceOfTypeShouldPassOnHigherInstance()
     {
-        Assert.IsInstanceOfType(5, typeof(object));
+        Action action = () => Assert.IsInstanceOfType(5, typeof(object));
+        action.Should().NotThrow();
     }
 
     public void InstanceNotOfTypeShouldFailWhenValueIsNull()
     {
-        Assert.IsNotInstanceOfType(null, typeof(object));
+        Action action = () => Assert.IsNotInstanceOfType(null, typeof(object));
+        action.Should().NotThrow();
     }
 
     public void InstanceNotOfTypeShouldFailWhenTypeIsNull()
     {
-        static void Action() => Assert.IsNotInstanceOfType(5, null);
-        var ex = VerifyThrows(Action);
-        Verify(ex is AssertFailedException);
+        Action action = () => Assert.IsNotInstanceOfType(5, null);
+        action.Should().ThrowExactly<AssertFailedException>();
     }
 
     public void InstanceNotOfTypeShouldPassOnWrongInstance()
     {
-        Assert.IsNotInstanceOfType(5L, typeof(int));
+        Action action = () => Assert.IsNotInstanceOfType(5L, typeof(int));
+        action.Should().NotThrow();
     }
 
     public void InstanceNotOfTypeShouldPassOnSubInstance()
     {
-        Assert.IsNotInstanceOfType(new object(), typeof(int));
+        Action action = () => Assert.IsNotInstanceOfType(new object(), typeof(int));
+        action.Should().NotThrow();
     }
 
     [TestMethod]
     public void IsInstanceOfTypeUsingGenericType_WhenValueIsNull_Fails()
     {
-        static void Action() => Assert.IsInstanceOfType<AssertTests>(null);
-        var ex = VerifyThrows(Action);
-        Verify(ex is AssertFailedException);
+        Action action = () => Assert.IsInstanceOfType<AssertTests>(null);
+        action.Should().ThrowExactly<AssertFailedException>();
     }
 
     [TestMethod]
     public void IsInstanceOfTypeUsingGenericType_OnSameInstance_DoesNotThrow()
     {
-        Assert.IsInstanceOfType<int>(5);
+        Action action = () => Assert.IsInstanceOfType<int>(5);
+        action.Should().NotThrow();
     }
 
     [TestMethod]
     public void IsInstanceOfTypeUsingGenericType_OnHigherInstance_DoesNotThrow()
     {
-        Assert.IsInstanceOfType<object>(5);
+        Action action = () => Assert.IsInstanceOfType<object>(5);
+        action.Should().NotThrow();
     }
 
     [TestMethod]
     public void IsNotInstanceOfTypeUsingGenericType_WhenValueIsNull_DoesNotThrow()
     {
-        Assert.IsNotInstanceOfType<object>(null);
+        Action action = () => Assert.IsNotInstanceOfType<object>(null);
+        action.Should().NotThrow();
     }
 
     [TestMethod]
     public void IsNotInstanceOfType_OnWrongInstanceUsingGenericType_DoesNotThrow()
     {
-        Assert.IsNotInstanceOfType<int>(5L);
+        Action action = () => Assert.IsNotInstanceOfType<int>(5L);
+        action.Should().NotThrow();
     }
 
     [TestMethod]
     public void IsNotInstanceOfTypeUsingGenericType_OnSubInstance_DoesNotThrow()
     {
-        Assert.IsNotInstanceOfType<int>(new object());
+        Action action = () => Assert.IsNotInstanceOfType<int>(new object());
+        action.Should().NotThrow();
     }
 }

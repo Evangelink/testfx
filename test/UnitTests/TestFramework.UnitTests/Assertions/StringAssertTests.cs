@@ -4,57 +4,59 @@
 using System;
 using System.Text.RegularExpressions;
 
-using global::TestFramework.ForTestingMSTest;
+using FluentAssertions;
 
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+using TestFramework.ForTestingMSTest;
 
 namespace Microsoft.VisualStudio.TestPlatform.TestFramework.UnitTests.Assertions;
 public class StringAssertTests : TestContainer
 {
     public void ThatShouldReturnAnInstanceOfStringAssert()
     {
-        Verify(StringAssert.That is not null);
+        StringAssert.That.Should().NotBeNull();
     }
 
     public void ThatShouldCacheStringAssertInstance()
     {
-        Verify(StringAssert.That == StringAssert.That);
+        StringAssert.That.Should().BeSameAs(StringAssert.That);
     }
 
     public void StringAssertContains()
     {
         string actual = "The quick brown fox jumps over the lazy dog.";
         string notInString = "I'm not in the string above";
-        var ex = VerifyThrows(() => StringAssert.Contains(actual, notInString));
-        Verify(ex is not null);
-        Verify(ex.Message.Contains("StringAssert.Contains failed"));
+        Action action = () => StringAssert.Contains(actual, notInString);
+
+        action.Should().ThrowExactly<AssertFailedException>().And.Message.Should().Contain("StringAssert.Contains failed");
     }
 
     public void StringAssertStartsWith()
     {
         string actual = "The quick brown fox jumps over the lazy dog.";
         string notInString = "I'm not in the string above";
-        var ex = VerifyThrows(() => StringAssert.StartsWith(actual, notInString));
-        Verify(ex is not null);
-        Verify(ex.Message.Contains("StringAssert.StartsWith failed"));
+        Action action = () => StringAssert.StartsWith(actual, notInString);
+
+        action.Should().ThrowExactly<AssertFailedException>().And.Message.Should().Contain("StringAssert.StartsWith failed");
     }
 
     public void StringAssertEndsWith()
     {
         string actual = "The quick brown fox jumps over the lazy dog.";
         string notInString = "I'm not in the string above";
-        var ex = VerifyThrows(() => StringAssert.EndsWith(actual, notInString));
-        Verify(ex is not null);
-        Verify(ex.Message.Contains("StringAssert.EndsWith failed"));
+        Action action = () => StringAssert.EndsWith(actual, notInString);
+
+        action.Should().ThrowExactly<AssertFailedException>().And.Message.Should().Contain("StringAssert.EndsWith failed");
     }
 
     public void StringAssertDoesNotMatch()
     {
         string actual = "The quick brown fox jumps over the lazy dog.";
         Regex doesMatch = new("quick brown fox");
-        var ex = VerifyThrows(() => StringAssert.DoesNotMatch(actual, doesMatch));
-        Verify(ex is not null);
-        Verify(ex.Message.Contains("StringAssert.DoesNotMatch failed"));
+        Action action = () => StringAssert.DoesNotMatch(actual, doesMatch);
+
+        action.Should().ThrowExactly<AssertFailedException>().And.Message.Should().Contain("StringAssert.DoesNotMatch failed");
     }
 
     public void StringAssertContainsIgnoreCase_DoesNotThrow()
@@ -81,24 +83,24 @@ public class StringAssertTests : TestContainer
     // See https://github.com/dotnet/sdk/issues/25373
     public void StringAssertContainsDoesNotThrowFormatException()
     {
-        var ex = VerifyThrows(() => StringAssert.Contains(":-{", "x"));
-        Verify(ex is not null);
-        Verify(ex.Message.Contains("StringAssert.Contains failed"));
+        Action action = () => StringAssert.Contains(":-{", "x");
+
+        action.Should().ThrowExactly<AssertFailedException>().And.Message.Should().Contain("StringAssert.Contains failed");
     }
 
     // See https://github.com/dotnet/sdk/issues/25373
     public void StringAssertContainsDoesNotThrowFormatExceptionWithArguments()
     {
-        var ex = VerifyThrows(() => StringAssert.Contains("{", "x", "message {0}", "arg"));
-        Verify(ex is not null);
-        Verify(ex.Message.Contains("StringAssert.Contains failed"));
+        Action action = () => StringAssert.Contains("{", "x", "message {0}", "arg");
+
+        action.Should().ThrowExactly<AssertFailedException>().And.Message.Should().Contain("StringAssert.Contains failed");
     }
 
     // See https://github.com/dotnet/sdk/issues/25373
     public void StringAssertContainsFailsIfMessageIsInvalidStringFormatComposite()
     {
-        var ex = VerifyThrows(() => StringAssert.Contains("a", "b", "message {{0}", "arg"));
-        Verify(ex is not null);
-        Verify(ex is FormatException);
+        Action action = () => StringAssert.Contains("a", "b", "message {{0}", "arg");
+
+        action.Should().ThrowExactly<FormatException>();
     }
 }
