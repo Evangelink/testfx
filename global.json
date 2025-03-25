@@ -23,7 +23,6 @@
     }
   },
   "sdk": {
-    "version": "10.0.100-preview.4.25172.1",
     "allowPrerelease": true,
     "rollForward": "latestFeature"
   },
