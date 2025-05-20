@@ -26,6 +26,15 @@ public sealed partial class Assert
     public static Assert That { get; } = new Assert();
 
     /// <summary>
+    /// Creates a new FluentAssertions instance for the given subject.
+    /// </summary>
+    /// <typeparam name="TSubject">The type of the subject being tested.</typeparam>
+    /// <param name="subject">The subject being tested.</param>
+    /// <returns>A new FluentAssertions instance for the given subject.</returns>
+    public static FluentAssertions<TSubject> Subject<TSubject>(TSubject subject)
+        => new FluentAssertions<TSubject>(subject);
+
+    /// <summary>
     /// Replaces null characters ('\0') with "\\0".
     /// </summary>
     /// <param name="input">
