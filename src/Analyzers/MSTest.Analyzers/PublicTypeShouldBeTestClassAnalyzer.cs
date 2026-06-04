@@ -12,6 +12,9 @@ using MSTest.Analyzers.Helpers;
 
 namespace MSTest.Analyzers;
 
+/// <summary>
+/// MSTEST0004: <inheritdoc cref="Resources.PublicTypeShouldBeTestClassTitle"/>.
+/// </summary>
 [DiagnosticAnalyzer(LanguageNames.CSharp, LanguageNames.VisualBasic)]
 public sealed class PublicTypeShouldBeTestClassAnalyzer : DiagnosticAnalyzer
 {
@@ -28,9 +31,11 @@ public sealed class PublicTypeShouldBeTestClassAnalyzer : DiagnosticAnalyzer
         DiagnosticSeverity.Info,
         isEnabledByDefault: false);
 
+    /// <inheritdoc />
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; }
         = ImmutableArray.Create(Rule);
 
+    /// <inheritdoc />
     public override void Initialize(AnalysisContext context)
     {
         context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
@@ -38,7 +43,7 @@ public sealed class PublicTypeShouldBeTestClassAnalyzer : DiagnosticAnalyzer
 
         context.RegisterCompilationStartAction(context =>
         {
-            if (context.Compilation.TryGetOrCreateTypeByMetadataName(WellKnownTypeNames.MicrosoftVisualStudioTestToolsUnitTestingTestClassAttribute, out var testClassAttributeSymbol))
+            if (context.Compilation.TryGetOrCreateTypeByMetadataName(WellKnownTypeNames.MicrosoftVisualStudioTestToolsUnitTestingTestClassAttribute, out INamedTypeSymbol? testClassAttributeSymbol))
             {
                 context.RegisterSymbolAction(context => AnalyzeSymbol(context, testClassAttributeSymbol), SymbolKind.NamedType);
             }
@@ -48,14 +53,17 @@ public sealed class PublicTypeShouldBeTestClassAnalyzer : DiagnosticAnalyzer
     private static void AnalyzeSymbol(SymbolAnalysisContext context, INamedTypeSymbol testClassAttributeSymbol)
     {
         var namedTypeSymbol = (INamedTypeSymbol)context.Symbol;
-        if (namedTypeSymbol.DeclaredAccessibility != Accessibility.Public
+        if (namedTypeSymbol.IsAbstract
+            || namedTypeSymbol.IsStatic
+            || namedTypeSymbol.TypeKind != TypeKind.Class
+            || namedTypeSymbol.DeclaredAccessibility != Accessibility.Public
             || namedTypeSymbol.GetResultantVisibility() != SymbolVisibility.Public)
         {
             return;
         }
 
         // The type is public, ensure this is a test class.
-        if (!namedTypeSymbol.GetAttributes().Any(attr => SymbolEqualityComparer.Default.Equals(attr.AttributeClass, testClassAttributeSymbol)))
+        if (!namedTypeSymbol.GetAttributes().Any(attr => attr.AttributeClass.Inherits(testClassAttributeSymbol)))
         {
             context.ReportDiagnostic(namedTypeSymbol.CreateDiagnostic(Rule, namedTypeSymbol.Name));
         }

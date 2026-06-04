@@ -1,7 +1,5 @@
-// Copyright (c) Microsoft Corporation. All rights reserved.
+﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
-
-using System.Diagnostics;
 
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -10,13 +8,12 @@ namespace SuiteLifeCycleTestProject;
 [TestClass]
 public sealed class LifeCycleDerivedClassCleanupEndOfClassAndBeforeEachDerivedClass : LifeCycleClassCleanupEndOfClassAndBeforeEachDerivedClass
 {
-    private static TestContext s_testContext;
+    public TestContext DerivedClassTestContext { get; set; } = null!;
 
-    public TestContext DerivedClassTestContext { get; set; }
-
-    public LifeCycleDerivedClassCleanupEndOfClassAndBeforeEachDerivedClass()
+    public LifeCycleDerivedClassCleanupEndOfClassAndBeforeEachDerivedClass(TestContext testContext)
+        : base(testContext)
     {
-        s_testContext.WriteLine("LifeCycleDerivedClassCleanupEndOfClassAndBeforeEachDerivedClass.ctor was called");
+        testContext.WriteLine("LifeCycleDerivedClassCleanupEndOfClassAndBeforeEachDerivedClass.ctor was called");
         Console.WriteLine("Console: LifeCycleDerivedClassCleanupEndOfClassAndBeforeEachDerivedClass.ctor was called");
         Trace.WriteLine("Trace: LifeCycleDerivedClassCleanupEndOfClassAndBeforeEachDerivedClass.ctor was called");
         Debug.WriteLine("Debug: LifeCycleDerivedClassCleanupEndOfClassAndBeforeEachDerivedClass.ctor was called");
@@ -25,8 +22,7 @@ public sealed class LifeCycleDerivedClassCleanupEndOfClassAndBeforeEachDerivedCl
     [ClassInitialize]
     public static void DerivedClassInitialize(TestContext testContext)
     {
-        s_testContext = testContext;
-        s_testContext.WriteLine("LifeCycleDerivedClassCleanupEndOfClassAndBeforeEachDerivedClass.ClassInitialize was called");
+        testContext.WriteLine("LifeCycleDerivedClassCleanupEndOfClassAndBeforeEachDerivedClass.ClassInitialize was called");
         Console.WriteLine("Console: LifeCycleDerivedClassCleanupEndOfClassAndBeforeEachDerivedClass.ClassInitialize was called");
         Trace.WriteLine("Trace: LifeCycleDerivedClassCleanupEndOfClassAndBeforeEachDerivedClass.ClassInitialize was called");
         Debug.WriteLine("Debug: LifeCycleDerivedClassCleanupEndOfClassAndBeforeEachDerivedClass.ClassInitialize was called");
@@ -60,9 +56,9 @@ public sealed class LifeCycleDerivedClassCleanupEndOfClassAndBeforeEachDerivedCl
     }
 
     [ClassCleanup]
-    public static void DerivedClassCleanup()
+    public static void DerivedClassCleanup(TestContext testContext)
     {
-        s_testContext.WriteLine("LifeCycleDerivedClassCleanupEndOfClassAndBeforeEachDerivedClass.ClassCleanup was called");
+        testContext.WriteLine("LifeCycleDerivedClassCleanupEndOfClassAndBeforeEachDerivedClass.ClassCleanup was called");
         Console.WriteLine("Console: LifeCycleDerivedClassCleanupEndOfClassAndBeforeEachDerivedClass.ClassCleanup was called");
         Trace.WriteLine("Trace: LifeCycleDerivedClassCleanupEndOfClassAndBeforeEachDerivedClass.ClassCleanup was called");
         Debug.WriteLine("Debug: LifeCycleDerivedClassCleanupEndOfClassAndBeforeEachDerivedClass.ClassCleanup was called");

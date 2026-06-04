@@ -8,12 +8,15 @@ namespace Microsoft.Testing.TestInfrastructure;
 public sealed class CommandLine : IDisposable
 {
     private static int s_totalProcessesAttempt;
-
-    private readonly List<string> _errorOutputLines = new();
-    private readonly List<string> _standardOutputLines = new();
-    private IProcessHandle? _process;
+    [SuppressMessage("Style", "IDE0032:Use auto property", Justification = "It's causing some runtime issue")]
+    private static int s_maxOutstandingCommand = Environment.ProcessorCount;
+    private static SemaphoreSlim s_maxOutstandingCommands_semaphore = new(s_maxOutstandingCommand, s_maxOutstandingCommand);
 
     public static int TotalProcessesAttempt => s_totalProcessesAttempt;
+
+    private readonly List<string> _errorOutputLines = [];
+    private readonly List<string> _standardOutputLines = [];
+    private IProcessHandle? _process;
 
     public ReadOnlyCollection<string> StandardOutputLines => _standardOutputLines.AsReadOnly();
 
@@ -23,15 +26,9 @@ public sealed class CommandLine : IDisposable
 
     public string ErrorOutput => string.Join(Environment.NewLine, _errorOutputLines);
 
-    private static int s_maxOutstandingCommand = Environment.ProcessorCount;
-    private static SemaphoreSlim s_maxOutstandingCommands_semaphore = new(s_maxOutstandingCommand, s_maxOutstandingCommand);
-
     public static int MaxOutstandingCommands
     {
-        get
-        {
-            return s_maxOutstandingCommand;
-        }
+        get => s_maxOutstandingCommand;
 
         set
         {
@@ -43,9 +40,10 @@ public sealed class CommandLine : IDisposable
 
     public async Task RunAsync(
         string commandLine,
-        IDictionary<string, string>? environmentVariables = null)
+        IDictionary<string, string?>? environmentVariables = null,
+        CancellationToken cancellationToken = default)
     {
-        int exitCode = await RunAsyncAndReturnExitCode(commandLine, environmentVariables);
+        int exitCode = await RunAsyncAndReturnExitCodeAsync(commandLine, environmentVariables, cancellationToken: cancellationToken);
         if (exitCode != 0)
         {
             throw new InvalidOperationException(
@@ -57,60 +55,62 @@ public sealed class CommandLine : IDisposable
         }
     }
 
-    public async Task<int> RunAsyncAndReturnExitCode(
+    private static (string Command, string Arguments) GetCommandAndArguments(string commandLine)
+    {
+        // Hacky way to split command and arguments that works with the limited cases we use in our tests.
+        if (!commandLine.StartsWith('"'))
+        {
+            string[] tokens = commandLine.Split(' ');
+            return (tokens[0], string.Join(' ', tokens.Skip(1)));
+        }
+
+        int endQuote = commandLine.IndexOf('"', 1);
+        return (commandLine.Substring(1, endQuote - 1), commandLine.Substring(endQuote + 2));
+    }
+
+    public async Task<int> RunAsyncAndReturnExitCodeAsync(
         string commandLine,
-        IDictionary<string, string>? environmentVariables = null,
+        IDictionary<string, string?>? environmentVariables = null,
         string? workingDirectory = null,
         bool cleanDefaultEnvironmentVariableIfCustomAreProvided = false,
-        int timeoutInSeconds = 60)
+        CancellationToken cancellationToken = default)
     {
-        await s_maxOutstandingCommands_semaphore.WaitAsync();
+        await s_maxOutstandingCommands_semaphore.WaitAsync(cancellationToken);
         try
         {
             Interlocked.Increment(ref s_totalProcessesAttempt);
-            string[] tokens = commandLine.Split(' ');
-            string command = tokens[0];
-            string arguments = string.Join(" ", tokens.Skip(1));
+            (string command, string arguments) = GetCommandAndArguments(commandLine);
             _errorOutputLines.Clear();
             _standardOutputLines.Clear();
-            var startInfo = new ProcessConfiguration(command)
+            ProcessConfiguration startInfo = new(command)
             {
                 Arguments = arguments,
                 EnvironmentVariables = environmentVariables,
-                OnErrorOutput = (_, o) => _errorOutputLines.Add(o),
-                OnStandardOutput = (_, o) => _standardOutputLines.Add(o),
+                OnErrorOutput = (_, o) => _errorOutputLines.Add(ClearBOM(o)),
+                OnStandardOutput = (_, o) => _standardOutputLines.Add(ClearBOM(o)),
                 WorkingDirectory = workingDirectory,
             };
             _process = ProcessFactory.Start(startInfo, cleanDefaultEnvironmentVariableIfCustomAreProvided);
 
-            Task<int> exited = _process.WaitForExitAsync();
-            int seconds = timeoutInSeconds;
-            var stopTheTimer = new CancellationTokenSource();
-            var timedOut = Task.Delay(TimeSpan.FromSeconds(seconds), stopTheTimer.Token);
-            if (await Task.WhenAny(exited, timedOut) == exited)
-            {
-#if NET8_0_OR_GREATER
-                await stopTheTimer.CancelAsync();
-#else
-                stopTheTimer.Cancel();
-#endif
-                return await exited;
-            }
-            else
-            {
-                _process.Kill();
-                throw new TimeoutException(
-                    $"""
-                Timeout after {seconds}s on command line: '{commandLine}'
-                STD: {StandardOutput}
-                ERR: {ErrorOutput}
-                """);
-            }
+            using CancellationTokenRegistration registration = cancellationToken.Register(() => _process.Kill());
+            return await _process.WaitForExitAsync(cancellationToken);
         }
         finally
         {
             s_maxOutstandingCommands_semaphore.Release();
         }
+    }
+
+    /// <summary>
+    /// Depending on command line settings, e.g. when using Windows Terminal
+    /// .NET Framework app might have BOM at the beginning of the captured output, which breaks output comparisons
+    /// while no visible difference is seen between the outputs.
+    /// </summary>
+    private static string ClearBOM(string outputLine)
+    {
+        int firstChar = outputLine[0];
+        int byteOrderMark = 65279;
+        return firstChar == byteOrderMark ? outputLine[1..] : outputLine;
     }
 
     public void Dispose() => _process?.Kill();

@@ -10,14 +10,20 @@ using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Operations;
 
 using MSTest.Analyzers.Helpers;
+using MSTest.Analyzers.RoslynAnalyzerHelpers;
 
 namespace MSTest.Analyzers;
 
+/// <summary>
+/// MSTEST0023: <inheritdoc cref="Resources.DoNotNegateBooleanAssertionTitle"/>.
+/// </summary>
 [DiagnosticAnalyzer(LanguageNames.CSharp, LanguageNames.VisualBasic)]
 public sealed class DoNotNegateBooleanAssertionAnalyzer : DiagnosticAnalyzer
 {
     private static readonly LocalizableResourceString Title = new(nameof(Resources.DoNotNegateBooleanAssertionTitle), Resources.ResourceManager, typeof(Resources));
     private static readonly LocalizableResourceString MessageFormat = new(nameof(Resources.DoNotNegateBooleanAssertionMessageFormat), Resources.ResourceManager, typeof(Resources));
+
+    internal const string ProperAssertMethodNameKey = nameof(ProperAssertMethodNameKey);
 
     internal static readonly DiagnosticDescriptor Rule = DiagnosticDescriptorHelper.Create(
         DiagnosticIds.DoNotNegateBooleanAssertionRuleId,
@@ -28,9 +34,11 @@ public sealed class DoNotNegateBooleanAssertionAnalyzer : DiagnosticAnalyzer
         DiagnosticSeverity.Info,
         isEnabledByDefault: true);
 
+    /// <inheritdoc />
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; }
         = ImmutableArray.Create(Rule);
 
+    /// <inheritdoc />
     public override void Initialize(AnalysisContext context)
     {
         context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
@@ -38,7 +46,7 @@ public sealed class DoNotNegateBooleanAssertionAnalyzer : DiagnosticAnalyzer
 
         context.RegisterCompilationStartAction(context =>
         {
-            if (context.Compilation.TryGetOrCreateTypeByMetadataName(WellKnownTypeNames.MicrosoftVisualStudioTestToolsUnitTestingAssert, out var assertSymbol))
+            if (context.Compilation.TryGetOrCreateTypeByMetadataName(WellKnownTypeNames.MicrosoftVisualStudioTestToolsUnitTestingAssert, out INamedTypeSymbol? assertSymbol))
             {
                 context.RegisterOperationAction(context => AnalyzeOperation(context, assertSymbol), OperationKind.Invocation);
             }
@@ -47,18 +55,33 @@ public sealed class DoNotNegateBooleanAssertionAnalyzer : DiagnosticAnalyzer
 
     private static void AnalyzeOperation(OperationAnalysisContext context, INamedTypeSymbol assertSymbol)
     {
-        IInvocationOperation invocationOperation = (IInvocationOperation)context.Operation;
+        var invocationOperation = (IInvocationOperation)context.Operation;
         if (invocationOperation.TargetMethod.Name is not "IsTrue" and not "IsFalse"
             || !SymbolEqualityComparer.Default.Equals(invocationOperation.TargetMethod.ContainingType, assertSymbol))
         {
             return;
         }
 
-        var conditionArgument = invocationOperation.Arguments.FirstOrDefault(x => x.Parameter?.Name == "condition");
+        IArgumentOperation? conditionArgument = invocationOperation.Arguments.FirstOrDefault(x => x.Parameter?.Name == "condition");
         if (conditionArgument != null
-            && conditionArgument.Children.Any(op => op is IUnaryOperation unary && unary.OperatorKind == UnaryOperatorKind.Not))
+            && conditionArgument.Value.WalkDownConversion() is IUnaryOperation { OperatorKind: UnaryOperatorKind.Not })
         {
-            context.ReportDiagnostic(invocationOperation.CreateDiagnostic(Rule));
+            // Determine the proper assert method name (swap IsTrue <-> IsFalse)
+            string currentMethodName = invocationOperation.TargetMethod.Name;
+            string properAssertMethodName = currentMethodName == "IsTrue" ? "IsFalse" : "IsTrue";
+
+            // Add the proper method name to diagnostic properties for the code fix
+            ImmutableDictionary<string, string?>.Builder properties = ImmutableDictionary.CreateBuilder<string, string?>();
+            properties.Add(ProperAssertMethodNameKey, properAssertMethodName);
+
+            Location? conditionArgumentLocation = conditionArgument.Syntax.GetLocation();
+            var additionalLocations = ImmutableArray.Create(conditionArgumentLocation);
+
+            context.ReportDiagnostic(Diagnostic.Create(
+                 Rule,
+                 invocationOperation.Syntax.GetLocation(),
+                 additionalLocations: additionalLocations,
+                 properties: properties.ToImmutable()));
         }
     }
 }

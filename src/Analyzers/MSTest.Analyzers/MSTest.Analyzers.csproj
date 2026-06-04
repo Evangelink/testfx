@@ -1,22 +1,20 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <IsPackable>false</IsPackable>
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
-    <LangVersion>Latest</LangVersion>
 
     <!-- Avoid ID conflicts with the package project. -->
     <PackageId>*$(MSBuildProjectFile)*</PackageId>
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="..\..\Platform\Microsoft.Testing.Platform\Helpers\RoslynHashCode.cs" Link="RoslynAnalyzerHelpers\RoslynHashCode.cs" />
-    <Compile Include="..\..\Platform\Microsoft.Testing.Platform\Helpers\SystemPolyfills.cs" Link="Helpers\SystemPolyfills.cs" />
+    <Compile Include="$(RepoRoot)src\Platform\Microsoft.Testing.Platform\Helpers\RoslynHashCode.cs" Link="RoslynAnalyzerHelpers\RoslynHashCode.cs" />
   </ItemGroup>
 
   <ItemGroup>
-    <InternalsVisibleTo Include="MSTest.Analyzers.UnitTests" Key="$(VsPublicKey)" />
+    <InternalsVisibleTo Include="MSTest.Analyzers.CodeFixes" Key="$(VsPublicKey)" />
   </ItemGroup>
 
   <ItemGroup>
@@ -25,8 +23,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Update="Resources.Designer.cs" DesignTime="True" AutoGen="True" DependentUpon="Resources.resx" />
-    <EmbeddedResource Update="Resources.resx" Generator="ResXFileCodeGenerator" LastGenOutput="Resources.Designer.cs" />
+    <Compile Include="$(RepoRoot)src/Polyfills/**/*.cs" Link="Polyfills\%(RecursiveDir)%(Filename)%(Extension)" />
   </ItemGroup>
-
 </Project>

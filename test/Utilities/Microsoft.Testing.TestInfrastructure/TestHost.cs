@@ -1,18 +1,13 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System.Collections;
-using System.Runtime.InteropServices;
-
-using Polly;
-using Polly.Contrib.WaitAndRetry;
-
 namespace Microsoft.Testing.TestInfrastructure;
 
 public sealed class TestHost
 {
     private readonly string _testHostModuleName;
 
+    [SuppressMessage("Style", "IDE0032:Use auto property", Justification = "It's causing runtime bug")]
     private static int s_maxOutstandingExecutions = Environment.ProcessorCount;
     private static SemaphoreSlim s_maxOutstandingExecutions_semaphore = new(s_maxOutstandingExecutions, s_maxOutstandingExecutions);
 
@@ -25,10 +20,7 @@ public sealed class TestHost
 
     public static int MaxOutstandingExecutions
     {
-        get
-        {
-            return s_maxOutstandingExecutions;
-        }
+        get => s_maxOutstandingExecutions;
 
         set
         {
@@ -44,11 +36,12 @@ public sealed class TestHost
 
     public async Task<TestHostResult> ExecuteAsync(
         string? command = null,
-        Dictionary<string, string>? environmentVariables = null,
+        Dictionary<string, string?>? environmentVariables = null,
         bool disableTelemetry = true,
-        int timeoutSeconds = 60)
+        bool disableAzureDevOpsOutput = true,
+        CancellationToken cancellationToken = default)
     {
-        await s_maxOutstandingExecutions_semaphore.WaitAsync();
+        await s_maxOutstandingExecutions_semaphore.WaitAsync(cancellationToken);
         try
         {
             if (command?.StartsWith(_testHostModuleName, StringComparison.OrdinalIgnoreCase) ?? false)
@@ -56,22 +49,36 @@ public sealed class TestHost
                 throw new InvalidOperationException($"Command should not start with module name '{_testHostModuleName}'.");
             }
 
-            environmentVariables ??= new Dictionary<string, string>();
+            environmentVariables ??= [];
 
             if (disableTelemetry)
             {
                 environmentVariables.Add("DOTNET_CLI_TELEMETRY_OPTOUT", "1");
             }
 
+            if (disableAzureDevOpsOutput)
+            {
+                // Acceptance tests assert against literal stdout content and many of them run on Azure DevOps
+                // (where TF_BUILD=true is set). Without this opt-out the child test host would emit
+                // ##vso[task.logissue type=...] logging commands for every warning/error/exception, which
+                // breaks index-based line assertions.
+                environmentVariables.TryAdd("TESTINGPLATFORM_AZDO_OUTPUT", "off");
+            }
+
             foreach (DictionaryEntry entry in Environment.GetEnvironmentVariables())
             {
                 // Skip all unwanted environment variables.
-                if (WellKnownEnvironmentVariables.ToSkipEnvironmentVariables.Contains(entry.Key!.ToString(), StringComparer.OrdinalIgnoreCase))
+                string? key = entry.Key.ToString();
+                if (WellKnownEnvironmentVariables.ToSkipEnvironmentVariables.Contains(key, StringComparer.OrdinalIgnoreCase))
                 {
                     continue;
                 }
 
-                environmentVariables.Add(entry.Key!.ToString()!, entry.Value!.ToString()!);
+                // We use TryAdd to let tests "overwrite" existing environment variables.
+                // Consider that the given dictionary has "TESTINGPLATFORM_UI_LANGUAGE" as a key.
+                // And also Environment.GetEnvironmentVariables() is returning TESTINGPLATFORM_UI_LANGUAGE.
+                // In that case, we do a "TryAdd" which effectively means the value from the original dictionary wins.
+                environmentVariables.TryAdd(key!, entry!.Value!.ToString()!);
             }
 
             // Define DOTNET_ROOT to point to the dotnet we install for this repository, to avoid
@@ -80,22 +87,17 @@ public sealed class TestHost
 
             string finalArguments = command ?? string.Empty;
 
-            var delay = Backoff.ExponentialBackoff(TimeSpan.FromSeconds(3), retryCount: 5, factor: 1.5);
-            return await Policy
-                .Handle<Exception>()
-                .WaitAndRetryAsync(delay)
-                .ExecuteAsync(async () =>
-                {
-                    CommandLine commandLine = new();
-                    int exitCode = await commandLine.RunAsyncAndReturnExitCode(
-                        $"{FullName} {finalArguments}",
-                        environmentVariables: environmentVariables,
-                        workingDirectory: null,
-                        cleanDefaultEnvironmentVariableIfCustomAreProvided: true,
-                        timeoutInSeconds: timeoutSeconds);
-                    string fullCommand = command is not null ? $"{FullName} {command}" : FullName;
-                    return new TestHostResult(fullCommand, exitCode, commandLine.StandardOutput, commandLine.StandardOutputLines, commandLine.ErrorOutput, commandLine.ErrorOutputLines);
-                });
+            CommandLine commandLine = new();
+            // Disable ANSI rendering so tests have easier time parsing the output.
+            // Disable progress so tests don't mix progress with overall progress, and with test process output.
+            int exitCode = await commandLine.RunAsyncAndReturnExitCodeAsync(
+                $"{FullName} --no-ansi --no-progress {finalArguments}",
+                environmentVariables: environmentVariables,
+                workingDirectory: null,
+                cleanDefaultEnvironmentVariableIfCustomAreProvided: true,
+                cancellationToken: cancellationToken);
+            string fullCommand = command is not null ? $"{FullName} {command}" : FullName;
+            return new TestHostResult(fullCommand, exitCode, commandLine.StandardOutput, commandLine.StandardOutputLines, commandLine.ErrorOutput, commandLine.ErrorOutputLines);
         }
         finally
         {
@@ -122,7 +124,7 @@ public sealed class TestHost
         BuildConfiguration buildConfiguration = BuildConfiguration.Release)
     {
         string moduleName = $"{testHostModuleNameWithoutExtension}{(RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? ".exe" : string.Empty)}";
-        string? expectedRootPath = Path.Combine(rootFolder, "bin", buildConfiguration.ToString(), tfm);
+        string expectedRootPath = Path.Combine(rootFolder, "bin", buildConfiguration.ToString(), tfm);
         string[] executables = Directory.GetFiles(expectedRootPath, moduleName, SearchOption.AllDirectories);
         string? expectedPath = executables.SingleOrDefault(p => p.Contains(rid) && p.Contains(verb == Verb.publish ? "publish" : string.Empty));
 

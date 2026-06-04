@@ -2,14 +2,12 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 #if NETCOREAPP
-using System.Text;
 using System.Text.Json;
 #else
 using Jsonite;
 #endif
 
 using Microsoft.Testing.Platform.Extensions;
-using Microsoft.Testing.Platform.Extensions.TestHost;
 using Microsoft.Testing.Platform.Helpers;
 using Microsoft.Testing.Platform.Messages;
 using Microsoft.Testing.Platform.Services;
@@ -18,15 +16,22 @@ namespace Microsoft.Testing.Platform.Telemetry;
 
 internal static class ExtensionInformationCollector
 {
-    public static async Task<string> CollectAndSerializeToJsonAsync(ServiceProvider serviceProvider)
+    public static async Task<string?> CollectAndSerializeToJsonAsync(ServiceProvider serviceProvider)
     {
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Create("WASI")))
+        {
+            // HashWithNormalizedCasing not supported on WASI at time of writing.
+            // https://github.com/dotnet/runtime/issues/99126
+            return null;
+        }
+
         HashSet<ExtensionInformation> extensionsInformation = [];
 
         foreach (object service in serviceProvider.Services)
         {
             if (service is IExtension extension)
             {
-                extensionsInformation.Add(new ExtensionInformation(Sha256Hasher.HashWithNormalizedCasing(extension.Uid), extension.Version, await extension.IsEnabledAsync()));
+                extensionsInformation.Add(new ExtensionInformation(Sha256Hasher.HashWithNormalizedCasing(extension.Uid), extension.Version, await extension.IsEnabledAsync().ConfigureAwait(false)));
             }
 
             if (service is MessageBusProxy messageBus)
@@ -35,14 +40,14 @@ internal static class ExtensionInformationCollector
                 {
                     if (dataConsumer is IExtension extension1)
                     {
-                        extensionsInformation.Add(new ExtensionInformation(Sha256Hasher.HashWithNormalizedCasing(extension1.Uid), extension1.Version, await extension1.IsEnabledAsync()));
+                        extensionsInformation.Add(new ExtensionInformation(Sha256Hasher.HashWithNormalizedCasing(extension1.Uid), extension1.Version, await extension1.IsEnabledAsync().ConfigureAwait(false)));
                     }
                 }
             }
         }
 
 #if NETCOREAPP
-        using var stream = new MemoryStream();
+        using MemoryStream stream = new();
         Utf8JsonWriter writer = new(stream);
         writer.WriteStartArray();
         foreach (ExtensionInformation extension in extensionsInformation)

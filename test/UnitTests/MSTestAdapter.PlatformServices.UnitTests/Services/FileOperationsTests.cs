@@ -1,68 +1,70 @@
-// Copyright (c) Microsoft Corporation. All rights reserved.
+﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-#if !NET462
-using System.Reflection;
+#if !NETFRAMEWORK
+using AwesomeAssertions;
 
 using Microsoft.VisualStudio.TestPlatform.MSTestAdapter.PlatformServices;
 
 using TestFramework.ForTestingMSTest;
 
-namespace MSTestAdapter.PlatformServices.Tests.Services;
+namespace MSTestAdapter.PlatformServices.UnitTests.Services;
 
 public class FileOperationsTests : TestContainer
 {
     private readonly FileOperations _fileOperations;
 
-    public FileOperationsTests()
-    {
-        _fileOperations = new FileOperations();
-    }
+    public FileOperationsTests() => _fileOperations = new FileOperations();
 
     public void LoadAssemblyShouldThrowExceptionIfTheFileNameHasInvalidCharacters()
     {
-        var filePath = "temp<>txt";
-        void A() => _fileOperations.LoadAssembly(filePath, false);
+        string filePath = "temp<>txt";
+        Action action = () => _fileOperations.LoadAssembly(filePath);
 
-        Type expectedException;
 #if NETCOREAPP
-        expectedException = typeof(FileNotFoundException);
+        action.Should().Throw<FileNotFoundException>();
 #else
-        expectedException = typeof(ArgumentException);
+        action.Should().Throw<ArgumentException>();
 #endif
-
-        var ex = VerifyThrows(A);
-        Verify(ex.GetType() == expectedException);
     }
 
-    public void LoadAssemblyShouldThrowExceptionIfFileIsNotFound()
+    public void LoadAssemblyShouldNotThrowFileLoadExceptionIfTheFileNameHasValidFileCharacterButInvalidFullAssemblyNameCharacter()
     {
-        var filePath = "temptxt";
-        void A() => _fileOperations.LoadAssembly(filePath, false);
-        var ex = VerifyThrows(A);
-        Verify(ex is FileNotFoundException);
+#if NETCOREAPP
+        // = (for example) is a valid file name character, but not a valid character in an full assembly name.
+        // If we construct assembly name by calling new AssemblyName(filePath), it will throw FileLoadException for a correct file name.
+        // This test is checking that. It still fails with FileNotFoundException, because the file does not exist, but it should not throw FileLoadException.
+        // (The FileLoadException used for the unparseable name is weird choice, and confusing to me, but that is what the runtime decided to do. No dll is being loaded.)
+        string filePath = "temp=txt";
+        Action action = () => _fileOperations.LoadAssembly(filePath);
+
+        action.Should().Throw<FileNotFoundException>();
+#endif
     }
+
+    public void LoadAssemblyShouldThrowExceptionIfFileIsNotFound() =>
+        new Action(() => _fileOperations.LoadAssembly("temptxt")).Should().Throw<FileNotFoundException>();
 
     public void LoadAssemblyShouldLoadAssemblyInCurrentContext()
     {
-        var filePath = typeof(FileOperationsTests).GetTypeInfo().Assembly.Location;
+        string filePath = typeof(FileOperationsTests).Assembly.Location;
 
         // This should not throw.
-        _fileOperations.LoadAssembly(filePath, false);
+        _fileOperations.LoadAssembly(filePath);
     }
 
 #if !WIN_UI
     public void DoesFileExistReturnsTrueForAllFiles()
     {
-        Verify(_fileOperations.DoesFileExist(null));
-        Verify(_fileOperations.DoesFileExist("foobar"));
+        _fileOperations.DoesFileExist(null!).Should().BeTrue();
+        _fileOperations.DoesFileExist("foobar").Should().BeTrue();
     }
 #endif
 
     public void GetFullFilePathShouldReturnAssemblyFileName()
     {
-        Verify(_fileOperations.GetFullFilePath(null) is null);
-        Verify(_fileOperations.GetFullFilePath("assemblyFileName") == "assemblyFileName");
+        _fileOperations.GetFullFilePath(null!).Should().BeNull();
+        _fileOperations.GetFullFilePath("assemblyFileName").Should().Be("assemblyFileName");
     }
 }
 #pragma warning restore SA1649 // SA1649FileNameMustMatchTypeName

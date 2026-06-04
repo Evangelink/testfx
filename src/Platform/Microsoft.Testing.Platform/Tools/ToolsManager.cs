@@ -2,7 +2,6 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using Microsoft.Testing.Platform.Extensions;
-using Microsoft.Testing.Platform.Helpers;
 
 namespace Microsoft.Testing.Platform.Tools;
 
@@ -11,30 +10,24 @@ internal sealed class ToolsManager : IToolsManager
     private readonly List<Func<IServiceProvider, ITool>> _toolsFactories = [];
 
     public void AddTool(Func<IServiceProvider, ITool> toolFactory)
-    {
-        ArgumentGuard.IsNotNull(toolFactory);
-        _toolsFactories.Add(toolFactory);
-    }
+        => _toolsFactories.Add(toolFactory ?? throw new ArgumentNullException(nameof(toolFactory)));
 
-    internal async Task<ToolsInformation> BuildAsync(IServiceProvider serviceProvider)
+    internal async Task<IReadOnlyList<ITool>> BuildAsync(IServiceProvider serviceProvider)
     {
         List<ITool> tools = [];
         foreach (Func<IServiceProvider, ITool> toolFactory in _toolsFactories)
         {
             ITool tool = toolFactory(serviceProvider);
-            if (!await tool.IsEnabledAsync())
+            if (!await tool.IsEnabledAsync().ConfigureAwait(false))
             {
                 continue;
             }
 
-            if (tool is IAsyncInitializableExtension async)
-            {
-                await async.InitializeAsync();
-            }
+            await tool.TryInitializeAsync().ConfigureAwait(false);
 
             tools.Add(tool);
         }
 
-        return new ToolsInformation(tools.ToArray());
+        return tools;
     }
 }

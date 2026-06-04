@@ -1,17 +1,18 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Microsoft.Testing.Platform.Extensions;
 using Microsoft.Testing.Platform.Extensions.Messages;
 using Microsoft.Testing.Platform.Extensions.TestHost;
-using Microsoft.Testing.Platform.TestHost;
+using Microsoft.Testing.Platform.Services;
 
 namespace Microsoft.Testing.TestInfrastructure;
 
 public sealed class SlowestTestsConsumer : IDataConsumer, ITestSessionLifetimeHandler
 {
-    private readonly List<(string TestId, double Milliseconds)> _testPerf = new();
+    private readonly List<(string TestId, string DisplayName, double Milliseconds)> _testPerf = [];
 
-    public Type[] DataTypesConsumed => new[] { typeof(TestNodeUpdateMessage) };
+    public Type[] DataTypesConsumed => [typeof(TestNodeUpdateMessage)];
 
     public string Uid => nameof(SlowestTestsConsumer);
 
@@ -32,22 +33,21 @@ public sealed class SlowestTestsConsumer : IDataConsumer, ITestSessionLifetimeHa
         }
 
         double milliseconds = testNodeUpdatedMessage.TestNode.Properties.Single<TimingProperty>().GlobalTiming.Duration.TotalMilliseconds;
-        _testPerf.Add((testNodeUpdatedMessage.TestNode.Uid, milliseconds));
+        _testPerf.Add((testNodeUpdatedMessage.TestNode.Uid, testNodeUpdatedMessage.TestNode.DisplayName, milliseconds));
 
         return Task.CompletedTask;
     }
 
-    public Task OnTestSessionFinishingAsync(SessionUid sessionUid, CancellationToken cancellationToken)
+    public Task OnTestSessionFinishingAsync(ITestSessionContext testSessionContext)
     {
         Console.WriteLine("Slowest 10 tests");
-        foreach ((string testId, double milliseconds) in _testPerf.OrderByDescending(x => x.Milliseconds).Take(10))
+        foreach ((_, string displayName, double milliseconds) in _testPerf.OrderByDescending(x => x.Milliseconds).Take(10))
         {
-            Console.WriteLine($"{testId} {TimeSpan.FromMilliseconds(milliseconds).TotalSeconds:F5}s");
+            Console.WriteLine($"{displayName} {TimeSpan.FromMilliseconds(milliseconds).TotalSeconds:F5}s");
         }
 
         return Task.CompletedTask;
     }
 
-    public Task OnTestSessionStartingAsync(SessionUid sessionUid, CancellationToken cancellationToken)
-        => Task.CompletedTask;
+    public Task OnTestSessionStartingAsync(ITestSessionContext testSessionContext) => Task.CompletedTask;
 }

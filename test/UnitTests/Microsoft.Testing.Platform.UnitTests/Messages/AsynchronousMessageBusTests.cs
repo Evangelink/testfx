@@ -1,30 +1,25 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using Microsoft.Testing.Internal.Framework;
 using Microsoft.Testing.Platform.Extensions.Messages;
-using Microsoft.Testing.Platform.Extensions.TestHost;
 using Microsoft.Testing.Platform.Helpers;
 using Microsoft.Testing.Platform.Logging;
 using Microsoft.Testing.Platform.Messages;
 using Microsoft.Testing.Platform.Services;
-using Microsoft.Testing.TestInfrastructure;
 
 namespace Microsoft.Testing.Platform.UnitTests;
 
-[TestGroup]
-public sealed class AsynchronousMessageBusTests : TestBase
+[TestClass]
+public sealed class AsynchronousMessageBusTests
 {
-    public AsynchronousMessageBusTests(ITestExecutionContext testExecutionContext)
-        : base(testExecutionContext)
-    {
-    }
+    public TestContext TestContext { get; set; }
 
+    [TestMethod]
     public async Task UnexpectedTypePublished_ShouldFail()
     {
-        MessageBusProxy proxy = new();
-        var consumer = new InvalidTypePublished(proxy);
-        AsynchronousMessageBus asynchronousMessageBus = new(
+        using MessageBusProxy proxy = new();
+        InvalidTypePublished consumer = new(proxy);
+        var asynchronousMessageBus = new AsynchronousMessageBus(
             [consumer],
             new CTRLPlusCCancellationTokenSource(),
             new SystemTask(),
@@ -35,16 +30,17 @@ public sealed class AsynchronousMessageBusTests : TestBase
 
         // Fire consume with a good message
         await proxy.PublishAsync(new DummyProducer("DummyProducer", typeof(InvalidTypePublished.ValidDataToProduce)), new InvalidTypePublished.ValidDataToProduce());
-        consumer.Published.WaitOne(TimeoutHelper.DefaultHangTimeoutMilliseconds);
-        await Assert.ThrowsAsync<InvalidOperationException>(() => proxy.DrainDataAsync());
+        consumer.Published.WaitOne();
+        await Assert.ThrowsAsync<InvalidOperationException>(proxy.DrainDataAsync);
     }
 
+    [TestMethod]
     public async Task DrainDataAsync_Loop_ShouldFail()
     {
-        MessageBusProxy proxy = new();
+        using MessageBusProxy proxy = new();
         LoopConsumerA consumerA = new(proxy);
         ConsumerB consumerB = new(proxy);
-        AsynchronousMessageBus asynchronousMessageBus = new(
+        var asynchronousMessageBus = new AsynchronousMessageBus(
             [consumerA, consumerB],
             new CTRLPlusCCancellationTokenSource(),
             new SystemTask(),
@@ -55,26 +51,21 @@ public sealed class AsynchronousMessageBusTests : TestBase
 
         await proxy.PublishAsync(consumerA, new LoopDataA());
 
-        try
-        {
-            await asynchronousMessageBus.DrainDataAsync();
-        }
-        catch (InvalidOperationException ex)
-        {
-            Assert.That(ex.Message.Contains("Publisher/Consumer loop detected during the drain after"));
-        }
+        InvalidOperationException ex = await Assert.ThrowsExactlyAsync<InvalidOperationException>(asynchronousMessageBus.DrainDataAsync);
+        Assert.Contains("Publisher/Consumer loop detected during the drain after", ex.Message);
 
         // Prevent loop to continue
         consumerA.StopConsume();
         consumerB.StopConsume();
     }
 
+    [TestMethod]
     public async Task MessageBus_WhenConsumerProducesAndConsumesTheSameType_ShouldNotConsumeWhatProducedByItself()
     {
-        MessageBusProxy proxy = new();
+        using MessageBusProxy proxy = new();
         Consumer consumerA = new(proxy, "consumerA");
         Consumer consumerB = new(proxy, "consumerB");
-        AsynchronousMessageBus asynchronousMessageBus = new(
+        var asynchronousMessageBus = new AsynchronousMessageBus(
             [consumerA, consumerB],
             new CTRLPlusCCancellationTokenSource(),
             new SystemTask(),
@@ -83,8 +74,8 @@ public sealed class AsynchronousMessageBusTests : TestBase
         await asynchronousMessageBus.InitAsync();
         proxy.SetBuiltMessageBus(asynchronousMessageBus);
 
-        var consumerAData = new Data();
-        var consumerBData = new Data();
+        Data consumerAData = new();
+        Data consumerBData = new();
 
         await proxy.PublishAsync(consumerA, consumerAData);
         await proxy.PublishAsync(consumerB, consumerBData);
@@ -92,27 +83,55 @@ public sealed class AsynchronousMessageBusTests : TestBase
         await proxy.DrainDataAsync();
 
         // assert
-        Assert.AreEqual(consumerA.ConsumedData.Count, 1);
-        Assert.AreEqual(consumerA.ConsumedData[0], consumerBData);
+        Assert.HasCount(1, consumerA.ConsumedData);
+        Assert.AreEqual(consumerBData, consumerA.ConsumedData[0]);
 
-        Assert.AreEqual(consumerB.ConsumedData.Count, 1);
-        Assert.AreEqual(consumerB.ConsumedData[0], consumerAData);
+        Assert.HasCount(1, consumerB.ConsumedData);
+        Assert.AreEqual(consumerAData, consumerB.ConsumedData[0]);
     }
 
+    [TestMethod]
+    public async Task DisableAsync_WithConsumerSubscribedToMultipleDataTypes_ShouldCompleteProcessorOnce()
+    {
+        using MessageBusProxy proxy = new();
+        MultiTypeConsumer consumer = new();
+        using var asynchronousMessageBus = new AsynchronousMessageBus(
+            [consumer],
+            new CTRLPlusCCancellationTokenSource(),
+            new SystemTask(),
+            new NopLoggerFactory(),
+            new SystemEnvironment());
+        await asynchronousMessageBus.InitAsync();
+        proxy.SetBuiltMessageBus(asynchronousMessageBus);
+
+        DummyProducer producer = new("MultiTypeProducer", typeof(MultiTypeConsumer.DataTypeA), typeof(MultiTypeConsumer.DataTypeB));
+        await proxy.PublishAsync(producer, new MultiTypeConsumer.DataTypeA());
+        await proxy.PublishAsync(producer, new MultiTypeConsumer.DataTypeB());
+        await proxy.DrainDataAsync();
+
+        Assert.AreEqual(1, consumer.ReceivedTypeA);
+        Assert.AreEqual(1, consumer.ReceivedTypeB);
+
+        // DisableAsync must not throw even though the consumer is registered for 2 data types;
+        // the single backing processor must be completed exactly once (not once per data type).
+        await asynchronousMessageBus.DisableAsync();
+    }
+
+    [TestMethod]
     public async Task Consumers_ConsumeData_ShouldNotMissAnyPayload()
     {
         int totalConsumers = Environment.ProcessorCount;
         int totalPayloads = Environment.ProcessorCount * 3;
         using MessageBusProxy proxy = new();
         List<DummyConsumer> dummyConsumers = [];
-        var random = new Random();
+        Random random = new();
         for (int i = 0; i < totalConsumers; i++)
         {
-            DummyConsumer dummyConsumer = new(async _ => await Task.Delay(random.Next(40, 80)));
+            DummyConsumer dummyConsumer = new(async _ => await Task.Delay(random.Next(40, 80), TestContext.CancellationToken));
             dummyConsumers.Add(dummyConsumer);
         }
 
-        using AsynchronousMessageBus asynchronousMessageBus = new(
+        using var asynchronousMessageBus = new AsynchronousMessageBus(
             dummyConsumers.ToArray(),
             new CTRLPlusCCancellationTokenSource(),
             new SystemTask(),
@@ -122,16 +141,15 @@ public sealed class AsynchronousMessageBusTests : TestBase
 
         proxy.SetBuiltMessageBus(asynchronousMessageBus);
 
-        var producer = new DummyConsumer.DummyProducer();
-        await Task.WhenAll(Enumerable.Range(1, totalPayloads)
-            .Select(i => Task.Run(async () => await proxy.PublishAsync(producer, new DummyConsumer.DummyData() { Data = i }))).ToArray());
+        DummyConsumer.DummyProducer producer = new();
+        await Task.WhenAll([.. Enumerable.Range(1, totalPayloads).Select(i => Task.Run(async () => await proxy.PublishAsync(producer, new DummyConsumer.DummyData { Data = i }), TestContext.CancellationToken))]);
 
         await proxy.DrainDataAsync();
 
-        Assert.AreEqual(totalConsumers, dummyConsumers.Count);
+        Assert.HasCount(totalConsumers, dummyConsumers);
         foreach (DummyConsumer consumer in dummyConsumers)
         {
-            Assert.AreEqual(totalPayloads, consumer.DummyDataList.Count);
+            Assert.HasCount(totalPayloads, consumer.DummyDataList);
 
             int i = 1;
             foreach (DummyConsumer.DummyData payload in consumer.DummyDataList.OrderBy(x => x.Data))
@@ -151,23 +169,17 @@ public sealed class AsynchronousMessageBusTests : TestBase
     {
         private readonly Func<DummyData, Task> _action;
 
-        public DummyConsumer()
-        {
-            _action = _ => Task.CompletedTask;
-        }
+        public DummyConsumer() => _action = _ => Task.CompletedTask;
 
-        public DummyConsumer(Func<DummyData, Task> action)
-        {
-            _action = action;
-        }
+        public DummyConsumer(Func<DummyData, Task> action) => _action = action;
 
         public List<DummyData> DummyDataList { get; } = [];
 
-        public Type[] DataTypesConsumed => new[] { typeof(DummyData) };
+        public Type[] DataTypesConsumed => [typeof(DummyData)];
 
         public string Uid => nameof(DummyConsumer);
 
-        public string Version => AppVersion.DefaultSemVer;
+        public string Version => PlatformVersion.Version;
 
         public string DisplayName => nameof(DummyConsumer);
 
@@ -197,11 +209,11 @@ public sealed class AsynchronousMessageBusTests : TestBase
 
         public sealed class DummyProducer : IDataProducer
         {
-            public Type[] DataTypesProduced => new[] { typeof(DummyData) };
+            public Type[] DataTypesProduced => [typeof(DummyData)];
 
             public string Uid => nameof(DummyProducer);
 
-            public string Version => AppVersion.DefaultSemVer;
+            public string Version => PlatformVersion.Version;
 
             public string DisplayName => nameof(DummyProducer);
 
@@ -223,12 +235,9 @@ public sealed class AsynchronousMessageBusTests : TestBase
         private readonly IMessageBus _messageBus;
         private bool _stopConsume;
 
-        public LoopConsumerA(IMessageBus messageBus)
-        {
-            _messageBus = messageBus;
-        }
+        public LoopConsumerA(IMessageBus messageBus) => _messageBus = messageBus;
 
-        public Type[] DataTypesConsumed => new[] { typeof(LoopDataB) };
+        public Type[] DataTypesConsumed => [typeof(LoopDataB)];
 
         public string Uid => nameof(LoopConsumerA);
 
@@ -238,7 +247,7 @@ public sealed class AsynchronousMessageBusTests : TestBase
 
         public string Description => string.Empty;
 
-        public Type[] DataTypesProduced => new[] { typeof(LoopDataA) };
+        public Type[] DataTypesProduced => [typeof(LoopDataA)];
 
         public Task<bool> IsEnabledAsync() => Task.FromResult(true);
 
@@ -277,14 +286,11 @@ public sealed class AsynchronousMessageBusTests : TestBase
         private readonly IMessageBus _messageBus;
         private bool _stopConsume;
 
-        public ConsumerB(IMessageBus messageBus)
-        {
-            _messageBus = messageBus;
-        }
+        public ConsumerB(IMessageBus messageBus) => _messageBus = messageBus;
 
-        public Type[] DataTypesConsumed => new[] { typeof(LoopDataA) };
+        public Type[] DataTypesConsumed => [typeof(LoopDataA)];
 
-        public string Uid => nameof(LoopConsumerA);
+        public string Uid => nameof(ConsumerB);
 
         public string Version => "1.0.0";
 
@@ -292,7 +298,7 @@ public sealed class AsynchronousMessageBusTests : TestBase
 
         public string Description => string.Empty;
 
-        public Type[] DataTypesProduced => new[] { typeof(LoopDataB) };
+        public Type[] DataTypesProduced => [typeof(LoopDataB)];
 
         public Task<bool> IsEnabledAsync() => Task.FromResult(true);
 
@@ -314,14 +320,11 @@ public sealed class AsynchronousMessageBusTests : TestBase
 
     private sealed class Consumer : IDataConsumer, IDataProducer
     {
-        public Consumer(IMessageBus messageBus, string id)
-        {
-            Uid = id;
-        }
+        public Consumer(IMessageBus messageBus, string id) => Uid = id;
 
         public List<IData> ConsumedData { get; } = [];
 
-        public Type[] DataTypesConsumed => new[] { typeof(Data) };
+        public Type[] DataTypesConsumed => [typeof(Data)];
 
         public string Uid { get; set; }
 
@@ -331,7 +334,7 @@ public sealed class AsynchronousMessageBusTests : TestBase
 
         public string Description => string.Empty;
 
-        public Type[] DataTypesProduced => new[] { typeof(Data) };
+        public Type[] DataTypesProduced => [typeof(Data)];
 
         public Task<bool> IsEnabledAsync() => Task.FromResult(true);
 
@@ -347,18 +350,15 @@ public sealed class AsynchronousMessageBusTests : TestBase
     {
         private readonly IMessageBus _messageBus;
 
-        public InvalidTypePublished(IMessageBus messageBus)
-        {
-            _messageBus = messageBus;
-        }
+        public InvalidTypePublished(IMessageBus messageBus) => _messageBus = messageBus;
 
         public ManualResetEvent Published { get; set; } = new(false);
 
-        public Type[] DataTypesConsumed => new[] { typeof(ValidDataToProduce) };
+        public Type[] DataTypesConsumed => [typeof(ValidDataToProduce)];
 
         public string Uid => nameof(InvalidTypePublished);
 
-        public Type[] DataTypesProduced => new[] { typeof(ValidDataToProduce) };
+        public Type[] DataTypesProduced => [typeof(ValidDataToProduce)];
 
         public string Version => "1.0.0";
 
@@ -417,5 +417,52 @@ public sealed class AsynchronousMessageBusTests : TestBase
         public string ProducerId { get; }
 
         public Task<bool> IsEnabledAsync() => Task.FromResult(true);
+    }
+
+    private sealed class MultiTypeConsumer : IDataConsumer
+    {
+        public int ReceivedTypeA { get; private set; }
+
+        public int ReceivedTypeB { get; private set; }
+
+        public Type[] DataTypesConsumed => [typeof(DataTypeA), typeof(DataTypeB)];
+
+        public string Uid => nameof(MultiTypeConsumer);
+
+        public string Version => "1.0.0";
+
+        public string DisplayName => string.Empty;
+
+        public string Description => string.Empty;
+
+        public Task<bool> IsEnabledAsync() => Task.FromResult(true);
+
+        public Task ConsumeAsync(IDataProducer dataProducer, IData value, CancellationToken cancellationToken)
+        {
+            if (value is DataTypeA)
+            {
+                ReceivedTypeA++;
+            }
+            else if (value is DataTypeB)
+            {
+                ReceivedTypeB++;
+            }
+
+            return Task.CompletedTask;
+        }
+
+        public sealed class DataTypeA : IData
+        {
+            public string DisplayName => nameof(DataTypeA);
+
+            public string? Description => nameof(DataTypeA);
+        }
+
+        public sealed class DataTypeB : IData
+        {
+            public string DisplayName => nameof(DataTypeB);
+
+            public string? Description => nameof(DataTypeB);
+        }
     }
 }

@@ -1,11 +1,8 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System.Diagnostics;
-
 using Microsoft.Testing.Platform.Capabilities;
 using Microsoft.Testing.Platform.Capabilities.TestFramework;
-using Microsoft.Testing.Platform.Extensions.Messages;
 using Microsoft.Testing.Platform.Extensions.OutputDevice;
 using Microsoft.Testing.Platform.Extensions.TestFramework;
 using Microsoft.Testing.Platform.Helpers;
@@ -14,79 +11,98 @@ using Microsoft.Testing.Platform.Messages;
 using Microsoft.Testing.Platform.OutputDevice;
 using Microsoft.Testing.Platform.Resources;
 using Microsoft.Testing.Platform.Services;
+using Microsoft.Testing.Platform.Telemetry;
 using Microsoft.Testing.Platform.TestHost;
 
 namespace Microsoft.Testing.Platform.Requests;
 
-internal class TestHostTestFrameworkInvoker(IServiceProvider serviceProvider) : ITestFrameworkInvoker, IOutputDeviceDataProducer, IDataProducer
+[SuppressMessage("Performance", "CA1852: Seal internal types", Justification = "HotReload needs to inherit and override ExecuteRequestAsync")]
+internal class TestHostTestFrameworkInvoker(IServiceProvider serviceProvider) : ITestFrameworkInvoker, IOutputDeviceDataProducer
 {
     protected IServiceProvider ServiceProvider { get; } = serviceProvider;
 
     public string Uid => nameof(TestHostTestFrameworkInvoker);
 
-    public string Version => AppVersion.DefaultSemVer;
+    public string Version => PlatformVersion.Version;
 
     public string DisplayName => string.Empty;
 
     public string Description => string.Empty;
 
-    public Type[] DataTypesProduced => new[] { typeof(TestRequestExecutionTimeInfo) };
-
     public Task<bool> IsEnabledAsync() => Task.FromResult(true);
 
-    public async Task ExecuteAsync(ITestFramework testFrameworkAdapter, ClientInfo client, CancellationToken cancellationToken)
+    public async Task ExecuteAsync(ITestFramework testFramework, ClientInfo client, CancellationToken cancellationToken)
     {
         ILogger<TestHostTestFrameworkInvoker> logger = ServiceProvider.GetLoggerFactory().CreateLogger<TestHostTestFrameworkInvoker>();
-
-        await logger.LogInformationAsync($"TestFrameworkAdapter UID: '{testFrameworkAdapter.Uid}' Version: '{testFrameworkAdapter.Version}' DisplayName: '{testFrameworkAdapter.DisplayName}' Description: '{testFrameworkAdapter.Description}'");
+        await logger.LogInformationAsync($"Test framework UID: '{testFramework.Uid}' Version: '{testFramework.Version}' DisplayName: '{testFramework.DisplayName}' Description: '{testFramework.Description}'").ConfigureAwait(false);
 
         foreach (ICapability capability in ServiceProvider.GetTestFrameworkCapabilities().Capabilities)
         {
             if (capability is ITestNodesTreeFilterTestFrameworkCapability testNodesTreeFilterCapability)
             {
-                await logger.LogInformationAsync($"ITestNodesTreeFilterCapability.IsSupported: {testNodesTreeFilterCapability.IsSupported}");
+                await logger.LogInformationAsync($"ITestNodesTreeFilterCapability.IsSupported: {testNodesTreeFilterCapability.IsSupported}").ConfigureAwait(false);
             }
         }
 
-        DateTimeOffset startTime = DateTimeOffset.UtcNow;
-        var stopwatch = Stopwatch.StartNew();
-        SessionUid sessionId = ServiceProvider.GetTestSessionContext().SessionId;
-        CreateTestSessionResult createTestSessionResult = await testFrameworkAdapter.CreateTestSessionAsync(new(sessionId, client, cancellationToken));
-        await HandleTestSessionResultAsync(createTestSessionResult.IsSuccess, createTestSessionResult.WarningMessage, createTestSessionResult.ErrorMessage);
+        SessionUid sessionId = ServiceProvider.GetTestSessionContext().SessionUid;
+        await logger.LogDebugAsync($"Test session UID: '{sessionId.Value}'").ConfigureAwait(false);
 
-        ITestExecutionRequestFactory testExecutionRequestFactory = ServiceProvider.GetTestExecutionRequestFactory();
-        TestExecutionRequest request = await testExecutionRequestFactory.CreateRequestAsync(new(sessionId, client));
+        IPlatformOpenTelemetryService? otelService = ServiceProvider.GetPlatformOTelService();
+        using (otelService?.StartActivity("CreateTestFrameworkSession", tags: [new("SessionUid", sessionId)]))
+        {
+            CreateTestSessionResult createTestSessionResult = await testFramework.CreateTestSessionAsync(new(sessionId, cancellationToken)).ConfigureAwait(false);
+            await HandleTestSessionResultAsync(logger, "CreateTestSession", sessionId, createTestSessionResult.IsSuccess, createTestSessionResult.WarningMessage, createTestSessionResult.ErrorMessage, cancellationToken).ConfigureAwait(false);
+        }
+
+        TestExecutionRequest request;
+        using (otelService?.StartActivity("CreateTestRequest", tags: [new("SessionUid", sessionId)]))
+        {
+            ITestExecutionRequestFactory testExecutionRequestFactory = ServiceProvider.GetTestExecutionRequestFactory();
+            request = await testExecutionRequestFactory.CreateRequestAsync(new(sessionId)).ConfigureAwait(false);
+        }
+
         IMessageBus messageBus = ServiceProvider.GetMessageBus();
 
         // Execute the test request
-        await ExecuteRequestAsync(testFrameworkAdapter, request, messageBus, cancellationToken);
+        using (otelService?.StartActivity("ExecuteTestRequest", tags: [new("SessionUid", sessionId), new("RequestType", request.GetType().Name)]))
+        {
+            await ExecuteRequestAsync(testFramework, request, messageBus, cancellationToken).ConfigureAwait(false);
+        }
 
-        CloseTestSessionResult closeTestSessionResult = await testFrameworkAdapter.CloseTestSessionAsync(new(sessionId, client, cancellationToken));
-        await HandleTestSessionResultAsync(closeTestSessionResult.IsSuccess, closeTestSessionResult.WarningMessage, closeTestSessionResult.ErrorMessage);
-        DateTimeOffset endTime = DateTimeOffset.UtcNow;
-        await messageBus.PublishAsync(this, new TestRequestExecutionTimeInfo(new TimingInfo(startTime, endTime, stopwatch.Elapsed)));
+        using (otelService?.StartActivity("CloseTestFrameworkSession", tags: [new("SessionUid", sessionId)]))
+        {
+            CloseTestSessionResult closeTestSessionResult = await testFramework.CloseTestSessionAsync(new(sessionId, cancellationToken)).ConfigureAwait(false);
+            await HandleTestSessionResultAsync(logger, "CloseTestSession", sessionId, closeTestSessionResult.IsSuccess, closeTestSessionResult.WarningMessage, closeTestSessionResult.ErrorMessage, cancellationToken).ConfigureAwait(false);
+        }
     }
 
-    public virtual async Task ExecuteRequestAsync(ITestFramework testFrameworkAdapter, TestExecutionRequest request, IMessageBus messageBus, CancellationToken cancellationToken)
+    public virtual async Task ExecuteRequestAsync(ITestFramework testFramework, TestExecutionRequest request, IMessageBus messageBus, CancellationToken cancellationToken)
     {
+        IPlatformOpenTelemetryService? otelService = ServiceProvider.GetPlatformOTelService();
+        using IPlatformActivity? testFrameworkActivity = otelService?.StartActivity("TestFramework", testFramework.ToOTelTags());
+        otelService?.TestFrameworkActivity = testFrameworkActivity;
         using SemaphoreSlim requestSemaphore = new(0, 1);
-        await testFrameworkAdapter.ExecuteRequestAsync(new(request, messageBus, requestSemaphore, cancellationToken));
-        await requestSemaphore.WaitAsync(cancellationToken);
+        await testFramework.ExecuteRequestAsync(new(request, messageBus, new SemaphoreSlimRequestCompleteNotifier(requestSemaphore), cancellationToken)).ConfigureAwait(false);
+        await requestSemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
     }
 
-    private async Task HandleTestSessionResultAsync(bool isSuccess, string? warningMessage, string? errorMessage)
+    private async Task HandleTestSessionResultAsync(ILogger logger, string phase, SessionUid sessionId, bool isSuccess, string? warningMessage, string? errorMessage, CancellationToken cancellationToken)
     {
         if (warningMessage is not null)
         {
+            await logger.LogWarningAsync($"Test framework '{phase}' (session '{sessionId.Value}') reported warning: {warningMessage}").ConfigureAwait(false);
             IOutputDevice outputDisplay = ServiceProvider.GetOutputDevice();
-            await outputDisplay.DisplayAsync(this, FormattedTextOutputDeviceDataBuilder.CreateYellowConsoleColorText(warningMessage));
+            await outputDisplay.DisplayAsync(this, new WarningMessageOutputDeviceData(warningMessage), cancellationToken).ConfigureAwait(false);
         }
 
         if (!isSuccess)
         {
+            string effectiveErrorMessage = errorMessage ?? PlatformResources.TestHostAdapterInvokerFailedTestSessionErrorMessage;
+            await logger.LogErrorAsync($"Test framework '{phase}' (session '{sessionId.Value}') failed: {effectiveErrorMessage}").ConfigureAwait(false);
             ITestApplicationProcessExitCode testApplicationProcessExitCode = ServiceProvider.GetTestApplicationProcessExitCode();
-            await testApplicationProcessExitCode.SetTestAdapterTestSessionFailureAsync(errorMessage
-                ?? PlatformResources.TestHostAdapterInvokerFailedTestSessionErrorMessage);
+            await testApplicationProcessExitCode.SetTestAdapterTestSessionFailureAsync(
+                effectiveErrorMessage,
+                cancellationToken).ConfigureAwait(false);
         }
     }
 }

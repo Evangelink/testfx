@@ -1,9 +1,10 @@
-// Copyright (c) Microsoft Corporation. All rights reserved.
+﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System.Xml;
+using AwesomeAssertions;
 
 using Microsoft.VisualStudio.TestPlatform.MSTestAdapter.PlatformServices;
+using Microsoft.VisualStudio.TestPlatform.MSTestAdapter.PlatformServices.Interface;
 using Microsoft.VisualStudio.TestPlatform.ObjectModel.Utilities;
 
 using TestFramework.ForTestingMSTest;
@@ -26,49 +27,80 @@ public class DesktopSettingsProviderTests : TestContainer
     {
         // this is a base case and we just validating that properties does not remain un-initialized,
         // so passing 'null' source will also suffice.
-        var properties = _settingsProvider.GetProperties(null);
+        IDictionary<string, object> properties = _settingsProvider.GetProperties(null);
 
-        Verify(properties is not null);
-        Verify(properties.Count > 0);
+        properties.Should().NotBeNull();
+#if !WINDOWS_UWP && !WIN_UI
+        properties.Count.Should().BeGreaterThan(0);
+#endif
     }
 
     public void SettingsShouldReturnDefaultSettingsIfNotInitialized()
     {
-        var settings = MSTestSettingsProvider.Settings;
+        MSTestAdapterSettings settings = MSTestSettingsProvider.Settings;
 
-        Verify(settings is not null);
-        Verify(settings.DeploymentEnabled);
+        settings.Should().NotBeNull();
+        settings.DeploymentEnabled.Should().BeTrue();
     }
 
     public void SettingsShouldReturnInitializedSettings()
     {
-        string runSettingxml =
-            @"<MSTestV2>
-                        <DeploymentEnabled>False</DeploymentEnabled>
-                  </MSTestV2>";
-        StringReader stringReader = new(runSettingxml);
-        XmlReader reader = XmlReader.Create(stringReader, XmlRunSettingsUtilities.ReaderSettings);
+        string runSettingsXml =
+            """
+            <MSTestV2>
+              <DeploymentEnabled>False</DeploymentEnabled>
+            </MSTestV2>
+            """;
+        StringReader stringReader = new(runSettingsXml);
+        var reader = XmlReader.Create(stringReader, XmlRunSettingsUtilities.ReaderSettings);
         reader.Read();
         _settingsProvider.Load(reader);
-        Verify(!MSTestSettingsProvider.Settings.DeploymentEnabled);
+        MSTestSettingsProvider.Settings.DeploymentEnabled.Should().BeFalse();
     }
 
-    public void LoadShouldThrowIfReaderIsNull()
-    {
-        var exception = VerifyThrows(() => _settingsProvider.Load(null));
-        Verify(exception is ArgumentNullException);
-    }
+    public void LoadShouldThrowIfReaderIsNull() =>
+        new Action(() => _settingsProvider.Load(null!)).Should().Throw<ArgumentNullException>();
 
     public void LoadShouldReadAndFillInSettings()
     {
-        string runSettingxml =
-            @"<MSTestV2>
-                        <DeploymentEnabled>False</DeploymentEnabled>
-                  </MSTestV2>";
-        StringReader stringReader = new(runSettingxml);
-        XmlReader reader = XmlReader.Create(stringReader, XmlRunSettingsUtilities.ReaderSettings);
+        string runSettingsXml =
+            """
+            <MSTestV2>
+              <DeploymentEnabled>False</DeploymentEnabled>
+            </MSTestV2>
+            """;
+        StringReader stringReader = new(runSettingsXml);
+        var reader = XmlReader.Create(stringReader, XmlRunSettingsUtilities.ReaderSettings);
         reader.Read();
         _settingsProvider.Load(reader);
-        Verify(!MSTestSettingsProvider.Settings.DeploymentEnabled);
+        MSTestSettingsProvider.Settings.DeploymentEnabled.Should().BeFalse();
+    }
+
+    public void LoadShouldReadAndFillInSettingsFromIConfiguration()
+    {
+        MSTestSettingsProvider.Settings.DeploymentEnabled.Should().BeTrue();
+
+        MSTestSettingsProvider.Load(new MockConfiguration(
+            new Dictionary<string, string?>()
+            {
+                ["mstest:deployment:enabled"] = "false",
+            }, null));
+
+        MSTestSettingsProvider.Settings.DeploymentEnabled.Should().BeFalse();
+    }
+
+    private sealed class MockConfiguration : IConfiguration
+    {
+        private readonly Dictionary<string, string?> _values;
+        private readonly string? _defaultValue;
+
+        public MockConfiguration(Dictionary<string, string?> values, string? defaultValue)
+        {
+            _values = values;
+            _defaultValue = defaultValue;
+        }
+
+        public string? this[string key]
+            => _values.TryGetValue(key, out string? value) ? value : _defaultValue;
     }
 }

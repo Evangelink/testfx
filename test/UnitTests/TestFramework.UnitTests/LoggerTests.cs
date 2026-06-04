@@ -1,7 +1,8 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-#nullable enable
+using AwesomeAssertions;
+
 using Microsoft.VisualStudio.TestTools.UnitTesting.Logging;
 
 using TestFramework.ForTestingMSTest;
@@ -13,47 +14,38 @@ public sealed class LoggerTests : TestContainer
     public void LogMessageWhenFormatIsNullShouldThrow()
     {
         Logger.OnLogMessage += message => { };
-        var ex = VerifyThrows(() => Logger.LogMessage(null!, "arg1"));
-        Verify(ex is ArgumentNullException && ex.Message.Contains("format"));
+        Action act = () => Logger.LogMessage(null!, "arg1");
+        act.Should().Throw<ArgumentNullException>().WithMessage("*format*");
     }
 
     public void LogMessageWhenArgsIsNullShouldThrow()
     {
         Logger.OnLogMessage += message => { };
-        var ex = VerifyThrows(() => Logger.LogMessage("foo", null!));
-        Verify(ex is ArgumentNullException && ex.Message.Contains("args"));
+        Action act = () => Logger.LogMessage("foo", null!);
+        act.Should().Throw<ArgumentNullException>().WithMessage("*args*");
     }
 
     public void LogMessageWhenFormatIsSimpleMessageAndNoArgsShouldCallEvent()
     {
         string? calledWith = null;
-        Logger.OnLogMessage += message =>
-        {
-            calledWith = message;
-        };
+        Logger.OnLogMessage += message => calledWith = message;
         Logger.LogMessage("message");
-        Verify(calledWith == "message");
+        calledWith.Should().Be("message");
     }
 
     public void LogMessageWhenFormatIsFormateMessageWithArgsShouldCallEvent()
     {
         string? calledWith = null;
-        Logger.OnLogMessage += message =>
-        {
-            calledWith = message;
-        };
+        Logger.OnLogMessage += message => calledWith = message;
         Logger.LogMessage("message {0}", 1);
-        Verify(calledWith == "message 1");
+        calledWith.Should().Be("message 1");
     }
 
     public void LogMessageWhenFormatContainsCurlyBrace()
     {
         string? calledWith = null;
-        Logger.OnLogMessage += message =>
-        {
-            calledWith = message;
-        };
+        Logger.OnLogMessage += message => calledWith = message;
         Logger.LogMessage("{ A");
-        Verify(calledWith == "{ A");
+        calledWith.Should().Be("{ A");
     }
 }

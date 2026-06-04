@@ -1,8 +1,6 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System.Text;
-
 namespace Microsoft.Testing.TestInfrastructure;
 
 public class TempDirectory : IDisposable
@@ -14,56 +12,60 @@ public class TempDirectory : IDisposable
     /// <summary>
     /// Initializes a new instance of the <see cref="TempDirectory"/> class.
     /// </summary>
-    public TempDirectory(string? subDirectory = null, bool arcadeConvention = true, bool cleanup = true)
+    public TempDirectory(string? subDirectory = null)
     {
-        if (Environment.GetEnvironmentVariable("Microsoft_Testing_TestInfrastructure_TempDirectory_Cleanup") == "0")
-        {
-            cleanup = false;
-        }
-
-        (_baseDirectory, Path) = CreateUniqueDirectory(subDirectory, arcadeConvention);
-        _cleanup = cleanup;
+        _cleanup = Environment.GetEnvironmentVariable("Microsoft_Testing_TestInfrastructure_TempDirectory_Cleanup") != "0";
+        (_baseDirectory, Path) = CreateUniqueDirectory(subDirectory);
     }
-
-    ~TempDirectory() => Clean();
 
     public string Path { get; }
 
-    public void Dispose()
-    {
-        Dispose(true);
-        GC.SuppressFinalize(this);
-    }
+#pragma warning disable CS0618 // Type or member is obsolete - This is the only place where GetRepoRoot and GetTestSuiteDirectory should be called.
+    internal static string RepoRoot { get; } = GetRepoRoot();
 
-    protected virtual void Dispose(bool disposing)
+    public static string TestSuiteDirectory { get; } = GetTestSuiteDirectory();
+#pragma warning restore CS0618 // Type or member is obsolete
+
+    public void Dispose()
     {
         if (_isDisposed)
         {
             return;
         }
 
-        if (disposing && _cleanup)
+        _isDisposed = true;
+
+        if (!_cleanup)
         {
-            Clean();
+            return;
         }
 
-        _isDisposed = true;
+        if (!Directory.Exists(_baseDirectory))
+        {
+            return;
+        }
+
+        try
+        {
+            Directory.Delete(_baseDirectory, recursive: true);
+        }
+        catch
+        {
+        }
     }
 
-    public DirectoryInfo CreateDirectory(string dir)
-        => Directory.CreateDirectory(System.IO.Path.Combine(Path, dir));
+    public DirectoryInfo CreateDirectory(string dir) => Directory.CreateDirectory(System.IO.Path.Combine(Path, dir));
 
     public static async Task WriteFileAsync(string targetDirectory, string fileName, string fileContents)
     {
         string finalFile = System.IO.Path.Combine(targetDirectory, fileName);
         Directory.CreateDirectory(System.IO.Path.GetDirectoryName(finalFile)!);
-        using var fs = new FileStream(finalFile, FileMode.CreateNew);
-        using var stream = new StreamWriter(fs);
+        using FileStream fs = new(finalFile, FileMode.CreateNew);
+        using StreamWriter stream = new(fs);
         await stream.WriteLineAsync(fileContents);
     }
 
-    public async Task CopyDirectoryAsync(string sourceDirectory, string targetDirectory, bool retainAttributes = false)
-        => await CopyDirectoryAsync(new DirectoryInfo(sourceDirectory), new DirectoryInfo(targetDirectory), retainAttributes);
+    public async Task CopyDirectoryAsync(string sourceDirectory, string targetDirectory, bool retainAttributes = false) => await CopyDirectoryAsync(new DirectoryInfo(sourceDirectory), new DirectoryInfo(targetDirectory), retainAttributes);
 
     public static async Task CopyDirectoryAsync(DirectoryInfo source, DirectoryInfo target, bool retainAttributes = false)
     {
@@ -79,7 +81,7 @@ public class TempDirectory : IDisposable
             else
             {
                 using FileStream fileStream = File.OpenRead(fi.FullName);
-                using var destinationStream = new FileStream(
+                using FileStream destinationStream = new(
                     System.IO.Path.Combine(target.FullName, fi.Name),
                     FileMode.CreateNew);
                 await fileStream.CopyToAsync(destinationStream);
@@ -94,8 +96,7 @@ public class TempDirectory : IDisposable
         }
     }
 
-    public void CopyDirectory(string sourceDirectory, string targetDirectory)
-        => CopyDirectory(new DirectoryInfo(sourceDirectory), new DirectoryInfo(targetDirectory));
+    public void CopyDirectory(string sourceDirectory, string targetDirectory) => CopyDirectory(new DirectoryInfo(sourceDirectory), new DirectoryInfo(targetDirectory));
 
     public static void CopyDirectory(DirectoryInfo source, DirectoryInfo target)
     {
@@ -120,7 +121,7 @@ public class TempDirectory : IDisposable
     /// </summary>
     public string[] CopyFile(params string[] filePaths)
     {
-        var paths = new List<string>(filePaths.Length);
+        List<string> paths = [with(filePaths.Length)];
         foreach (string filePath in filePaths)
         {
             string destination = System.IO.Path.Combine(Path, System.IO.Path.GetFileName(filePath));
@@ -128,7 +129,7 @@ public class TempDirectory : IDisposable
             paths.Add(destination);
         }
 
-        return paths.ToArray();
+        return [.. paths];
     }
 
     /// <summary>
@@ -141,53 +142,95 @@ public class TempDirectory : IDisposable
         return destination;
     }
 
+    [Obsolete("Don't use directly. Use TestSuiteDirectory property instead.")]
+    private static string GetTestSuiteDirectory()
+        => System.IO.Path.Combine(RepoRoot, "artifacts", "tmp", Constants.BuildConfiguration, "testsuite");
+
+    [Obsolete("Don't use directly. Use RepoRoot property instead.")]
+    private static string GetRepoRoot()
+    {
+        string? currentDirectory = AppContext.BaseDirectory;
+        while (System.IO.Path.GetFileName(currentDirectory) != "artifacts" && currentDirectory is not null)
+        {
+            currentDirectory = System.IO.Path.GetDirectoryName(currentDirectory);
+        }
+
+        return System.IO.Path.GetDirectoryName(currentDirectory)
+            ?? throw new InvalidOperationException("artifacts folder not found");
+    }
+
     /// <summary>
     /// Creates an unique temporary directory.
     /// </summary>
     /// <returns>
     /// Path of the created directory.
     /// </returns>
-    internal static (string BaseDirectory, string FinalDirectory) CreateUniqueDirectory(string? subDirectory, bool arcadeConvention)
+    internal static (string BaseDirectory, string FinalDirectory) CreateUniqueDirectory(string? subDirectory)
     {
-        if (arcadeConvention)
-        {
-            string currentDirectory = AppContext.BaseDirectory;
-            while (System.IO.Path.GetFileName(currentDirectory) != "artifacts" && currentDirectory is not null)
-            {
-                currentDirectory = System.IO.Path.GetDirectoryName(currentDirectory)!;
-            }
+        string directoryPath = System.IO.Path.Combine(TestSuiteDirectory, RandomId.Next());
+        Directory.CreateDirectory(directoryPath);
 
-            if (currentDirectory is null)
-            {
-                throw new InvalidOperationException("artifacts folder not found");
-            }
-
-            string directoryPath = System.IO.Path.Combine(currentDirectory, "tmp", Constants.BuildConfiguration, "testsuite", RandomId.Next());
-            Directory.CreateDirectory(directoryPath);
-
-            string directoryBuildProps = System.IO.Path.Combine(directoryPath, "Directory.Build.props");
-            File.WriteAllText(directoryBuildProps, $"""
+        string directoryBuildProps = System.IO.Path.Combine(directoryPath, "Directory.Build.props");
+        File.WriteAllText(directoryBuildProps, $"""
 <?xml version="1.0" encoding="utf-8"?>
 <Project>
     <PropertyGroup>
-      <RepoRoot>{System.IO.Path.GetDirectoryName(currentDirectory)}/</RepoRoot>
-      <!--
-        Do not warn about package downgrade. NuGet uses alphabetical sort as ordering so -dev or -ci are considered downgrades of -preview.
-        -->
+      <RepoRoot>{RepoRoot}/</RepoRoot>
+      <!-- Do not warn about package downgrade. NuGet uses alphabetical sort as ordering so -dev or -ci are considered downgrades of -preview. -->
       <NoWarn>NU1605</NoWarn>
       <RunAnalyzers>false</RunAnalyzers>
+      <!-- Prevent build warnings/errors on unsupported TFMs -->
+      <CheckEolTargetFramework>false</CheckEolTargetFramework>
     </PropertyGroup>
 </Project>
 """);
 
-            string directoryBuildTarget = System.IO.Path.Combine(directoryPath, "Directory.Build.targets");
-            File.WriteAllText(directoryBuildTarget, """
+        string directoryBuildTarget = System.IO.Path.Combine(directoryPath, "Directory.Build.targets");
+        File.WriteAllText(directoryBuildTarget, $"""
 <?xml version="1.0" encoding="utf-8"?>
-<Project/>
+<Project>
+    <ItemGroup>
+        <!-- EnableMicrosoftTestingPlatform is already handled by MSTest.Sdk, but not when using MSTest metapackage -->
+        <!-- Historically, EnableMicrosoftTestingPlatform existed first in MSTest.Sdk with the goal of fixing our tests -->
+        <!-- Then, this code was introduced. -->
+        <!-- As EnableMicrosoftTestingPlatform isn't expected/intended to be used by users, it may be possible to remove it from MSTest.Sdk -->
+        <!-- The code here should solve the issue either way. -->
+        <!--
+            This property is not required by users and is only set to simplify our testing infrastructure. When testing out in local or ci,
+            we end up with a -dev or -ci version which will lose resolution over -preview dependency of code coverage. Because we want to
+            ensure we are testing with locally built version, we force adding the platform dependency.
+        -->
+        <PackageReference Include="Microsoft.Testing.Platform" Version="{ExtensionVersion.DefaultSemVer}" Condition="'$(UsingMSTestSdk)' != 'true' AND '$(EnableMicrosoftTestingPlatform)' == 'true'" />
+    </ItemGroup>
+
+    <!-- Note: Generally, RunCommand should never be dotnet if UseAppHost is not false. However, because VSTest sets OutputType late in its targets, it breaks assumptions in SDK. So we special case that here. -->
+    <Target Name="WorkaroundMacOSDumpIssue" AfterTargets="Build" Condition="$([MSBuild]::IsOSPlatform('OSX')) AND '$(UseAppHost)' != 'false' AND '$(OutputType)' == 'Exe' AND '$(TargetFramework)' != '' AND '$(RunCommand)' != '' AND '$(RunCommand)' != 'dotnet'">
+        <Exec Command="codesign --sign - --force --entitlements '$(MSBuildThisFileDirectory)mtp-test-entitlements.plist' '$(RunCommand)'" />
+    </Target>
+</Project>
 """);
 
-            string directoryPackagesProps = System.IO.Path.Combine(directoryPath, "Directory.Packages.props");
-            File.WriteAllText(directoryPackagesProps, """
+        File.WriteAllText(System.IO.Path.Combine(directoryPath, "mtp-test-entitlements.plist"), """
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+    <dict>
+    <key>com.apple.security.cs.allow-jit</key>
+        <true/>
+    <key>com.apple.security.cs.allow-dyld-environment-variables</key>
+        <true/>
+    <key>com.apple.security.cs.disable-library-validation</key>
+        <true/>
+    <key>com.apple.security.cs.debugger</key>
+        <true/>
+    <key>com.apple.security.get-task-allow</key>
+        <true/>
+    </dict>
+</plist>
+""");
+
+        string directoryPackagesProps = System.IO.Path.Combine(directoryPath, "Directory.Packages.props");
+        File.WriteAllText(directoryPackagesProps, """
 <?xml version="1.0" encoding="utf-8"?>
 <Project>
     <PropertyGroup>
@@ -196,110 +239,16 @@ public class TempDirectory : IDisposable
 </Project>
 """);
 
-            string finalDirectory = directoryPath;
-            if (!string.IsNullOrWhiteSpace(subDirectory))
-            {
-                finalDirectory = System.IO.Path.Combine(directoryPath, subDirectory);
-            }
-
-            Directory.CreateDirectory(finalDirectory);
-
-            return (directoryPath, finalDirectory);
-        }
-        else
+        string finalDirectory = directoryPath;
+        if (!string.IsNullOrWhiteSpace(subDirectory))
         {
-            string temp = GetTempPath();
-            string directoryPath = System.IO.Path.Combine(temp, "testingplatform", RandomId.Next());
-            string finalDirectory = directoryPath;
-            if (!string.IsNullOrWhiteSpace(subDirectory))
-            {
-                finalDirectory = System.IO.Path.Combine(directoryPath, subDirectory);
-            }
-
-            Directory.CreateDirectory(finalDirectory);
-
-            return (directoryPath, finalDirectory);
-        }
-    }
-
-    // AGENT_TEMPDIRECTORY is Azure DevOps variable, which is set to path
-    // that is cleaned up after every job. This is preferable to use over
-    // just the normal TEMP, because that is not cleaned up for every run.
-    //
-    // System.IO.Path.GetTempPath is banned from the rest of the code. This is the only
-    // place where we are allowed to use it. All other methods should use our GetTempPath (this method).
-    private static string GetTempPath()
-        => Environment.GetEnvironmentVariable("AGENT_TEMPDIRECTORY")
-        ?? System.IO.Path.GetTempPath();
-
-    public void Clean()
-    {
-        if (!Directory.Exists(_baseDirectory))
-        {
-            return;
+            finalDirectory = System.IO.Path.Combine(directoryPath, subDirectory);
         }
 
-        try
-        {
-            Directory.Delete(_baseDirectory, recursive: true);
-        }
-        catch
-        {
-        }
-    }
+        Directory.CreateDirectory(finalDirectory);
 
-    public void Add(string fileContents)
-    {
-        List<InlineFile> files = InlineFileParser.ParseFiles(fileContents);
-        foreach (InlineFile file in files)
-        {
-            File.WriteAllText(System.IO.Path.Combine(Path, file.Name), file.Content, Encoding.UTF8);
-        }
+        return (directoryPath, finalDirectory);
     }
 
     public override string ToString() => Path;
-
-    internal sealed class InlineFile(string name, string content)
-    {
-        public string Name { get; } = name;
-
-        public string Content { get; } = content;
-    }
-
-    internal static class InlineFileParser
-    {
-        internal static List<InlineFile> ParseFiles(string fileContents)
-        {
-            List<InlineFile> files = new();
-            string? name = null;
-            bool inFile = false;
-            List<string> lines = new();
-            foreach (string line in fileContents.Split('\n'))
-            {
-                if (line.Trim()?.StartsWith("### ", StringComparison.InvariantCulture) ?? false)
-                {
-                    if (inFile)
-                    {
-                        files.Add(new InlineFile(name!, string.Join(Environment.NewLine, lines)));
-                        inFile = false;
-                        name = null;
-                        lines.Clear();
-                    }
-
-                    inFile = true;
-                    name = line.Trim().TrimStart('#').Trim();
-                    continue;
-                }
-
-                lines.Add(line);
-            }
-
-            if (inFile)
-            {
-                files.Add(new InlineFile(name!, string.Join(Environment.NewLine, lines)));
-            }
-
-            return files;
-        }
-    }
 }

@@ -1,12 +1,11 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System.Diagnostics.CodeAnalysis;
-
-using Microsoft.Testing.Platform.Helpers;
-
 namespace Microsoft.Testing.Platform.Extensions.Messages;
 
+/// <summary>
+/// Represents a property bag.
+/// </summary>
 public sealed partial class PropertyBag
 {
     // Optimized access to the TestNodeStateProperty, it's one of the most used property.
@@ -23,13 +22,20 @@ public sealed partial class PropertyBag
     internal /* for testing */ Property? _property;
 #pragma warning restore SA1401 // Fields should be private
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="PropertyBag"/> class.
+    /// </summary>
     public PropertyBag()
     {
     }
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="PropertyBag"/> class.
+    /// </summary>
+    /// <param name="properties">The collection of properties.</param>
     public PropertyBag(params IProperty[] properties)
     {
-        ArgumentGuard.IsNotNull(properties);
+        _ = properties ?? throw new ArgumentNullException(nameof(properties));
 
         if (properties.Length == 0)
         {
@@ -66,14 +72,13 @@ public sealed partial class PropertyBag
         }
     }
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="PropertyBag"/> class.
+    /// </summary>
+    /// <param name="properties">The collection of properties.</param>
     public PropertyBag(IEnumerable<IProperty> properties)
     {
-        ArgumentGuard.IsNotNull(properties);
-
-        if (!properties.Any())
-        {
-            return;
-        }
+        _ = properties ?? throw new ArgumentNullException(nameof(properties));
 
         foreach (IProperty property in properties)
         {
@@ -105,13 +110,20 @@ public sealed partial class PropertyBag
         }
     }
 
+    /// <summary>
+    /// Gets the number of properties in the bag.
+    /// </summary>
     public int Count => _property is null
         ? _testNodeStateProperty is null ? 0 : 1
         : _property.Count + (_testNodeStateProperty is not null ? 1 : 0);
 
+    /// <summary>
+    /// Adds a property to the bag.
+    /// </summary>
+    /// <param name="property">The property to add.</param>
     public void Add(IProperty property)
     {
-        ArgumentGuard.IsNotNull(property);
+        _ = property ?? throw new ArgumentNullException(nameof(property));
 
         // Optimized access to the TestNodeStateProperty, it's one of the most used property.
         if (property is TestNodeStateProperty testNodeStateProperty)
@@ -141,6 +153,11 @@ public sealed partial class PropertyBag
         }
     }
 
+    /// <summary>
+    /// Determines whether the bag contains a property of the specified type.
+    /// </summary>
+    /// <typeparam name="TProperty">The type of the property.</typeparam>
+    /// <returns><c>true</c> if the bag contains a property of the specified type; <c>false</c> otherwise.</returns>
     public bool Any<TProperty>()
         where TProperty : IProperty
     {
@@ -153,6 +170,12 @@ public sealed partial class PropertyBag
         return !typeof(TestNodeStateProperty).IsAssignableFrom(typeof(TProperty)) && _property?.Any<TProperty>() == true;
     }
 
+    /// <summary>
+    /// Returns the only property of the <typeparamref name="TProperty"/> type, or default, and throws an exception if there is more than one element.
+    /// </summary>
+    /// <typeparam name="TProperty">The type of the property.</typeparam>
+    /// <returns>The single item of the given type or default.</returns>
+    /// <exception cref="InvalidOperationException">Thrown when more than one property of the given type was found.</exception>
     public TProperty? SingleOrDefault<TProperty>()
         where TProperty : IProperty
     {
@@ -167,15 +190,35 @@ public sealed partial class PropertyBag
             return default;
         }
 
-        IEnumerable<TProperty> matchingValues = _property is null ? Array.Empty<TProperty>() : _property.OfType<TProperty>();
+        // Direct linked-list walk: avoids allocating a yield-iterator state machine.
+        TProperty? found = default;
+        bool foundAny = false;
+        Property? current = _property;
+        while (current is not null)
+        {
+            if (current.Current is TProperty match)
+            {
+                if (foundAny)
+                {
+                    throw new InvalidOperationException($"Found multiple properties of type '{typeof(TProperty)}'.");
+                }
 
-        return !matchingValues.Any()
-            ? default
-            : matchingValues.Skip(1).Any()
-                ? throw new InvalidOperationException($"Found multiple properties of type '{typeof(TProperty)}'.")
-                : matchingValues.First();
+                found = match;
+                foundAny = true;
+            }
+
+            current = current.Next;
+        }
+
+        return found;
     }
 
+    /// <summary>
+    /// Returns the only property of the <typeparamref name="TProperty"/> type, and throws an exception if there is not exactly one element.
+    /// </summary>
+    /// <typeparam name="TProperty">The type of the property.</typeparam>
+    /// <returns>The single property of the given type.</returns>
+    /// <exception cref="InvalidOperationException">Thrown when not exactly one property of the given type was found.</exception>
     [SuppressMessage("Naming", "CA1720:Identifier contains type name", Justification = "No interop")]
     public TProperty Single<TProperty>()
         where TProperty : IProperty
@@ -191,15 +234,37 @@ public sealed partial class PropertyBag
             throw new InvalidOperationException($"Could not find a property of type '{typeof(TProperty)}'.");
         }
 
-        IEnumerable<TProperty> matchingValues = _property is null ? Array.Empty<TProperty>() : _property.OfType<TProperty>();
+        // Direct linked-list walk: avoids allocating three separate yield-iterator state machines
+        // (the original code called Any(), Skip(1).Any(), and First() on the same IEnumerable).
+        TProperty? found = default;
+        bool foundAny = false;
+        Property? current = _property;
+        while (current is not null)
+        {
+            if (current.Current is TProperty match)
+            {
+                if (foundAny)
+                {
+                    throw new InvalidOperationException($"Found multiple properties of type '{typeof(TProperty)}'.");
+                }
 
-        return !matchingValues.Any()
-            ? throw new InvalidOperationException($"Could not find a property of type '{typeof(TProperty)}'.")
-            : matchingValues.Skip(1).Any()
-                ? throw new InvalidOperationException($"Found multiple properties of type '{typeof(TProperty)}'.")
-                : matchingValues.First();
+                found = match;
+                foundAny = true;
+            }
+
+            current = current.Next;
+        }
+
+        return foundAny
+            ? found!
+            : throw new InvalidOperationException($"Could not find a property of type '{typeof(TProperty)}'.");
     }
 
+    /// <summary>
+    /// Gets the properties of the <typeparamref name="TProperty"/> type.
+    /// </summary>
+    /// <typeparam name="TProperty">The property type.</typeparam>
+    /// <returns>An array of properties matching the given type.</returns>
     public TProperty[] OfType<TProperty>()
         where TProperty : IProperty
     {
@@ -209,18 +274,61 @@ public sealed partial class PropertyBag
         }
 
         // We don't want to allocate an array if we know that we're looking for a TestNodeStateProperty
-        return typeof(TestNodeStateProperty).IsAssignableFrom(typeof(TProperty))
+        if (typeof(TestNodeStateProperty).IsAssignableFrom(typeof(TProperty)) || _property is null)
+        {
+            return [];
+        }
+
+        // Direct linked-list walk: avoids allocating a yield-iterator state machine
+        // (the original code called _property.OfType<TProperty>() which uses yield return).
+        TProperty? first = default;
+        bool foundAny = false;
+        List<TProperty>? overflow = null;
+        Property? current = _property;
+        while (current is not null)
+        {
+            if (current.Current is TProperty match)
+            {
+                if (!foundAny)
+                {
+                    first = match;
+                    foundAny = true;
+                }
+                else
+                {
+                    (overflow ??= [first!]).Add(match);
+                }
+            }
+
+            current = current.Next;
+        }
+
+        return !foundAny
             ? []
-            : _property is null ? [] : _property.OfType<TProperty>().ToArray();
+            : overflow is not null ? [.. overflow] : [first!];
     }
 
+    /// <summary>
+    /// Returns an enumerable that iterates through the collection.
+    /// </summary>
+    /// <returns>The collection of properties.</returns>
     public IEnumerable<IProperty> AsEnumerable()
         => new PropertyBagEnumerable(_property, _testNodeStateProperty);
 
+    /// <summary>
+    /// Returns an enumerator that iterates through the collection.
+    /// </summary>
+    /// <returns>The enumerator of <see cref="IProperty"/>.</returns>
     // Duck typing for the enumerator, to avoid the direct usage of LINQ extension methods.
     // For LINQ usage, please use the AsEnumerable() method.
     public IEnumerator<IProperty> GetEnumerator()
         => new PropertyBagEnumerator(_property, _testNodeStateProperty);
+
+    // Returns the struct-based enumerator by value to allow zero-allocation iteration
+    // from inside the assembly (avoids the boxing that happens when the public
+    // GetEnumerator() returns the struct as IEnumerator<IProperty>).
+    internal PropertyBagEnumerator GetStructEnumerator()
+        => new(_property, _testNodeStateProperty);
 
     [DoesNotReturn]
     private static void ThrowDuplicatedPropertyType(IProperty property)

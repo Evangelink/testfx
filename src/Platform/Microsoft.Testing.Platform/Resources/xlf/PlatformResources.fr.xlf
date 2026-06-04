@@ -2,6 +2,41 @@
 <xliff xmlns="urn:oasis:names:tc:xliff:document:1.2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="1.2" xsi:schemaLocation="urn:oasis:names:tc:xliff:document:1.2 xliff-core-1.2-transitional.xsd">
   <file datatype="xml" source-language="en" target-language="fr" original="../PlatformResources.resx">
     <body>
+      <trans-unit id="AbortForMaxFailedTestsCapabilityNotAvailable">
+        <source>The current test framework does not implement 'IGracefulStopTestExecutionCapability' which is required for '--maximum-failed-tests' feature.</source>
+        <target state="translated">Le framework de tests actuel n’implémente pas 'IGracefulStopTestExecutionCapability', qui est requis pour la fonctionnalité '--maximum-failed-tests'.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="AbortForMaxFailedTestsDescription">
+        <source>Extension used to support '--maximum-failed-tests'. When a given failures threshold is reached, the test run will be aborted.</source>
+        <target state="translated">Extension utilisée pour prendre en charge '--maximum-failed-tests'. Quand un seuil d’échecs donné est atteint, la série de tests est abandonnée.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="Aborted">
+        <source>Aborted</source>
+        <target state="translated">Abandonné</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="Actual">
+        <source>Actual</source>
+        <target state="translated">Réel</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="CancelledLowercase">
+        <source>canceled</source>
+        <target state="translated">annulé</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="CancellingTestSession">
+        <source>Canceling the test session...</source>
+        <target state="translated">Annulation en cours de la session de test... Merci de patienter.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="BrowserPlatformNotSupportedOnOlderFrameworks">
+        <source>Browser platform is only supported on .NET 7.0 or greater.</source>
+        <target state="translated">La plateforme du navigateur est uniquement prise en charge sur .NET 7.0 ou version ultérieure.</target>
+        <note />
+      </trans-unit>
       <trans-unit id="CannotCreateTestExecutionFilterErrorMessage">
         <source>Failed to create a test execution filter</source>
         <target state="translated">Désolé, échec de la création d’un filtre d’exécution de test</target>
@@ -73,8 +108,8 @@
         <note />
       </trans-unit>
       <trans-unit id="CommandLineOptionIsDeclaredByMultipleProviders">
-        <source>Option '--{0}' is declared by multiple extensions: '{0}'</source>
-        <target state="translated">L’option « --{0} » est déclarée par plusieurs extensions : « {0} »</target>
+        <source>Option '--{0}' is declared by multiple providers: '{1}'</source>
+        <target state="new">Option '--{0}' is declared by multiple providers: '{1}'</target>
         <note />
       </trans-unit>
       <trans-unit id="CommandLineOptionIsDeclaredByMultipleProvidersWorkaround">
@@ -83,8 +118,8 @@
         <note />
       </trans-unit>
       <trans-unit id="CommandLineOptionIsReserved">
-        <source>Option '--{0}' is reserved and cannot be used by providers: '{0}'</source>
-        <target state="translated">L’option « --{0} » est réservée et ne peut pas être utilisée par les fournisseurs : « {0} »</target>
+        <source>Option '--{0}' is reserved and cannot be used by providers: '{1}'</source>
+        <target state="translated">L’option « --{0} » est réservée et ne peut pas être utilisée par les fournisseurs : « {1} »</target>
         <note />
       </trans-unit>
       <trans-unit id="CommandLineOptionIsUsingReservedPrefix">
@@ -92,14 +127,34 @@
         <target state="translated">L’option « --{0} » du fournisseur « {1} » (UID : {2}) utilise le préfixe réservé « --internal »</target>
         <note />
       </trans-unit>
+      <trans-unit id="CommandLineOptionsNotReady">
+        <source>The ICommandLineOptions has not been built yet.</source>
+        <target state="translated">ICommandLineOptions n’a pas encore été généré.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="CommandLineParserFailedToReadResponseFile">
+        <source>Failed to read response file '{0}'. {1}.</source>
+        <target state="translated">La lecture du fichier de réponse « {0} » a échoué. {1}.</target>
+        <note>{1} is the exception</note>
+      </trans-unit>
+      <trans-unit id="CommandLineParserResponseFileNotFound">
+        <source>The response file '{0}' was not found</source>
+        <target state="translated">Le fichier réponse « {0} » est introuvable</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="CommandLineParserUnclosedQuoteInCommandLine">
+        <source>Unclosed quote in command line</source>
+        <target state="translated">Guillemet non fermé sur la ligne de commande</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="CommandLineParserUnclosedQuoteInResponseFile">
+        <source>Unclosed quote in response file at line {0}</source>
+        <target state="translated">Guillemet non fermé dans le fichier de réponse à la ligne {0}</target>
+        <note>{0} is the line number</note>
+      </trans-unit>
       <trans-unit id="CommandLineParserUnexpectedArgument">
         <source>Unexpected argument {0}</source>
         <target state="translated">Arguments inattendue {0}</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="CommandLineParserUnexpectedNullArgument">
-        <source>Unexpected null argument at index {0}</source>
-        <target state="translated">Argument null inattendu à l’index de recherche{0}</target>
         <note />
       </trans-unit>
       <trans-unit id="CommandLineParserUnexpectedSingleQuoteInArgument">
@@ -117,9 +172,19 @@
         <target state="translated">Option « --{0} » inconnue.</target>
         <note />
       </trans-unit>
+      <trans-unit id="CommandLineValidationCommandLine">
+        <source>Command line: {0}</source>
+        <target state="translated">Ligne de commande : {0}</target>
+        <note>{0} is the command line used to run the application.</note>
+      </trans-unit>
       <trans-unit id="CompositeServiceFactoryInstanceAlreadyRegistered">
-        <source>The same instance of 'CompositeExtensonFactory' is already registered</source>
-        <target state="translated">La même instance de « CompositeExtensonFactory » est déjà inscrite</target>
+        <source>The same instance of 'CompositeExtensionFactory' is already registered</source>
+        <target state="translated">La même instance de 'CompositeExtensionFactory' est déjà enregistrée</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ConfigurationFileNotFound">
+        <source>The configuration file '{0}' specified with '--config-file' could not be found.</source>
+        <target state="translated">Nous n’avons pas pu trouver le fichier de configuration « {0} » spécifié avec « --config-file ».</target>
         <note />
       </trans-unit>
       <trans-unit id="ConfigurationManagerCannotFindDefaultJsonConfigurationErrorMessage">
@@ -131,6 +196,11 @@
         <source>Connecting to client host '{0}' port '{1}'</source>
         <target state="translated">Connexion au « {0} » de port « {1} » de l’hôte client</target>
         <note />
+      </trans-unit>
+      <trans-unit id="ConsoleIsAlreadyInBatchingMode">
+        <source>Console is already in batching mode.</source>
+        <target state="translated">La console est déjà en mode de traitement par lot.</target>
+        <note>Exception that is thrown when console is already collecting input into a batch (into a string builder), and code asks to enable batching mode again.</note>
       </trans-unit>
       <trans-unit id="ConsoleTestExecutionFilterFactoryDescription">
         <source>Creates the right test execution filter for console mode</source>
@@ -147,9 +217,56 @@
         <target state="translated">Répertoire « {0} » introuvable.</target>
         <note />
       </trans-unit>
+      <trans-unit id="DeprecatedEnvironmentVariableWarning">
+        <source>Warning: The environment variable '{0}' is deprecated and will be removed in a future major version. Use '{1}' instead.</source>
+        <target state="translated">Avertissement : la variable d’environnement « {0} » est déconseillée et sera supprimée dans une prochaine version majeure. Utilisez « {1} » à la place.</target>
+        <note>{0} is the deprecated environment variable name, {1} is the replacement environment variable name.</note>
+      </trans-unit>
+      <trans-unit id="DiagnosticFileLevelWithAsyncFlush">
+        <source>Diagnostic file (level '{0}' with async flush): {1}</source>
+        <target state="translated">Fichier de diagnostic (niveau « {0} » avec vidage asynchrone) : {1}</target>
+        <note>0 level such as verbose,
+1 path to file</note>
+      </trans-unit>
+      <trans-unit id="DiagnosticFileLevelWithFlush">
+        <source>Diagnostic file (level '{0}' with sync flush): {1}</source>
+        <target state="translated">Fichier de diagnostic (niveau « {0} » avec vidage synchrone) : {1}</target>
+        <note>0 level such as verbose,
+1 path to file</note>
+      </trans-unit>
+      <trans-unit id="DiscoveredTestsInAssembly">
+        <source>Discovered {0} test(s) in assembly</source>
+        <target state="translated">{0} test(s) découvert(s) dans l’assembly</target>
+        <note>0 is count, the sentence is followed by the path of the assebly</note>
+      </trans-unit>
+      <trans-unit id="DiscoveringTestsFrom">
+        <source>Discovering tests from</source>
+        <target state="translated">Découverte des tests à partir de</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DurationLowercase">
+        <source>duration</source>
+        <target state="translated">durée</target>
+        <note />
+      </trans-unit>
       <trans-unit id="EnvironmentVariableProviderFailedWithError">
         <source>Provider '{0}' (UID: {1}) failed with error: {2}</source>
         <target state="translated">Désolé, échec de l’« {0} » du fournisseur (UID : {1}) avec l’erreur : {2}</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ExceptionDuringCancellationWarningMessage">
+        <source>Exception during the cancellation of request id '{0}'</source>
+        <target state="translated">Exception lors de l’annulation de l’ID de demande '{0}'</target>
+        <note>{0} is the request id</note>
+      </trans-unit>
+      <trans-unit id="ExitCode">
+        <source>Exit code</source>
+        <target state="translated">Code de sortie</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="Expected">
+        <source>Expected</source>
+        <target state="translated">Attendu</target>
         <note />
       </trans-unit>
       <trans-unit id="ExtensionDoesNotImplementGivenInterfaceErrorMessage">
@@ -158,8 +275,18 @@
         <note />
       </trans-unit>
       <trans-unit id="ExtensionWithSameUidAlreadyRegisteredErrorMessage">
-        <source>Another extension with same the same UID '{0}' has already been registered. Registered extension is of type '{1}'</source>
-        <target state="translated">Désolé, une autre extension avec le même UID « {0} » a déjà été inscrite. Désolé, l’extension inscrite est de type « {1} »</target>
+        <source>Extensions with the same UID '{0}' have already been registered. Registered extensions are of types: {1}</source>
+        <target state="translated">Les extensions ayant le même UID « {0} » ont déjà été enregistrées. Les extensions enregistrées sont de types : {1}</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="Failed">
+        <source>Failed</source>
+        <target state="translated">Échec</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="FailedLowercase">
+        <source>failed</source>
+        <target state="translated">échec</target>
         <note />
       </trans-unit>
       <trans-unit id="FailedToWriteLogToChannelErrorMessage">
@@ -168,6 +295,36 @@
         <target state="translated">Désolé, échec de l’écriture du journal sur le canal. Contenu du journal manqué :
 {0}</target>
         <note />
+      </trans-unit>
+      <trans-unit id="FailedWithErrors">
+        <source>failed with {0} error(s)</source>
+        <target state="translated">a échoué avec {0} erreur(s)</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="FailedWithErrorsAndWarnings">
+        <source>failed with {0} error(s) and {1} warning(s)</source>
+        <target state="translated">a échoué avec {0} erreur(s) et {1} avertissement(s)</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="FailedWithWarnings">
+        <source>failed with {0} warning(s)</source>
+        <target state="translated">a échoué avec {0} avertissement(s)</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="FinishedTestSession">
+        <source>Finished test session.</source>
+        <target state="translated">Session de test terminée.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ForTest">
+        <source>For test</source>
+        <target state="translated">Pour le test</target>
+        <note>is followed by test name</note>
+      </trans-unit>
+      <trans-unit id="FromFile">
+        <source>from</source>
+        <target state="translated">à partir de</target>
+        <note>from followed by a file name to point to the file from which test is originating</note>
       </trans-unit>
       <trans-unit id="GlobalValidationOfTestHostEnvironmentVariablesFailedErrorMessage">
         <source>The following 'ITestHostEnvironmentVariableProvider' providers rejected the final environment variables setup:</source>
@@ -204,6 +361,11 @@
         <target state="translated">&lt;test application runner&gt;</target>
         <note />
       </trans-unit>
+      <trans-unit id="InProcessArtifactsProduced">
+        <source>In process file artifacts produced:</source>
+        <target state="translated">Artéfacts produits dans les dossiers en cours de traitement :</target>
+        <note />
+      </trans-unit>
       <trans-unit id="InternalLoopAsyncDidNotExitSuccessfullyErrorMessage">
         <source>Method '{0}' did not exit successfully</source>
         <target state="translated">La méthode « {0} » ne s’est pas arrêtée correctement</target>
@@ -213,6 +375,16 @@
         <source>Invalid command line arguments:</source>
         <target state="translated">Arguments de ligne de commande non valides :</target>
         <note />
+      </trans-unit>
+      <trans-unit id="JsonCommandLineOptionsEntryMustBeScalarOrArrayErrorMessage">
+        <source>The entry '{0}' under section '{1}' in the testconfig.json file ('{2}') must be either a scalar value (string, number, boolean) or an array of scalar values. Nested objects are not supported.</source>
+        <target state="new">The entry '{0}' under section '{1}' in the testconfig.json file ('{2}') must be either a scalar value (string, number, boolean) or an array of scalar values. Nested objects are not supported.</target>
+        <note>{0} is the entry name relative to the section (e.g. an option name like 'timeout' or an indexed key like 'timeout:0'). {1} is the section name (commandLineOptions). {2} is the path to the testconfig.json file.</note>
+      </trans-unit>
+      <trans-unit id="JsonCommandLineOptionsValidationErrorPrefix">
+        <source>In testconfig.json under 'commandLineOptions': {0}</source>
+        <target state="new">In testconfig.json under 'commandLineOptions': {0}</target>
+        <note>{0} is the underlying validation error message (unknown option, arity mismatch, invalid arguments...).</note>
       </trans-unit>
       <trans-unit id="JsonConfigurationFileParserDuplicateKeyErrorMessage">
         <source>A duplicate key '{0}' was found</source>
@@ -229,6 +401,16 @@
         <target state="translated">Le jeton JSON «{0}{0} » non pris en charge a été trouvé</target>
         <note />
       </trans-unit>
+      <trans-unit id="JsonConfigurationSectionEntryMustBeScalarErrorMessage">
+        <source>The entry '{0}' under section '{1}' in the testconfig.json file ('{2}') must be a scalar string value. Nested objects and arrays are not supported.</source>
+        <target state="translated">L’entrée « {0} » sous la section « {1} » dans le fichier testconfig.json (« {2} ») doit être une chaîne scalaire. Les objets imbriqués et les tableaux ne sont pas pris en charge.</target>
+        <note>{0} is the full dotted/colon-separated key. {1} is the section name. {2} is the path to the testconfig.json file.</note>
+      </trans-unit>
+      <trans-unit id="JsonConfigurationSectionMustBeAnObjectErrorMessage">
+        <source>The '{0}' section in the testconfig.json file ('{1}') must be a JSON object.</source>
+        <target state="translated">La section « {0} » dans le fichier testconfig.json (« {1} ») doit être un objet JSON.</target>
+        <note>{0} is the section name (e.g. environmentVariables). {1} is the path to the testconfig.json file.</note>
+      </trans-unit>
       <trans-unit id="JsonRpcTcpServerDescription">
         <source>JsonRpc server implementation based on the test platform protocol specification.</source>
         <target state="translated">Implémentation du serveur JsonRpc basée sur la spécification du protocole de plateforme de test.</target>
@@ -239,14 +421,39 @@
         <target state="translated">Établissement d’une liaison entre le serveur et le client JsonRpc, implémentation basée sur la spécification du protocole de la plateforme de test.</target>
         <note />
       </trans-unit>
-      <trans-unit id="NoSerializerRegisteredWithIdErrorMessage">
-        <source>No serializer registered with ID '{0}'</source>
-        <target state="translated">Aucun sérialiseur inscrit avec l’ID « {0} »</target>
+      <trans-unit id="LoggerFactoryNotReady">
+        <source>The ILoggerFactory has not been built yet.</source>
+        <target state="translated">ILoggerFactory n’a pas encore été généré.</target>
         <note />
       </trans-unit>
-      <trans-unit id="NoSerializerRegisteredWithTypeErrorMessage">
-        <source>No serializer registered with type '{0}'</source>
-        <target state="translated">Aucun sérialiseur inscrit avec le type « {0} »</target>
+      <trans-unit id="MaxFailedTestsMustBePositive">
+        <source>The option '--maximum-failed-tests' must be a positive integer. The value '{0}' is not valid.</source>
+        <target state="translated">L’option '--maximum-failed-tests' doit être un entier positif. La valeur '{0}' n’est pas valide.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="MessageBusNotReady">
+        <source>The message bus has not been built yet or is no more usable at this stage.</source>
+        <target state="translated">Le bus de messages n’a pas encore été généré ou n’est plus utilisable à ce stade.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="MinimumExpectedTestsPolicyViolation">
+        <source>Minimum expected tests policy violation, tests ran {0}, minimum expected {1}</source>
+        <target state="translated">Violation de stratégie de tests minimale attendue, tests exécutés {0}, minimum attendu {1}</target>
+        <note>{0}, {1} number of tests</note>
+      </trans-unit>
+      <trans-unit id="MissingClientPortFoJsonRpc">
+        <source>Expected --client-port when jsonRpc protocol is used.</source>
+        <target state="translated">Attendu --client-port attendu lorsque le protocole jsonRpc est utilisé.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ActiveTestsRunning_MoreTestsCount">
+        <source>and {0} more</source>
+        <target state="translated">et {0} de plus</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ActiveTestsRunning_FullTestsCount">
+        <source>{0} tests running</source>
+        <target state="translated">{0} tests en cours d’exécution</target>
         <note />
       </trans-unit>
       <trans-unit id="NotAvailable">
@@ -259,14 +466,29 @@
         <target state="translated">Introuvable</target>
         <note />
       </trans-unit>
+      <trans-unit id="OnlyOneFilterSupported">
+        <source>Passing both '--treenode-filter' and '--filter-uid' is unsupported.</source>
+        <target state="translated">Vous ne pouvez pas passer à la fois « --treenode-filter » et « --filter-uid ». Cette action n’est pas prise en charge.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="OutOfProcessArtifactsProduced">
+        <source>Out of process file artifacts produced:</source>
+        <target state="translated">Artefacts de fichier hors processus produits :</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="Passed">
+        <source>Passed</source>
+        <target state="translated">Réussite</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PassedLowercase">
+        <source>passed</source>
+        <target state="translated">réussite</target>
+        <note />
+      </trans-unit>
       <trans-unit id="PlatformCommandLineClientHostOptionDescription">
         <source>Specify the hostname of the client.</source>
         <target state="translated">Spécifier le nom d’hôte du client.</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="PlatformCommandLineClientHostOptionSingleArgument">
-        <source>'--client-host' expects a single host name as argument</source>
-        <target state="translated">« --client-host » attend un nom d’hôte unique comme argument</target>
         <note />
       </trans-unit>
       <trans-unit id="PlatformCommandLineClientPortOptionDescription">
@@ -274,19 +496,30 @@
         <target state="translated">Spécifier le port du client.</target>
         <note />
       </trans-unit>
-      <trans-unit id="PlatformCommandLineDiagnosticFileLoggerSynchronousWriteOptionDescription">
-        <source>Force the built-in file logger to write the log synchronously. Useful for scenario where you don't want to lose any log (i.e. in case of crash). Note that this is slowing down the test execution.</source>
-        <target state="translated">Forcer l’enregistreur d’événements de fichiers intégré à écrire le journal de manière synchrone. Utile pour les scénarios où vous ne voulez pas perdre de journal (c’est-à-dire en cas d’incident). Notez que cela ralentit l’exécution du test.</target>
+      <trans-unit id="PlatformCommandLineConfigFileOptionDescription">
+        <source>Specifies a testconfig.json file.</source>
+        <target state="translated">Spécifie un fichier testconfig.json.</target>
         <note />
       </trans-unit>
-      <trans-unit id="PlatformCommandLineDiagnosticFilePrefixOptionSingleArgument">
-        <source>'--diagnostic-output-fileprefix' expects a single file name prefix argument</source>
-        <target state="translated">« --diagnostic-output-fileprefix » attend un argument de préfixe de nom de fichier unique</target>
+      <trans-unit id="PlatformCommandLineDebugAttachOptionDescription">
+        <source>Allows to pause execution in order to attach to the process for debug purposes.</source>
+        <target state="translated">Permet de suspendre l’exécution afin de s’attacher au processus à des fins de débogage.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PlatformCommandLineDiagnosticFileLoggerSynchronousWriteOptionDescription">
+        <source>Force the built-in file logger to write the log synchronously.
+Useful for scenario where you don't want to lose any log (i.e. in case of crash).
+Note that this is slowing down the test execution.</source>
+        <target state="translated">Forcer l’enregistreur d’événements de fichiers intégré à écrire le journal de manière synchrone.
+Utile pour les scénarios où vous ne voulez pas perdre de journal (c’est-à-dire en cas d’incident).
+Notez que cela ralentit l’exécution du test.</target>
         <note />
       </trans-unit>
       <trans-unit id="PlatformCommandLineDiagnosticOptionDescription">
-        <source>Enable the diagnostic logging. The default log level is 'Trace'. The file will be written in the output directory with the name log_[MMddHHssfff].diag</source>
-        <target state="translated">Activez la journalisation des diagnostics. Le niveau de consignation par défaut est « Trace ». Le fichier sera écrit dans le répertoire de sortie avec le nom log_[MMddHHssfff].diag</target>
+        <source>Enable the diagnostic logging. The default log level is 'Trace'.
+The file will be written in the output directory with the name log_[yyMMddHHmmssfff].diag</source>
+        <target state="translated">Activer la journalisation des diagnostics. Le niveau de consignation par défaut est « Trace ».
+Le fichier sera écrit dans le répertoire de sortie avec le nom log_[yyMMddHmmssfff].diag</target>
         <note />
       </trans-unit>
       <trans-unit id="PlatformCommandLineDiagnosticOptionExpectsSingleArgumentErrorMessage">
@@ -300,13 +533,10 @@
         <note />
       </trans-unit>
       <trans-unit id="PlatformCommandLineDiagnosticOutputDirectoryOptionDescription">
-        <source>Output directory of the diagnostic logging, if not specified the file will be generated inside the default 'TestResults' directory.</source>
-        <target state="translated">Répertoire de sortie de la journalisation des diagnostics. S’il n’est pas spécifié, le fichier est généré dans le répertoire ’TestResults’ par défaut.</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="PlatformCommandLineDiagnosticOutputDirectoryOptionSingleArgument">
-        <source>'--diagnostic-output-directory' expects a single directory name argument</source>
-        <target state="translated">« --diagnostic-output-directory » attend un argument de nom de répertoire unique</target>
+        <source>Output directory of the diagnostic logging.
+If not specified the file will be generated inside the default 'TestResults' directory.</source>
+        <target state="translated">Répertoire de sortie de la journalisation des diagnostics.
+S’il n’est pas spécifié, le fichier est généré dans le répertoire « TestResults » par défaut.</target>
         <note />
       </trans-unit>
       <trans-unit id="PlatformCommandLineDiagnosticOutputFilePrefixOptionDescription">
@@ -315,20 +545,44 @@
         <note />
       </trans-unit>
       <trans-unit id="PlatformCommandLineDiagnosticVerbosityOptionDescription">
-        <source>Define the level of the verbosity for the --diagnostic. The available values are 'Trace', 'Debug', 'Information', 'Warning', 'Error', and 'Critical'</source>
-        <target state="translated">Définissez le niveau de verbosité pour le --diagnostic. Les valeurs disponibles sont « Trace », « Debug », « Information », « Warning », « Error » et « Critical »</target>
+        <source>Define the level of the verbosity for the --diagnostic.
+The available values are 'Trace', 'Debug', 'Information', 'Warning', 'Error', and 'Critical'.</source>
+        <target state="translated">Définir le niveau de verbosité pour le --diagnostic.
+Les valeurs disponibles sont « Trace », « Debug », « Information », « Warning », « Error » et « Critical ».</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PlatformCommandLineDiscoverTestsInvalidArgument">
+        <source>'--list-tests' received unexpected value '{0}'. Supported values are: {1}.</source>
+        <target state="translated">La valeur « {0} » reçue pour « --list-tests » est inattendue. Les valeurs prises en charge sont :{1}.</target>
         <note />
       </trans-unit>
       <trans-unit id="PlatformCommandLineDiscoverTestsOptionDescription">
-        <source>List available tests.</source>
-        <target state="translated">Répertorier les tests disponibles.</target>
+        <source>List available tests.
+Optionally accepts 'text' (the default human-readable output) or 'json' to print the discovered tests as a JSON document on standard output.</source>
+        <target state="translated">Répertoriez les tests disponibles.
+Accepte éventuellement « text » (sortie lisible par l’humain par défaut) ou « json » pour imprimer les tests détectés sous forme de document JSON sur une sortie standard.</target>
         <note />
       </trans-unit>
-      <trans-unit id="PlatformCommandLineExitOnProcessExitInvalidDependantProcess">
+      <trans-unit id="PlatformCommandLineDotnetTestCliRequiresPipe">
+        <source>'--server {0}' requires '--{1}' to be specified.</source>
+        <target state="translated">« --server {0} » nécessite la spécification de « --{1} ».</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PlatformCommandLineDotnetTestPipe">
+        <source>dotnet test pipe.</source>
+        <target state="translated">canal de test dotnet.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PlatformCommandLineExitOnProcessExitInvalidDependentProcess">
         <source>Invalid PID '{0}'
 {1}</source>
         <target state="translated">PID incorrect « {0} »
 {1}</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PlatformCommandLineExitOnProcessExitNotSupportedInBrowser">
+        <source>The '--exit-on-process-exit' option is not supported in browser environments.</source>
+        <target state="translated">L’option « --exit-on-process-exit » n’est pas prise en charge dans les environnements navigateur.</target>
         <note />
       </trans-unit>
       <trans-unit id="PlatformCommandLineExitOnProcessExitOptionDescription">
@@ -341,14 +595,21 @@
         <target state="translated">« --{0} » attend un seul argument PID int</target>
         <note />
       </trans-unit>
+      <trans-unit id="PlatformCommandLineFilterUidOptionDescription">
+        <source>Provides a list of test node UIDs to filter by.</source>
+        <target state="translated">Fournit la liste des IUD de nœud de test à filtrer.</target>
+        <note />
+      </trans-unit>
       <trans-unit id="PlatformCommandLineHelpOptionDescription">
         <source>Show the command line help.</source>
         <target state="translated">Afficher l’aide de la ligne de commande.</target>
         <note />
       </trans-unit>
       <trans-unit id="PlatformCommandLineIgnoreExitCodeOptionDescription">
-        <source>Do not report non successful exit value for specific exit codes (e.g. '--ignore-exit-code 8;9' ignore exit code 8 and 9 and will return 0 in these case)</source>
-        <target state="translated">Ne signalez pas les valeurs de sortie non réussies pour des codes de sortie spécifiques (par exemple, « --ignore-exit-code 8;9 » ignore les codes de sortie 8 et 9 et renverra 0 dans ce cas)</target>
+        <source>Do not report non successful exit value for specific exit codes
+(e.g. '--ignore-exit-code 8;9' ignore exit code 8 and 9 and will return 0 in these case)</source>
+        <target state="translated">Ne signalez pas de valeur de sortie non réussie pour des codes de sortie spécifiques
+(par exemple, « --ignore-exit-code 8 ; 9 » ignorent les codes de sortie 8 et 9 et retournent 0 dans ce cas)</target>
         <note />
       </trans-unit>
       <trans-unit id="PlatformCommandLineInfoOptionDescription">
@@ -356,24 +617,31 @@
         <target state="translated">Afficher les informations de l’application de test .NET.</target>
         <note />
       </trans-unit>
+      <trans-unit id="PlatformCommandLineMaxFailedTestsOptionDescription">
+        <source>Specifies a maximum number of test failures that, when exceeded, will abort the test run.</source>
+        <target state="translated">Spécifie le nombre maximal d’échecs de tests qui, lorsqu’ils sont dépassés, abandonnent la série de tests.</target>
+        <note />
+      </trans-unit>
       <trans-unit id="PlatformCommandLineMinimumExpectedTestsIncompatibleDiscoverTests">
         <source>'--list-tests' and '--minimum-expected-tests' are incompatible options</source>
         <target state="translated">« --list-tests » et « --minimum-expected-tests » sont des options incompatibles</target>
         <note />
       </trans-unit>
+      <trans-unit id="PlatformCommandLineMinimumExpectedTestsOptionDescription">
+        <source>Specifies the minimum number of tests that are expected to run.</source>
+        <target state="translated">Spécifie le nombre minimal de tests censés s’exécuter.</target>
+        <note />
+      </trans-unit>
       <trans-unit id="PlatformCommandLineMinimumExpectedTestsOptionSingleArgument">
-        <source>'--minimum-expected-tests' expects a single non-zero positive integer value (e.g. '--minimum-expected-tests 10')</source>
-        <target state="translated">« --minimum-expected-tests » attend une seule valeur entière positive différente de zéro (par ex., « --minimum-expected-tests 10 »)</target>
+        <source>'--minimum-expected-tests' expects a single non-zero positive integer value
+(e.g. '--minimum-expected-tests 10')</source>
+        <target state="translated">« --minimum-expected-tests » attend une seule valeur entière positive différente de zéro
+(par exemple, « --minimum-expected-tests 10 »)</target>
         <note />
       </trans-unit>
       <trans-unit id="PlatformCommandLineNoBannerOptionDescription">
         <source>Do not display the startup banner, the copyright message or the telemetry banner.</source>
         <target state="translated">Ne pas afficher la bannière de démarrage, le message de copyright ou la bannière de télémétrie.</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="PlatformCommandLineOptionExpectsNoArgumentErrorMessage">
-        <source>'--{0}' expects no argument</source>
-        <target state="translated">« --{0} » n’attend aucun argument</target>
         <note />
       </trans-unit>
       <trans-unit id="PlatformCommandLinePortOptionDescription">
@@ -397,8 +665,17 @@
         <note />
       </trans-unit>
       <trans-unit id="PlatformCommandLineResultDirectoryOptionDescription">
-        <source>The directory where the test results are going to be placed. If the specified directory doesn't exist, it's created. The default is TestResults in the directory that contains the test application.</source>
-        <target state="translated">Le répertoire dans lequel les résultats des tests vont être placés. Si le répertoire spécifié n’existe pas, il est créé. La valeur par défaut est TestResults dans le répertoire qui contient l’application de test.</target>
+        <source>The directory where the test results are going to be placed.
+If the specified directory doesn't exist, it's created.
+The default is TestResults in the directory that contains the test application.</source>
+        <target state="translated">Le répertoire dans lequel les résultats des tests vont être placés.
+Si le répertoire spécifié n’existe pas, il est créé.
+La valeur par défaut est TestResults dans le répertoire qui contient l’application de test.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PlatformCommandLineServerInvalidArgument">
+        <source>'--server' received unexpected value '{0}'. Supported values are: {1}.</source>
+        <target state="translated">La valeur « {0} » reçue pour « --serveur » est inattendue. Les valeurs prises en charge sont :{1}.</target>
         <note />
       </trans-unit>
       <trans-unit id="PlatformCommandLineServerOptionDescription">
@@ -416,9 +693,21 @@
         <target state="translated">PID du contrôleur hôte de test parent éventuel.</target>
         <note />
       </trans-unit>
-      <trans-unit id="PlatformCommandLineVSTestAdapterModeOptionDescription">
-        <source>Bridge to VSTest APIs</source>
-        <target state="translated">Pont vers les API VSTest</target>
+      <trans-unit id="PlatformCommandLineTimeoutArgumentErrorMessage">
+        <source>'timeout' option should have one argument as a time value with an explicit unit suffix and a positive numeric value within the supported range (up to ~49.7 days). Accepted suffixes are 'ms'/'mil(s)'/'millisecond(s)', 's'/'sec(s)'/'second(s)', 'm'/'min(s)'/'minute(s)', 'h'/'hour(s)', and 'd'/'day(s)', e.g. '500ms', '5400s', '90m', '1.5h', '1d'.</source>
+        <target state="translated">L’option « timeout » doit avoir un argument correspondant à une valeur de temps avec un suffixe d’unité explicite et une valeur numérique positive dans la plage prise en charge (jusqu’à environ 49,7 jours). Les suffixes acceptés sont 'ms'/'mil(s)'/'millisecond(s)', 's'/'sec(s)'/'second(s)', 'm'/'min(s)'/'minute(s)', 'h'/'hour(s)' et 'd'/'day(s)', par exemple '500ms', '5400s', '90m', '1.5h', '1d'.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PlatformCommandLineTimeoutOptionDescription">
+        <source>A global test execution timeout.
+Takes one argument as a time value with an explicit unit suffix. Accepted suffixes are 'ms'/'mil(s)'/'millisecond(s)', 's'/'sec(s)'/'second(s)', 'm'/'min(s)'/'minute(s)', 'h'/'hour(s)', and 'd'/'day(s)', e.g. '500ms', '5400s', '90m', '1.5h', '1d'.</source>
+        <target state="translated">Délai global d’exécution du test.
+Prend un argument correspondant à une valeur de temps avec un suffixe d’unité explicite. Les suffixes acceptés sont 'ms'/'mil(s)'/'millisecond(s)', 's'/'sec(s)'/'second(s)', 'm'/'min(s)'/'minute(s)', 'h'/'hour(s)' et 'd'/'day(s)', par exemple '500ms', '5400s', '90m', '1.5h', '1d'.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PressCtrlCAgainToForceExit">
+        <source>Press Ctrl+C again to force exit.</source>
+        <target state="translated">Appuyez de nouveau sur Ctrl+C pour forcer la fermeture.</target>
         <note />
       </trans-unit>
       <trans-unit id="ProcessHasNotYetExitedErrorMessage">
@@ -426,9 +715,19 @@
         <target state="translated">Le processus aurait dû s’arrêter avant que nous puissions déterminer cette valeur</target>
         <note />
       </trans-unit>
+      <trans-unit id="ReachedMaxFailedTestsMessage">
+        <source>Test session is aborting due to reaching failures ('{0}') specified by the '--maximum-failed-tests' option.</source>
+        <target state="translated">La session de test est en cours d’abandon en raison d’échecs ('{0}') spécifiés par l’option '--maximum-failed-tests'.</target>
+        <note>{0} is the number of max failed tests.</note>
+      </trans-unit>
       <trans-unit id="RetryFailedAfterTriesErrorMessage">
         <source>Retry failed after {0} times</source>
         <target state="translated">Échec de la nouvelle tentative après {0} fois</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="RunningTestsFrom">
+        <source>Running tests from</source>
+        <target state="translated">Exécuter des tests à partir de</target>
         <note />
       </trans-unit>
       <trans-unit id="ServerLogMessageDescription">
@@ -451,6 +750,16 @@
         <target state="translated">Fabrique de filtres d’exécution de tests du serveur</target>
         <note />
       </trans-unit>
+      <trans-unit id="ServerTestHostDescription">
+        <source>The 'ITestHost' implementation used when running server mode.</source>
+        <target state="translated">Implémentation 'ITestHost' utilisée lors de l’exécution du mode serveur.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ServerTestHostDisplayName">
+        <source>Server mode test host</source>
+        <target state="translated">Hôte de test du mode serveur</target>
+        <note />
+      </trans-unit>
       <trans-unit id="ServiceProviderCannotFindServiceErrorMessage">
         <source>Cannot find service of type '{0}'</source>
         <target state="translated">Service de type « {0} » introuvable</target>
@@ -466,9 +775,64 @@
         <target state="translated">Les instances de type « ITestFramework » ne doivent pas être inscrites par le biais du fournisseur de services, mais par le biais de « ITestApplicationBuilder.RegisterTestFramework »</target>
         <note />
       </trans-unit>
-      <trans-unit id="StartingServer">
-        <source>Starting server. Listening on port '{0}'</source>
-        <target state="translated">Démarrage du serveur. Écoute sur le port « {0} »</target>
+      <trans-unit id="ShutdownProgressStillWaitingPrefix">
+        <source>Still waiting for: </source>
+        <target state="translated">Toujours en attente de : </target>
+        <note>Prefix for the message that lists extensions that have not yet completed their shutdown work. Each entry is formatted as "{DisplayName} ({Phase}, {Seconds}s)" and entries are separated by "; ".</note>
+      </trans-unit>
+      <trans-unit id="Skipped">
+        <source>Skipped</source>
+        <target state="translated">Ignoré</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="SkippedLowercase">
+        <source>skipped</source>
+        <target state="translated">ignoré</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="StackFrameAt">
+        <source>at</source>
+        <target state="translated">sur</target>
+        <note>at that is used for a stack frame location in a stack trace, is followed by a class and method name</note>
+      </trans-unit>
+      <trans-unit id="StackFrameIn">
+        <source>in</source>
+        <target state="translated">dans</target>
+        <note>in that is used in stack frame it is followed by file name</note>
+      </trans-unit>
+      <trans-unit id="StackTrace">
+        <source>Stack Trace</source>
+        <target state="translated">Rapport des appels de procédure</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="StandardError">
+        <source>Error output</source>
+        <target state="translated">Sortie d’erreur</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="StandardOutput">
+        <source>Standard output</source>
+        <target state="translated">Sortie standard</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="StartingTestSession">
+        <source>Starting test session.</source>
+        <target state="translated">Démarrage de la session de test.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="StartingTestSessionWithLogFilePath">
+        <source>Starting test session. The log file path is '{0}'.</source>
+        <target state="translated">Démarrage de la session de test. Le chemin d’accès au fichier journal est '{0}'.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="SucceededLowercase">
+        <source>succeeded</source>
+        <target state="translated">opération réussie</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="SyncFlushNotSupportedInBrowserErrorMessage">
+        <source>Synchronous flush is not supported in browser environments.</source>
+        <target state="translated">Le vidage synchrone n’est pas pris en charge dans les environnements navigateur.</target>
         <note />
       </trans-unit>
       <trans-unit id="TEstExecutionFilterFactoryFactoryAlreadySetErrorMessage">
@@ -494,6 +858,73 @@ En savoir plus sur la télémétrie de la plateforme de tests Microsoft : https:
       <trans-unit id="TelemetryProviderAlreadySetErrorMessage">
         <source>Telemetry provider is already set</source>
         <target state="translated">Le fournisseur de télémétrie est déjà défini</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="TerminalAnsiOptionDescription">
+        <source>Control whether ANSI escape characters are emitted.
+Valid values are 'auto' (default), 'on' (also accepts 'true', 'enable', '1') or 'off' (also accepts 'false', 'disable', '0').
+'on' forces ANSI escape codes (including cursor movement) even when stdout is redirected; pair it with --no-progress if you only want colors.
+When both --ansi and --no-ansi are provided, --ansi wins.</source>
+        <target state="translated">Déterminez si des caractères d’échappement ANSI sont émis.
+Les valeurs valides sont « auto » (par défaut), « on » (accepte également « true », « enable », « 1 ») ou « off » (accepte également « false », « disable », « 0 »).
+« on » force les codes d’échappement ANSI, notamment le déplacement du curseur, même lorsque stdout est redirigé, associez-le à --no-progress si vous ne voulez que des couleurs.
+Lorsque --ansi et --no-ansi sont fournis, --ansi est prioritaire.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="TerminalAnsiOptionInvalidArgument">
+        <source>--ansi expects a single parameter with value 'auto', 'on' (or 'true', 'enable', '1') or 'off' (or 'false', 'disable', '0').</source>
+        <target state="translated">--ansi attend un seul paramètre avec la valeur « auto », « on » (ou « true », « enable », « 1 ») ou « off » (ou « false », « disable », « 0 »).</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="TerminalNoAnsiOptionDescription">
+        <source>Disable outputting ANSI escape characters to screen.</source>
+        <target state="translated">Désactiver la sortie des caractères d’échappement ANSI à l’écran.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="TerminalNoProgressOptionDescription">
+        <source>Disable reporting progress to screen.</source>
+        <target state="translated">Désactiver la progression des rapports à l’écran.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="TerminalOutputOptionDescription">
+        <source>Output verbosity when reporting tests.
+Valid values are 'Normal', 'Detailed'. Default is 'Normal'.</source>
+        <target state="translated">Verbosité de la sortie lors de l’établissement des rapports de tests.
+Les valeurs valides sont « Normal » et « Détaillé ». La valeur par défaut est « Normal ».</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="TerminalOutputOptionInvalidArgument">
+        <source>--output expects a single parameter with value 'Normal' or 'Detailed'.</source>
+        <target state="translated">--output attend un seul paramètre avec la valeur « Normal » ou « Détaillé ».</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="TerminalShowOutputOptionInvalidArgument">
+        <source>--show-stdout and --show-stderr expect a single parameter with value 'All', 'Failed', or 'None'.</source>
+        <target state="translated">--show-stdout et --show-stderr attendent un seul paramètre avec la valeur « All », « Failed » ou « None ».</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="TerminalShowStderrOptionDescription">
+        <source>Determines when to show captured error output of a test.
+Valid values are 'All', 'Failed', 'None'. Default is 'All' (or 'Failed' when an LLM/AI agent environment is detected).</source>
+        <target state="new">Determines when to show captured error output of a test.
+Valid values are 'All', 'Failed', 'None'. Default is 'All' (or 'Failed' when an LLM/AI agent environment is detected).</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="TerminalShowStdoutOptionDescription">
+        <source>Determines when to show captured standard output of a test.
+Valid values are 'All', 'Failed', 'None'. Default is 'All' (or 'Failed' when an LLM/AI agent environment is detected).</source>
+        <target state="new">Determines when to show captured standard output of a test.
+Valid values are 'All', 'Failed', 'None'. Default is 'All' (or 'Failed' when an LLM/AI agent environment is detected).</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="TerminalTestReporterDescription">
+        <source>Writes test results to terminal.</source>
+        <target state="translated">Écrit les résultats des tests dans le terminal.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="TerminalTestReporterDisplayName">
+        <source>Terminal test reporter</source>
+        <target state="translated">Rapporteur de test terminal</target>
         <note />
       </trans-unit>
       <trans-unit id="TestAdapterInvokerFactoryAlreadySetErrorMessage">
@@ -536,6 +967,36 @@ En savoir plus sur la télémétrie de la plateforme de tests Microsoft : https:
         <target state="translated">Le mode VSTest ne prend en charge qu’un seul TestApplicationBuilder par processus</target>
         <note />
       </trans-unit>
+      <trans-unit id="TestConfigurationEnvironmentVariableInvalidNameErrorMessage">
+        <source>Environment variable name '{0}' declared in the 'environmentVariables' section of the testconfig.json file is invalid. Names must not contain '=' or null characters.</source>
+        <target state="translated">Le nom de variable d’environnement {0} déclarée dans la section « environmentVariables » du fichier testconfig.json ne doit pas être vide. Les noms ne doivent pas contenir « = » ni de caractères nuls.</target>
+        <note>{0} is the invalid environment variable name.</note>
+      </trans-unit>
+      <trans-unit id="TestConfigurationEnvironmentVariableNameCannotBeEmptyErrorMessage">
+        <source>Environment variable names declared in the 'environmentVariables' section of the testconfig.json file must not be empty.</source>
+        <target state="translated">Les noms des variables d’environnement déclarées dans la section « environmentVariables » du fichier testconfig.json ne doivent pas être vides.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="TestConfigurationEnvironmentVariableProviderDescription">
+        <source>Applies environment variables declared in the 'environmentVariables' section of the testconfig.json file to the test host child process.</source>
+        <target state="translated">Permet d’appliquer les variables d’environnement déclarées dans la section « environmentVariables » du fichier testconfig.json au processus enfant de l’hôte de test.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="TestConfigurationEnvironmentVariableProviderDisplayName">
+        <source>testconfig.json environment variables provider</source>
+        <target state="translated">fournisseur de variables d’environnement testconfig.json</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="TestDiscoverySummary">
+        <source>Test discovery summary: found {0} test(s) in {1} assemblies.</source>
+        <target state="translated">Résumé de la découverte de tests : {0} test(s) trouvé(s) dans {1} assemblys.</target>
+        <note>0 is number of tests, 1 is count of assemblies</note>
+      </trans-unit>
+      <trans-unit id="TestDiscoverySummarySingular">
+        <source>Test discovery summary: found {0} test(s)</source>
+        <target state="translated">Résumé de la découverte de tests : {0} test(s) trouvé(s)</target>
+        <note>0 is number of tests</note>
+      </trans-unit>
       <trans-unit id="TestFrameworkProxyApiShouldNotBeCalled">
         <source>Method '{0}' should not have been called on this proxy object</source>
         <target state="translated">La méthode « {0} » n’aurait pas dû être appelée sur cet objet proxy</target>
@@ -546,9 +1007,19 @@ En savoir plus sur la télémétrie de la plateforme de tests Microsoft : https:
         <target state="translated">Désolé, échec de la session de test de l’adaptateur de test</target>
         <note />
       </trans-unit>
+      <trans-unit id="TestHostControllerProcessRestartNotSupportedOnWebAssembly">
+        <source>Test host controller extensions that require process restart are not supported on browser/WebAssembly platforms.</source>
+        <target state="translated">Les extensions de contrôleur d’hôte de test nécessitant un redémarrage du processus ne sont pas prises en charge sur les plateformes navigateur/WebAssembly.</target>
+        <note />
+      </trans-unit>
       <trans-unit id="TestProcessDidNotExitGracefullyErrorMessage">
         <source>Test application process didn't exit gracefully, exit code is '{0}'</source>
         <target state="translated">Le processus d’application de test ne s’est pas fermé normalement, le code de sortie est « {0} »</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="TestRunSummary">
+        <source>Test run summary:</source>
+        <target state="translated">Résumé de série de tests :</target>
         <note />
       </trans-unit>
       <trans-unit id="TimeoutAcquiringSemaphoreErrorMessage">
@@ -559,6 +1030,11 @@ En savoir plus sur la télémétrie de la plateforme de tests Microsoft : https:
       <trans-unit id="TimeoutFlushingLogsErrorMessage">
         <source>Failed to flush logs before the timeout of '{0}' seconds</source>
         <target state="translated">Échec du vidage des journaux avant le délai d’expiration de « {0} » secondes</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="Total">
+        <source>Total</source>
+        <target state="translated">Total</target>
         <note />
       </trans-unit>
       <trans-unit id="TreeNodeFilterCannotContainSlashCharacterErrorMessage">
@@ -574,11 +1050,6 @@ En savoir plus sur la télémétrie de la plateforme de tests Microsoft : https:
       <trans-unit id="TreeNodeFilterEscapeCharacterShouldNotBeLastErrorMessage">
         <source>An escape character should not terminate the filter string '{0}'</source>
         <target state="translated">Désolé, un caractère d’échappement ne doit pas terminer la chaîne de filtre « {0} »</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="TreeNodeFilterInvalidArgumentCount">
-        <source>A single argument is expected (e.g. '/MyAssembly/MyNamespace/MyClass/MyTestMethod*[OS=Linux]')</source>
-        <target state="translated">Un seul argument est attendu (par ex., « /MyAssembly/MyNamespace/MyClass/MyTestMethod*[OS=Linux] »)</target>
         <note />
       </trans-unit>
       <trans-unit id="TreeNodeFilterOnlyLastLevelCanContainMutiLevelWildcardErrorMessage">
@@ -606,20 +1077,20 @@ En savoir plus sur la télémétrie de la plateforme de tests Microsoft : https:
         <target state="translated">Désolé, le filtre contient un opérateur '/' inattendu dans une expression entre parenthèses</target>
         <note />
       </trans-unit>
+      <trans-unit id="TreeNodeFilterUnexpectedSlashOperatorInPathSegmentErrorMessage">
+        <source>Filter contains an unexpected '/' operator inside a parenthesized expression. Filter: '{0}'. To combine alternatives for one path segment, use syntax like '/A/B/C/(X|Y)'.</source>
+        <target state="translated">Désolé, le filtre contient un opérateur '/' inattendu dans une expression entre parenthèses. Filtrer : « {0} ». Pour combiner des alternatives pour un segment de chemin d’accès, utilisez une syntaxe telle que '/A/B/C/(X|Y)'.</target>
+        <note>{0} is the filter expression string. Diagnostic thrown by the TreeNodeFilter parser when a '/' is encountered inside a parenthesized alternative such as '/A/(B/C)'.</note>
+      </trans-unit>
       <trans-unit id="UnexpectedCallTelemetryIsDisabledErrorMessage">
         <source>Unexpected telemetry call, the telemetry is disabled.</source>
         <target state="translated">Appel de télémétrie inattendu, la télémétrie est désactivée.</target>
         <note />
       </trans-unit>
-      <trans-unit id="UnexpectedExceptionDuringByteConversionErrorMessage">
-        <source>An unexpected exception occured during byte conversion</source>
-        <target state="translated">Une exception inattendue s’est produite lors de la conversion d’octets</target>
-        <note />
-      </trans-unit>
       <trans-unit id="UnexpectedExceptionInFileLoggerErrorMessage">
-        <source>An unexpected exception occured in 'FileLogger.WriteLogToFileAsync'.
+        <source>An unexpected exception occurred in 'FileLogger.WriteLogToFileAsync'.
 {0}</source>
-        <target state="translated">Une exception inattendue s’est produite dans « FileLogger.WriteLogToFileAsync ».
+        <target state="translated">Une exception inattendue s’est produite dans « FileLogger.WriteLogToFileAsync ».
 {0}</target>
         <note>{0} exception ToString</note>
       </trans-unit>
@@ -628,14 +1099,39 @@ En savoir plus sur la télémétrie de la plateforme de tests Microsoft : https:
         <target state="translated">État inattendu dans le fichier « {0} » à la ligne « {1} »</target>
         <note />
       </trans-unit>
-      <trans-unit id="UnknownCommunicationProtocolErrorMessage">
-        <source>The communication protocol '{0}' is not supported</source>
-        <target state="translated">Le protocole de communication « {0} » n’est pas pris en charge</target>
-        <note />
+      <trans-unit id="UnobservedTaskExceptionWarningMessage">
+        <source>[ServerTestHost.OnTaskSchedulerUnobservedTaskException] Unhandled exception: {0}</source>
+        <target state="translated">[ServerTestHost.OnTaskSchedulerUnobservedTaskException] exception non prise en charge : {0}</target>
+        <note>{0} is the exception that was unhandled/unobserved</note>
       </trans-unit>
       <trans-unit id="UnreachableLocationErrorMessage">
         <source>This program location is thought to be unreachable. File='{0}' Line={1}</source>
         <target state="translated">Cet emplacement du programme est considéré comme inaccessible. File=« {0} », Ligne={1}</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="WaitDebuggerAttachNotSupportedInBrowserErrorMessage">
+        <source>Waiting for debugger to attach (TESTINGPLATFORM_WAIT_ATTACH_DEBUGGER=1) is not supported in browser environments.</source>
+        <target state="translated">L’attente de la connexion du débogueur (TESTINGPLATFORM_WAIT_ATTACH_DEBUGGER=1) n’est pas prise en charge dans les environnements navigateur.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="WaitDebuggerAttachNotSupportedInWasiErrorMessage">
+        <source>Waiting for debugger to attach (TESTINGPLATFORM_WAIT_ATTACH_DEBUGGER=1) is not supported on wasi.</source>
+        <target state="translated">L'attente de l'attachement du débogueur (TESTINGPLATFORM_WAIT_ATTACH_DEBUGGER=1) n'est pas prise en charge sur WASI.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ZeroTestsRan">
+        <source>Zero tests ran</source>
+        <target state="translated">Zéro tests exécutés</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="TotalLowercase">
+        <source>total</source>
+        <target state="translated">total</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ChatClientProviderAlreadyRegistered">
+        <source>A chat client provider has already been registered.</source>
+        <target state="translated">Un fournisseur de client de messagerie instantanée a déjà été enregistré.</target>
         <note />
       </trans-unit>
     </body>

@@ -5,15 +5,27 @@ namespace Microsoft.Testing.Platform.Helpers;
 
 internal interface IFileSystem
 {
-    bool Exists(string path);
+    bool ExistFile(string path);
+
+    bool ExistDirectory(string? path);
 
     string CreateDirectory(string path);
 
-    void Move(string sourceFileName, string destFileName);
+    void MoveFile(string sourceFileName, string destFileName, bool overwrite = false);
 
-    Stream NewFileStream(string path, FileMode mode);
+    IFileStream NewFileStream(string path, FileMode mode);
 
-    Stream NewFileStream(string path, FileMode mode, FileAccess access);
+    IFileStream NewFileStream(string path, FileMode mode, FileAccess access);
+
+    IFileStream NewFileStream(string path, FileMode mode, FileAccess access, FileShare share);
 
     string ReadAllText(string path);
+
+    Task<string> ReadAllTextAsync(string path);
+
+    void CopyFile(string sourceFileName, string destFileName, bool overwrite = false);
+
+    void DeleteFile(string path);
+
+    string[] GetFiles(string path, string searchPattern, SearchOption searchOption);
 }

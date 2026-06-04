@@ -1,4 +1,4 @@
-// Copyright (c) Microsoft Corporation. All rights reserved.
+﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 #if NETFRAMEWORK
@@ -24,10 +24,7 @@ internal sealed class SqlDataConnection : TestDataConnectionSql
     /// this.Connection must be already opened.
     /// </summary>
     /// <returns>The default database schema.</returns>
-    public override string? GetDefaultSchema()
-    {
-        return GetDefaultSchemaMSSql();
-    }
+    public override string? GetDefaultSchema() => GetDefaultSchemaMSSql();
 
     protected override SchemaMetaData[] GetSchemaMetaData()
     {
@@ -45,7 +42,7 @@ internal sealed class SqlDataConnection : TestDataConnectionSql
 
     private static string FixConnectionString(string connectionString, List<string> dataFolders)
     {
-        SqlConnectionStringBuilder sqlBuilder = new(connectionString);
+        SqlConnectionStringBuilder sqlBuilder = [with(connectionString)];
 
         string attachedFile = sqlBuilder.AttachDBFilename;
 

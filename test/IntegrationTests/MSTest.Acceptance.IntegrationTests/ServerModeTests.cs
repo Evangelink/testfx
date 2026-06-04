@@ -4,32 +4,29 @@
 using Microsoft.Testing.Platform.Acceptance.IntegrationTests;
 using Microsoft.Testing.Platform.ServerMode.IntegrationTests.Messages.V100;
 
-namespace MSTest.Acceptance.IntegrationTests.Messages.V100;
+using MSTest.Acceptance.IntegrationTests.Messages.V100;
 
-[TestGroup]
-public sealed class ServerModeTests : ServerModeTestsBase
+namespace MSTest.Acceptance.IntegrationTests;
+
+[TestClass]
+public sealed class ServerModeTests : ServerModeTestsBase<ServerModeTests.TestAssetFixture>
 {
-    private readonly TestAssetFixture _fixture;
+    public TestContext TestContext { get; set; }
 
-    public ServerModeTests(ITestExecutionContext testExecutionContext, TestAssetFixture fixture)
-        : base(testExecutionContext)
-    {
-        _fixture = fixture;
-    }
-
-    [ArgumentsProvider(nameof(TargetFrameworks.All), typeof(TargetFrameworks))]
+    [TestMethod]
+    [DynamicData(nameof(TargetFrameworks.AllForDynamicData), typeof(TargetFrameworks))]
     public async Task DiscoverAndRun(string tfm)
     {
-        using TestingPlatformClient jsonClient = await StartAsServerAndConnectToTheClientAsync(TestHost.LocateFrom(_fixture.ProjectPath, "MSTestProject", tfm, buildConfiguration: BuildConfiguration.Release));
-        LogsCollector logs = new();
+        using TestingPlatformClient jsonClient = await StartAsServerAndConnectToTheClientAsync(TestHost.LocateFrom(AssetFixture.ProjectPath, "MSTestProject", tfm, buildConfiguration: BuildConfiguration.Release));
+        LogsCollector logs = [];
         jsonClient.RegisterLogListener(logs);
-        TelemetryCollector telemetry = new();
+        TelemetryCollector telemetry = [];
         jsonClient.RegisterTelemetryListener(telemetry);
 
         InitializeResponse initializeResponseArgs = await jsonClient.Initialize();
 
-        Assert.IsTrue(initializeResponseArgs.Capabilities.Testing.VSTestProvider);
-        Assert.IsTrue(initializeResponseArgs.Capabilities.Testing.MultiRequestSupport);
+        Assert.IsFalse(initializeResponseArgs.Capabilities.Testing.VSTestProvider);
+        Assert.IsFalse(initializeResponseArgs.Capabilities.Testing.MultiRequestSupport);
         Assert.IsTrue(initializeResponseArgs.Capabilities.Testing.SupportsDiscovery);
 
         TestNodeUpdateCollector discoveryCollector = new();
@@ -39,26 +36,27 @@ public sealed class ServerModeTests : ServerModeTestsBase
         ResponseListener runListener = await jsonClient.RunTests(Guid.NewGuid(), runCollector.CollectNodeUpdates);
 
         await Task.WhenAll(discoveryListener.WaitCompletion(), runListener.WaitCompletion());
-        Assert.AreEqual(1, discoveryCollector.TestNodeUpdates.Count(x => x.Node.NodeType == "action"), $"Wrong number of discovery");
-        Assert.AreEqual(2, runCollector.TestNodeUpdates.Count, $"Wrong number of updates");
-        Assert.IsFalse(logs.IsEmpty, $"Logs are empty");
-        Assert.IsFalse(telemetry.IsEmpty, $"telemetry is empty");
+        Assert.ContainsSingle(x => x.Node.NodeType == "action", discoveryCollector.TestNodeUpdates, "Wrong number of discovery");
+        Assert.HasCount(2, runCollector.TestNodeUpdates);
+        Assert.IsNotEmpty(logs, "Logs are empty");
+        Assert.IsFalse(telemetry.IsEmpty, "telemetry is empty");
         await jsonClient.Exit();
-        Assert.AreEqual(0, await jsonClient.WaitServerProcessExit());
+        Assert.AreEqual(0, await jsonClient.WaitServerProcessExit(TestContext.CancellationToken));
         Assert.AreEqual(0, jsonClient.ExitCode);
     }
 
-    [ArgumentsProvider(nameof(TargetFrameworks.All), typeof(TargetFrameworks))]
+    [TestMethod]
+    [DynamicData(nameof(TargetFrameworks.AllForDynamicData), typeof(TargetFrameworks))]
     public async Task WhenClientDies_Server_ShouldClose_Gracefully(string tfm)
     {
-        using TestingPlatformClient jsonClient = await StartAsServerAndConnectToTheClientAsync(TestHost.LocateFrom(_fixture.ProjectPath, "MSTestProject", tfm, buildConfiguration: BuildConfiguration.Release));
-        LogsCollector logs = new();
+        using TestingPlatformClient jsonClient = await StartAsServerAndConnectToTheClientAsync(TestHost.LocateFrom(AssetFixture.ProjectPath, "MSTestProject", tfm, buildConfiguration: BuildConfiguration.Release));
+        LogsCollector logs = [];
         jsonClient.RegisterLogListener(logs);
-        TelemetryCollector telemetry = new();
+        TelemetryCollector telemetry = [];
         jsonClient.RegisterTelemetryListener(telemetry);
 
         InitializeResponse initializeResponseArgs = await jsonClient.Initialize();
-        Assert.IsTrue(initializeResponseArgs.Capabilities.Testing.MultiRequestSupport);
+        Assert.IsFalse(initializeResponseArgs.Capabilities.Testing.MultiRequestSupport);
 
         TestNodeUpdateCollector discoveryCollector = new();
 
@@ -67,20 +65,17 @@ public sealed class ServerModeTests : ServerModeTestsBase
         _ = jsonClient.DiscoverTests(Guid.NewGuid(), discoveryCollector.CollectNodeUpdates, @checked: false);
 
         await jsonClient.Exit(gracefully: false);
-        int exitCode = await jsonClient.WaitServerProcessExit();
+        int exitCode = await jsonClient.WaitServerProcessExit(TestContext.CancellationToken);
         Assert.AreEqual(3, exitCode);
     }
 
-    [TestFixture(TestFixtureSharingStrategy.PerTestGroup)]
-    public sealed class TestAssetFixture(AcceptanceFixture acceptanceFixture) : TestAssetFixtureBase(acceptanceFixture.NuGetGlobalPackagesFolder)
+    public sealed class TestAssetFixture() : TestAssetFixtureBase()
     {
         public const string ProjectName = "MSTestProject";
 
         public string ProjectPath => GetAssetPath(ProjectName);
 
-        public override IEnumerable<(string ID, string Name, string Code)> GetAssetsToGenerate()
-        {
-            yield return (ProjectName, ProjectName,
+        public override (string ID, string Name, string Code) GetAssetsToGenerate() => (ProjectName, ProjectName,
                 CurrentMSTestSourceCode
                 .PatchCodeWithReplace("$TargetFramework$", $"<TargetFrameworks>{TargetFrameworks.All.ToMSBuildTargetFrameworks()}</TargetFrameworks>")
                 .PatchCodeWithReplace("$MicrosoftNETTestSdkVersion$", MicrosoftNETTestSdkVersion)
@@ -88,6 +83,5 @@ public sealed class ServerModeTests : ServerModeTestsBase
                 .PatchCodeWithReplace("$EnableMSTestRunner$", "<EnableMSTestRunner>true</EnableMSTestRunner>")
                 .PatchCodeWithReplace("$OutputType$", "<OutputType>Exe</OutputType>")
                 .PatchCodeWithReplace("$Extra$", string.Empty));
-        }
     }
 }

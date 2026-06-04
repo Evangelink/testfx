@@ -5,18 +5,20 @@ using Microsoft.MSTestV2.CLIAutomation;
 
 namespace MSTest.IntegrationTests;
 
+[TestClass]
 public class DiscoverInternalsTests : CLITestBase
 {
     private const string TestAsset = "DiscoverInternalsProject";
 
-    public void InternalTestClassesAreDiscoveredWhenTheDiscoverInternalsAttributeIsPresent()
+    [TestMethod]
+    public async Task InternalTestClassesAreDiscoveredWhenTheDiscoverInternalsAttributeIsPresent()
     {
         // Arrange
-        var assemblyPath = Path.IsPathRooted(TestAsset) ? TestAsset : GetAssetFullPath(TestAsset);
+        string assemblyPath = Path.IsPathRooted(TestAsset) ? TestAsset : GetAssetFullPath(TestAsset);
 
         // Act
-        var testCases = DiscoverTests(assemblyPath);
-        _ = RunTests(testCases);
+        System.Collections.Immutable.ImmutableArray<Microsoft.VisualStudio.TestPlatform.ObjectModel.TestCase> testCases = DiscoverTests(assemblyPath);
+        _ = await RunTestsAsync(testCases);
 
         // Assert
         VerifyE2E.AtLeastTestsDiscovered(
@@ -25,13 +27,14 @@ public class DiscoverInternalsTests : CLITestBase
             "NestedInternalClass_TestMethod1");
     }
 
+    [TestMethod]
     public void AnInternalTestClassDerivedFromAPublicAbstractGenericBaseClassForAnInternalTypeIsDiscovered()
     {
         // Arrange
-        var assemblyPath = Path.IsPathRooted(TestAsset) ? TestAsset : GetAssetFullPath(TestAsset);
+        string assemblyPath = Path.IsPathRooted(TestAsset) ? TestAsset : GetAssetFullPath(TestAsset);
 
         // Act
-        var testCases = DiscoverTests(assemblyPath);
+        System.Collections.Immutable.ImmutableArray<Microsoft.VisualStudio.TestPlatform.ObjectModel.TestCase> testCases = DiscoverTests(assemblyPath);
 
         // Assert
         VerifyE2E.AtLeastTestsDiscovered(
@@ -39,16 +42,17 @@ public class DiscoverInternalsTests : CLITestBase
             "EqualityIsCaseInsensitive");
     }
 
-    public void AnInternalTypeCanBeUsedInADynamicDataTestMethod()
+    [TestMethod]
+    public async Task AnInternalTypeCanBeUsedInADynamicDataTestMethod()
     {
-        var assemblyPath = Path.IsPathRooted(TestAsset) ? TestAsset : GetAssetFullPath(TestAsset);
+        string assemblyPath = Path.IsPathRooted(TestAsset) ? TestAsset : GetAssetFullPath(TestAsset);
 
         // Act
-        var testCases = DiscoverTests(assemblyPath);
+        System.Collections.Immutable.ImmutableArray<Microsoft.VisualStudio.TestPlatform.ObjectModel.TestCase> testCases = DiscoverTests(assemblyPath);
 
-        var targetTestCases = testCases.Where(t => t.DisplayName == "DynamicDataTestMethod (DiscoverInternalsProject.SerializableInternalType)");
+        IEnumerable<Microsoft.VisualStudio.TestPlatform.ObjectModel.TestCase> targetTestCases = testCases.Where(t => t.DisplayName == "DynamicDataTestMethod (DiscoverInternalsProject.SerializableInternalType)");
 
-        var testResults = RunTests(targetTestCases);
+        System.Collections.Immutable.ImmutableArray<Microsoft.VisualStudio.TestPlatform.ObjectModel.TestResult> testResults = await RunTestsAsync(targetTestCases);
 
         // Assert
         VerifyE2E.TestsPassed(

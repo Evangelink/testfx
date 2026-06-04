@@ -1,11 +1,11 @@
-// Copyright (c) Microsoft Corporation. All rights reserved.
+﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System.Diagnostics.CodeAnalysis;
-using System.Globalization;
-using System.Reflection;
+using System.ComponentModel;
 
 namespace Microsoft.VisualStudio.TestTools.UnitTesting;
+
+#pragma warning disable CA2263 // Prefer generic overload when type is known - false positives
 
 /// <summary>
 /// A collection of helper classes to test various conditions within
@@ -14,42 +14,254 @@ namespace Microsoft.VisualStudio.TestTools.UnitTesting;
 /// </summary>
 public sealed partial class Assert
 {
-    /// <summary>
-    /// Tests whether the specified object is an instance of the expected
-    /// type and throws an exception if the expected type is not in the
-    /// inheritance hierarchy of the object.
-    /// </summary>
-    /// <param name="value">
-    /// The object the test expects to be of the specified type.
-    /// </param>
-    /// <param name="expectedType">
-    /// The expected type of <paramref name="value"/>.
-    /// </param>
-    /// <exception cref="AssertFailedException">
-    /// Thrown if <paramref name="value"/> is null or
-    /// <paramref name="expectedType"/> is not in the inheritance hierarchy
-    /// of <paramref name="value"/>.
-    /// </exception>
-    public static void IsInstanceOfType([NotNull] object? value, [NotNull] Type? expectedType)
-        => IsInstanceOfType(value, expectedType, string.Empty, null);
+    [StackTraceHidden]
+    [InterpolatedStringHandler]
+    [EditorBrowsable(EditorBrowsableState.Never)]
+#pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
+    public readonly struct AssertIsInstanceOfTypeInterpolatedStringHandler
+    {
+        private readonly StringBuilder? _builder;
+        private readonly object? _value;
+        private readonly Type? _expectedType;
 
-    /// <summary>
-    /// Tests whether the specified object is an instance of the generic
-    /// type and throws an exception if the generic type is not in the
-    /// inheritance hierarchy of the object.
-    /// </summary>
-    /// <typeparam name="T">The expected type of <paramref name="value"/>.</typeparam>
-    public static void IsInstanceOfType<T>([NotNull] object? value)
-        => IsInstanceOfType(value, typeof(T), string.Empty, null);
+        public AssertIsInstanceOfTypeInterpolatedStringHandler(int literalLength, int formattedCount, object? value, Type? expectedType, out bool shouldAppend)
+        {
+            _value = value;
+            _expectedType = expectedType;
+            shouldAppend = IsInstanceOfTypeFailing(value, expectedType);
+            if (shouldAppend)
+            {
+                _builder = new StringBuilder(literalLength + formattedCount);
+            }
+        }
 
-    /// <summary>
-    /// Tests whether the specified object is an instance of the generic
-    /// type and throws an exception if the generic type is not in the
-    /// inheritance hierarchy of the object.
-    /// </summary>
-    /// <typeparam name="T">The expected type of <paramref name="value"/>.</typeparam>
-    public static void IsInstanceOfType<T>([NotNull] object? value, out T instance)
-        => IsInstanceOfType<T>(value, out instance, string.Empty, null);
+        internal void ComputeAssertion(string valueExpression)
+        {
+            if (_builder is not null)
+            {
+                ReportAssertIsInstanceOfTypeFailed(_value, _expectedType, _builder.ToString(), valueExpression);
+            }
+        }
+
+        public void AppendLiteral(string value) => _builder!.Append(value);
+
+        public void AppendFormatted<T>(T value) => AppendFormatted(value, format: null);
+
+#if NETCOREAPP3_1_OR_GREATER
+        public void AppendFormatted(ReadOnlySpan<char> value) => _builder!.Append(value);
+
+#pragma warning disable RS0027 // API with optional parameter(s) should have the most parameters amongst its public overloads
+        public void AppendFormatted(ReadOnlySpan<char> value, int alignment = 0, string? format = null) => AppendFormatted(value.ToString(), alignment, format);
+#pragma warning restore RS0027 // API with optional parameter(s) should have the most parameters amongst its public overloads
+#endif
+
+        // NOTE: All the overloads involving format and/or alignment are not super efficient.
+        // This code path is only for when an assert is failing, so that's not the common scenario
+        // and should be okay if not very optimized.
+        // A more efficient implementation that can be used for .NET 6 and later is to delegate the work to
+        // the BCL's StringBuilder.AppendInterpolatedStringHandler
+        public void AppendFormatted<T>(T value, string? format) => _builder!.AppendFormat(null, $"{{0:{format}}}", value);
+
+        public void AppendFormatted<T>(T value, int alignment) => _builder!.AppendFormat(null, $"{{0,{alignment}}}", value);
+
+        public void AppendFormatted<T>(T value, int alignment, string? format) => _builder!.AppendFormat(null, $"{{0,{alignment}:{format}}}", value);
+
+        public void AppendFormatted(string? value) => _builder!.Append(value);
+
+#pragma warning disable RS0026 // Do not add multiple public overloads with optional parameters
+#pragma warning disable RS0027 // API with optional parameter(s) should have the most parameters amongst its public overloads
+        public void AppendFormatted(string? value, int alignment = 0, string? format = null) => _builder!.AppendFormat(null, $"{{0,{alignment}:{format}}}", value);
+
+        public void AppendFormatted(object? value, int alignment = 0, string? format = null) => _builder!.AppendFormat(null, $"{{0,{alignment}:{format}}}", value);
+#pragma warning restore RS0026 // Do not add multiple public overloads with optional parameters
+#pragma warning restore RS0027 // API with optional parameter(s) should have the most parameters amongst its public overloads
+    }
+
+    [StackTraceHidden]
+    [InterpolatedStringHandler]
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    public readonly struct AssertGenericIsInstanceOfTypeInterpolatedStringHandler<TArg>
+    {
+        private readonly StringBuilder? _builder;
+        private readonly object? _value;
+
+        public AssertGenericIsInstanceOfTypeInterpolatedStringHandler(int literalLength, int formattedCount, object? value, out bool shouldAppend)
+        {
+            _value = value;
+            shouldAppend = IsInstanceOfTypeFailing(value, typeof(TArg));
+            if (shouldAppend)
+            {
+                _builder = new StringBuilder(literalLength + formattedCount);
+            }
+        }
+
+        internal void ComputeAssertion(string valueExpression)
+        {
+            if (_builder is not null)
+            {
+                ReportAssertIsInstanceOfTypeFailed(_value, typeof(TArg), _builder.ToString(), valueExpression);
+            }
+        }
+
+        public void AppendLiteral(string value) => _builder!.Append(value);
+
+        public void AppendFormatted<T>(T value) => AppendFormatted(value, format: null);
+
+#if NETCOREAPP3_1_OR_GREATER
+        public void AppendFormatted(ReadOnlySpan<char> value) => _builder!.Append(value);
+
+#pragma warning disable RS0027 // API with optional parameter(s) should have the most parameters amongst its public overloads
+        public void AppendFormatted(ReadOnlySpan<char> value, int alignment = 0, string? format = null) => AppendFormatted(value.ToString(), alignment, format);
+#pragma warning restore RS0027 // API with optional parameter(s) should have the most parameters amongst its public overloads
+#endif
+
+        // NOTE: All the overloads involving format and/or alignment are not super efficient.
+        // This code path is only for when an assert is failing, so that's not the common scenario
+        // and should be okay if not very optimized.
+        // A more efficient implementation that can be used for .NET 6 and later is to delegate the work to
+        // the BCL's StringBuilder.AppendInterpolatedStringHandler
+        public void AppendFormatted<T>(T value, string? format) => _builder!.AppendFormat(null, $"{{0:{format}}}", value);
+
+        public void AppendFormatted<T>(T value, int alignment) => _builder!.AppendFormat(null, $"{{0,{alignment}}}", value);
+
+        public void AppendFormatted<T>(T value, int alignment, string? format) => _builder!.AppendFormat(null, $"{{0,{alignment}:{format}}}", value);
+
+        public void AppendFormatted(string? value) => _builder!.Append(value);
+
+#pragma warning disable RS0026 // Do not add multiple public overloads with optional parameters
+#pragma warning disable RS0027 // API with optional parameter(s) should have the most parameters amongst its public overloads
+        public void AppendFormatted(string? value, int alignment = 0, string? format = null) => _builder!.AppendFormat(null, $"{{0,{alignment}:{format}}}", value);
+
+        public void AppendFormatted(object? value, int alignment = 0, string? format = null) => _builder!.AppendFormat(null, $"{{0,{alignment}:{format}}}", value);
+#pragma warning restore RS0026 // Do not add multiple public overloads with optional parameters
+#pragma warning restore RS0027 // API with optional parameter(s) should have the most parameters amongst its public overloads
+    }
+
+    [StackTraceHidden]
+    [InterpolatedStringHandler]
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    public readonly struct AssertIsNotInstanceOfTypeInterpolatedStringHandler
+    {
+        private readonly StringBuilder? _builder;
+        private readonly object? _value;
+        private readonly Type? _wrongType;
+
+        public AssertIsNotInstanceOfTypeInterpolatedStringHandler(int literalLength, int formattedCount, object? value, Type? wrongType, out bool shouldAppend)
+        {
+            _value = value;
+            _wrongType = wrongType;
+            shouldAppend = IsNotInstanceOfTypeFailing(value, wrongType);
+            if (shouldAppend)
+            {
+                _builder = new StringBuilder(literalLength + formattedCount);
+            }
+        }
+
+        internal void ComputeAssertion(string valueExpression)
+        {
+            if (_builder is not null)
+            {
+                ReportAssertIsNotInstanceOfTypeFailed(_value, _wrongType, _builder.ToString(), valueExpression);
+            }
+        }
+
+        public void AppendLiteral(string value) => _builder!.Append(value);
+
+        public void AppendFormatted<T>(T value) => AppendFormatted(value, format: null);
+
+#if NETCOREAPP3_1_OR_GREATER
+        public void AppendFormatted(ReadOnlySpan<char> value) => _builder!.Append(value);
+
+#pragma warning disable RS0027 // API with optional parameter(s) should have the most parameters amongst its public overloads
+        public void AppendFormatted(ReadOnlySpan<char> value, int alignment = 0, string? format = null) => AppendFormatted(value.ToString(), alignment, format);
+#pragma warning restore RS0027 // API with optional parameter(s) should have the most parameters amongst its public overloads
+#endif
+
+        // NOTE: All the overloads involving format and/or alignment are not super efficient.
+        // This code path is only for when an assert is failing, so that's not the common scenario
+        // and should be okay if not very optimized.
+        // A more efficient implementation that can be used for .NET 6 and later is to delegate the work to
+        // the BCL's StringBuilder.AppendInterpolatedStringHandler
+        public void AppendFormatted<T>(T value, string? format) => _builder!.AppendFormat(null, $"{{0:{format}}}", value);
+
+        public void AppendFormatted<T>(T value, int alignment) => _builder!.AppendFormat(null, $"{{0,{alignment}}}", value);
+
+        public void AppendFormatted<T>(T value, int alignment, string? format) => _builder!.AppendFormat(null, $"{{0,{alignment}:{format}}}", value);
+
+        public void AppendFormatted(string? value) => _builder!.Append(value);
+
+#pragma warning disable RS0026 // Do not add multiple public overloads with optional parameters
+#pragma warning disable RS0027 // API with optional parameter(s) should have the most parameters amongst its public overloads
+        public void AppendFormatted(string? value, int alignment = 0, string? format = null) => _builder!.AppendFormat(null, $"{{0,{alignment}:{format}}}", value);
+
+        public void AppendFormatted(object? value, int alignment = 0, string? format = null) => _builder!.AppendFormat(null, $"{{0,{alignment}:{format}}}", value);
+#pragma warning restore RS0026 // Do not add multiple public overloads with optional parameters
+#pragma warning restore RS0027 // API with optional parameter(s) should have the most parameters amongst its public overloads
+    }
+
+    [StackTraceHidden]
+    [InterpolatedStringHandler]
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    public readonly struct AssertGenericIsNotInstanceOfTypeInterpolatedStringHandler<TArg>
+    {
+        private readonly StringBuilder? _builder;
+        private readonly object? _value;
+
+        public AssertGenericIsNotInstanceOfTypeInterpolatedStringHandler(int literalLength, int formattedCount, object? value, out bool shouldAppend)
+        {
+            _value = value;
+            shouldAppend = IsNotInstanceOfTypeFailing(value, typeof(TArg));
+            if (shouldAppend)
+            {
+                _builder = new StringBuilder(literalLength + formattedCount);
+            }
+        }
+
+        internal void ComputeAssertion(string valueExpression)
+        {
+            if (_builder is not null)
+            {
+                ReportAssertIsNotInstanceOfTypeFailed(_value, typeof(TArg), _builder.ToString(), valueExpression);
+            }
+        }
+
+        public void AppendLiteral(string value) => _builder!.Append(value);
+
+        public void AppendFormatted<T>(T value) => AppendFormatted(value, format: null);
+
+#if NETCOREAPP3_1_OR_GREATER
+        public void AppendFormatted(ReadOnlySpan<char> value) => _builder!.Append(value);
+
+#pragma warning disable RS0027 // API with optional parameter(s) should have the most parameters amongst its public overloads
+        public void AppendFormatted(ReadOnlySpan<char> value, int alignment = 0, string? format = null) => AppendFormatted(value.ToString(), alignment, format);
+#pragma warning restore RS0027 // API with optional parameter(s) should have the most parameters amongst its public overloads
+#endif
+
+        // NOTE: All the overloads involving format and/or alignment are not super efficient.
+        // This code path is only for when an assert is failing, so that's not the common scenario
+        // and should be okay if not very optimized.
+        // A more efficient implementation that can be used for .NET 6 and later is to delegate the work to
+        // the BCL's StringBuilder.AppendInterpolatedStringHandler
+        public void AppendFormatted<T>(T value, string? format) => _builder!.AppendFormat(null, $"{{0:{format}}}", value);
+
+        public void AppendFormatted<T>(T value, int alignment) => _builder!.AppendFormat(null, $"{{0,{alignment}}}", value);
+
+        public void AppendFormatted<T>(T value, int alignment, string? format) => _builder!.AppendFormat(null, $"{{0,{alignment}:{format}}}", value);
+
+        public void AppendFormatted(string? value) => _builder!.Append(value);
+
+#pragma warning disable RS0026 // Do not add multiple public overloads with optional parameters
+#pragma warning disable RS0027 // API with optional parameter(s) should have the most parameters amongst its public overloads
+        public void AppendFormatted(string? value, int alignment = 0, string? format = null) => _builder!.AppendFormat(null, $"{{0,{alignment}:{format}}}", value);
+
+        public void AppendFormatted(object? value, int alignment = 0, string? format = null) => _builder!.AppendFormat(null, $"{{0,{alignment}:{format}}}", value);
+#pragma warning restore RS0026 // Do not add multiple public overloads with optional parameters
+#pragma warning restore RS0027 // API with optional parameter(s) should have the most parameters amongst its public overloads
+    }
+#pragma warning restore CS1591 // Missing XML comment for publicly visible type or member
+
+#pragma warning disable RS0026 // Do not add multiple public overloads with optional parameters
+#pragma warning disable RS0027 // API with optional parameter(s) should have the most parameters amongst its public overloads
 
     /// <summary>
     /// Tests whether the specified object is an instance of the expected
@@ -67,78 +279,35 @@ public sealed partial class Assert
     /// is not an instance of <paramref name="expectedType"/>. The message is
     /// shown in test results.
     /// </param>
-    /// <exception cref="AssertFailedException">
-    /// Thrown if <paramref name="value"/> is null or
-    /// <paramref name="expectedType"/> is not in the inheritance hierarchy
-    /// of <paramref name="value"/>.
-    /// </exception>
-    public static void IsInstanceOfType([NotNull] object? value, [NotNull] Type? expectedType, string? message)
-        => IsInstanceOfType(value, expectedType, message, null);
-
-    /// <summary>
-    /// Tests whether the specified object is an instance of the generic
-    /// type and throws an exception if the generic type is not in the
-    /// inheritance hierarchy of the object.
-    /// </summary>
-    /// <typeparam name="T">The expected type of <paramref name="value"/>.</typeparam>
-    public static void IsInstanceOfType<T>([NotNull] object? value, string? message)
-        => IsInstanceOfType(value, typeof(T), message, null);
-
-    /// <summary>
-    /// Tests whether the specified object is an instance of the generic
-    /// type and throws an exception if the generic type is not in the
-    /// inheritance hierarchy of the object.
-    /// </summary>
-    /// <typeparam name="T">The expected type of <paramref name="value"/>.</typeparam>
-    public static void IsInstanceOfType<T>([NotNull] object? value, out T instance, string? message)
-        => IsInstanceOfType<T>(value, out instance, message, null);
-
-    /// <summary>
-    /// Tests whether the specified object is an instance of the expected
-    /// type and throws an exception if the expected type is not in the
-    /// inheritance hierarchy of the object.
-    /// </summary>
-    /// <param name="value">
-    /// The object the test expects to be of the specified type.
-    /// </param>
-    /// <param name="expectedType">
-    /// The expected type of <paramref name="value"/>.
-    /// </param>
-    /// <param name="message">
-    /// The message to include in the exception when <paramref name="value"/>
-    /// is not an instance of <paramref name="expectedType"/>. The message is
-    /// shown in test results.
-    /// </param>
-    /// <param name="parameters">
-    /// An array of parameters to use when formatting <paramref name="message"/>.
+    /// <param name="valueExpression">
+    /// The syntactic expression of value as given by the compiler via caller argument expression.
+    /// Users shouldn't pass a value for this parameter.
     /// </param>
     /// <exception cref="AssertFailedException">
     /// Thrown if <paramref name="value"/> is null or
     /// <paramref name="expectedType"/> is not in the inheritance hierarchy
     /// of <paramref name="value"/>.
     /// </exception>
-    public static void IsInstanceOfType([NotNull] object? value, [NotNull] Type? expectedType, string? message,
-        params object?[]? parameters)
+    public static void IsInstanceOfType([NotNull] object? value, [NotNull] Type? expectedType, string? message = "", [CallerArgumentExpression(nameof(value))] string valueExpression = "")
     {
-        if (expectedType == null || value == null)
-        {
-            ThrowAssertFailed("Assert.IsInstanceOfType", BuildUserMessage(message, parameters));
-        }
+        TelemetryCollector.TrackAssertionCall("Assert.IsInstanceOfType");
 
-        var elementTypeInfo = value.GetType().GetTypeInfo();
-        var expectedTypeInfo = expectedType.GetTypeInfo();
-        if (!expectedTypeInfo.IsAssignableFrom(elementTypeInfo))
+        if (IsInstanceOfTypeFailing(value, expectedType))
         {
-            string userMessage = BuildUserMessage(message, parameters);
-            string finalMessage = string.Format(
-                CultureInfo.CurrentCulture,
-                FrameworkMessages.IsInstanceOfFailMsg,
-                userMessage,
-                expectedType.ToString(),
-                value.GetType().ToString());
-            ThrowAssertFailed("Assert.IsInstanceOfType", finalMessage);
+            ReportAssertIsInstanceOfTypeFailed(value, expectedType, message, valueExpression);
         }
     }
+
+    /// <inheritdoc cref="IsInstanceOfType(object?, Type?, string, string)" />
+#pragma warning disable IDE0060 // Remove unused parameter - https://github.com/dotnet/roslyn/issues/76578
+    public static void IsInstanceOfType([NotNull] object? value, [NotNull] Type? expectedType, [InterpolatedStringHandlerArgument(nameof(value), nameof(expectedType))] ref AssertIsInstanceOfTypeInterpolatedStringHandler message, [CallerArgumentExpression(nameof(value))] string valueExpression = "")
+#pragma warning restore IDE0060 // Remove unused parameter
+#pragma warning disable CS8777 // Parameter must have a non-null value when exiting. - Deliberately keeping [NotNull] annotation while using soft assertions. Within an AssertScope, the postcondition is not enforced (same as all other assertion postconditions in scoped mode).
+    {
+        TelemetryCollector.TrackAssertionCall("Assert.IsInstanceOfType");
+        message.ComputeAssertion(valueExpression);
+    }
+#pragma warning restore CS8777 // Parameter must have a non-null value when exiting.
 
     /// <summary>
     /// Tests whether the specified object is an instance of the generic
@@ -146,48 +315,48 @@ public sealed partial class Assert
     /// inheritance hierarchy of the object.
     /// </summary>
     /// <typeparam name="T">The expected type of <paramref name="value"/>.</typeparam>
-    public static void IsInstanceOfType<T>([NotNull] object? value, string? message, params object?[]? parameters)
-        => IsInstanceOfType(value, typeof(T), message, parameters);
-
-    /// <summary>
-    /// Tests whether the specified object is an instance of the generic
-    /// type and throws an exception if the generic type is not in the
-    /// inheritance hierarchy of the object.
-    /// </summary>
-    /// <typeparam name="T">The expected type of <paramref name="value"/>.</typeparam>
-    public static void IsInstanceOfType<T>([NotNull] object? value, out T instance, string? message, params object?[]? parameters)
+    public static T IsInstanceOfType<T>([NotNull] object? value, string? message = "", [CallerArgumentExpression(nameof(value))] string valueExpression = "")
     {
-        IsInstanceOfType(value, typeof(T), message, parameters);
-        instance = (T)value;
+        IsInstanceOfType(value, typeof(T), message, valueExpression);
+        return (T)value!;
     }
 
-    /// <summary>
-    /// Tests whether the specified object is not an instance of the wrong
-    /// type and throws an exception if the specified type is in the
-    /// inheritance hierarchy of the object.
-    /// </summary>
-    /// <param name="value">
-    /// The object the test expects not to be of the specified type.
-    /// </param>
-    /// <param name="wrongType">
-    /// The type that <paramref name="value"/> should not be.
-    /// </param>
-    /// <exception cref="AssertFailedException">
-    /// Thrown if <paramref name="value"/> is not null and
-    /// <paramref name="wrongType"/> is in the inheritance hierarchy
-    /// of <paramref name="value"/>.
-    /// </exception>
-    public static void IsNotInstanceOfType(object? value, [NotNull] Type? wrongType)
-        => IsNotInstanceOfType(value, wrongType, string.Empty, null);
+    /// <inheritdoc cref="IsInstanceOfType{T}(object?, string, string)" />
+#pragma warning disable IDE0060 // Remove unused parameter - https://github.com/dotnet/roslyn/issues/76578
+    public static T IsInstanceOfType<T>([NotNull] object? value, [InterpolatedStringHandlerArgument(nameof(value))] ref AssertGenericIsInstanceOfTypeInterpolatedStringHandler<T> message, [CallerArgumentExpression(nameof(value))] string valueExpression = "")
+#pragma warning restore IDE0060 // Remove unused parameter
+#pragma warning disable CS8777 // Parameter must have a non-null value when exiting. - Deliberately keeping [NotNull] annotation while using soft assertions. Within an AssertScope, the postcondition is not enforced (same as all other assertion postconditions in scoped mode).
+    {
+        TelemetryCollector.TrackAssertionCall("Assert.IsInstanceOfType");
+        message.ComputeAssertion(valueExpression);
+        return (T)value!;
+    }
+#pragma warning restore CS8777 // Parameter must have a non-null value when exiting.
 
-    /// <summary>
-    /// Tests whether the specified object is not an instance of the wrong generic
-    /// type and throws an exception if the specified type is in the
-    /// inheritance hierarchy of the object.
-    /// </summary>
-    /// <typeparam name="T">The type that <paramref name="value"/> should not be.</typeparam>
-    public static void IsNotInstanceOfType<T>(object? value)
-        => IsNotInstanceOfType(value, typeof(T), string.Empty, null);
+    private static bool IsInstanceOfTypeFailing([NotNullWhen(false)] object? value, [NotNullWhen(false)] Type? expectedType)
+        => expectedType == null || value == null || !expectedType.IsInstanceOfType(value);
+
+    [DoesNotReturn]
+    private static void ReportAssertIsInstanceOfTypeFailed(object? value, Type? expectedType, string? userMessage, string valueExpression)
+    {
+        StructuredAssertionMessage msg = expectedType is null
+            ? new("Cannot check type because the expected type argument is null.")
+            : new($"Expected value to be of type {expectedType.Name} (or derived).");
+        msg.WithUserMessage(userMessage);
+
+        if (expectedType is not null)
+        {
+            string actualTypeText = value?.GetType().ToString() ?? "null";
+            EvidenceBlock evidence = EvidenceBlock.Create()
+                .AddLine("expected type:", $"{expectedType} (or derived)")
+                .AddLine(value is null ? "actual:" : "actual type:", actualTypeText);
+            msg.WithEvidence(evidence)
+               .WithExpectedAndActual($"{expectedType} (or derived)", actualTypeText);
+        }
+
+        msg.WithCallSiteExpression(FormatCallSiteExpression("Assert.IsInstanceOfType", valueExpression, "<value>"));
+        ReportAssertFailed(msg);
+    }
 
     /// <summary>
     /// Tests whether the specified object is not an instance of the wrong
@@ -205,82 +374,78 @@ public sealed partial class Assert
     /// is an instance of <paramref name="wrongType"/>. The message is shown
     /// in test results.
     /// </param>
-    /// <exception cref="AssertFailedException">
-    /// Thrown if <paramref name="value"/> is not null and
-    /// <paramref name="wrongType"/> is in the inheritance hierarchy
-    /// of <paramref name="value"/>.
-    /// </exception>
-    public static void IsNotInstanceOfType(object? value, [NotNull] Type? wrongType, string? message)
-        => IsNotInstanceOfType(value, wrongType, message, null);
-
-    /// <summary>
-    /// Tests whether the specified object is not an instance of the wrong generic
-    /// type and throws an exception if the specified type is in the
-    /// inheritance hierarchy of the object.
-    /// </summary>
-    /// <typeparam name="T">The type that <paramref name="value"/> should not be.</typeparam>
-    public static void IsNotInstanceOfType<T>(object? value, string? message)
-        => IsNotInstanceOfType(value, typeof(T), message, null);
-
-    /// <summary>
-    /// Tests whether the specified object is not an instance of the wrong
-    /// type and throws an exception if the specified type is in the
-    /// inheritance hierarchy of the object.
-    /// </summary>
-    /// <param name="value">
-    /// The object the test expects not to be of the specified type.
-    /// </param>
-    /// <param name="wrongType">
-    /// The type that <paramref name="value"/> should not be.
-    /// </param>
-    /// <param name="message">
-    /// The message to include in the exception when <paramref name="value"/>
-    /// is an instance of <paramref name="wrongType"/>. The message is shown
-    /// in test results.
-    /// </param>
-    /// <param name="parameters">
-    /// An array of parameters to use when formatting <paramref name="message"/>.
+    /// <param name="valueExpression">
+    /// The syntactic expression of value as given by the compiler via caller argument expression.
+    /// Users shouldn't pass a value for this parameter.
     /// </param>
     /// <exception cref="AssertFailedException">
     /// Thrown if <paramref name="value"/> is not null and
     /// <paramref name="wrongType"/> is in the inheritance hierarchy
     /// of <paramref name="value"/>.
     /// </exception>
-    public static void IsNotInstanceOfType(object? value, [NotNull] Type? wrongType, string? message,
-        params object?[]? parameters)
+    public static void IsNotInstanceOfType(object? value, [NotNull] Type? wrongType, string? message = "", [CallerArgumentExpression(nameof(value))] string valueExpression = "")
     {
-        if (wrongType == null)
-        {
-            ThrowAssertFailed("Assert.IsNotInstanceOfType", BuildUserMessage(message, parameters));
-        }
+        TelemetryCollector.TrackAssertionCall("Assert.IsNotInstanceOfType");
 
-        // Null is not an instance of any type.
-        if (value == null)
+        if (IsNotInstanceOfTypeFailing(value, wrongType))
         {
-            return;
-        }
-
-        var elementTypeInfo = value.GetType().GetTypeInfo();
-        var expectedTypeInfo = wrongType.GetTypeInfo();
-        if (expectedTypeInfo.IsAssignableFrom(elementTypeInfo))
-        {
-            string userMessage = BuildUserMessage(message, parameters);
-            string finalMessage = string.Format(
-                CultureInfo.CurrentCulture,
-                FrameworkMessages.IsNotInstanceOfFailMsg,
-                userMessage,
-                wrongType.ToString(),
-                value.GetType().ToString());
-            ThrowAssertFailed("Assert.IsNotInstanceOfType", finalMessage);
+            ReportAssertIsNotInstanceOfTypeFailed(value, wrongType, message, valueExpression);
         }
     }
 
+    /// <inheritdoc cref="IsNotInstanceOfType(object?, Type?, string, string)" />
+#pragma warning disable IDE0060 // Remove unused parameter - https://github.com/dotnet/roslyn/issues/76578
+    public static void IsNotInstanceOfType(object? value, [NotNull] Type? wrongType, [InterpolatedStringHandlerArgument(nameof(value), nameof(wrongType))] ref AssertIsNotInstanceOfTypeInterpolatedStringHandler message, [CallerArgumentExpression(nameof(value))] string valueExpression = "")
+#pragma warning restore IDE0060 // Remove unused parameter
+#pragma warning disable CS8777 // Parameter must have a non-null value when exiting. - Not sure how to express the semantics to the compiler, but the implementation guarantees that.
+    {
+        TelemetryCollector.TrackAssertionCall("Assert.IsNotInstanceOfType");
+        message.ComputeAssertion(valueExpression);
+    }
+#pragma warning restore CS8777 // Parameter must have a non-null value when exiting.
+
     /// <summary>
     /// Tests whether the specified object is not an instance of the wrong generic
     /// type and throws an exception if the specified type is in the
     /// inheritance hierarchy of the object.
     /// </summary>
     /// <typeparam name="T">The type that <paramref name="value"/> should not be.</typeparam>
-    public static void IsNotInstanceOfType<T>(object? value, string? message, params object?[]? parameters)
-        => IsNotInstanceOfType(value, typeof(T), message, parameters);
+    public static void IsNotInstanceOfType<T>(object? value, string? message = "", [CallerArgumentExpression(nameof(value))] string valueExpression = "")
+        => IsNotInstanceOfType(value, typeof(T), message, valueExpression);
+
+    /// <inheritdoc cref="IsNotInstanceOfType{T}(object?, string, string)" />
+#pragma warning disable IDE0060 // Remove unused parameter - https://github.com/dotnet/roslyn/issues/76578
+    public static void IsNotInstanceOfType<T>(object? value, [InterpolatedStringHandlerArgument(nameof(value))] AssertGenericIsNotInstanceOfTypeInterpolatedStringHandler<T> message, [CallerArgumentExpression(nameof(value))] string valueExpression = "")
+#pragma warning restore IDE0060 // Remove unused parameter
+    {
+        TelemetryCollector.TrackAssertionCall("Assert.IsNotInstanceOfType");
+        message.ComputeAssertion(valueExpression);
+    }
+
+    private static bool IsNotInstanceOfTypeFailing(object? value, [NotNullWhen(false)] Type? wrongType)
+        => wrongType is null ||
+            // Null is not an instance of any type.
+            (value is not null && wrongType.IsInstanceOfType(value));
+
+    [DoesNotReturn]
+    private static void ReportAssertIsNotInstanceOfTypeFailed(object? value, Type? wrongType, string? userMessage, string valueExpression)
+    {
+        StructuredAssertionMessage msg = wrongType is null
+            ? new("Cannot check type because the not-expected type argument is null.")
+            : new($"Expected value to not be of type {wrongType.Name} (or derived).");
+        msg.WithUserMessage(userMessage);
+
+        if (wrongType is not null)
+        {
+            string actualTypeText = value?.GetType().ToString() ?? "null";
+            EvidenceBlock evidence = EvidenceBlock.Create()
+                .AddLine("not expected type:", $"{wrongType} (or derived)")
+                .AddLine("actual type:", actualTypeText);
+            msg.WithEvidence(evidence)
+               .WithExpectedAndActual($"{wrongType} (or derived)", actualTypeText);
+        }
+
+        msg.WithCallSiteExpression(FormatCallSiteExpression("Assert.IsNotInstanceOfType", valueExpression, "<value>"));
+        ReportAssertFailed(msg);
+    }
 }

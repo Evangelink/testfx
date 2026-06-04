@@ -1,8 +1,8 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-#if NET462
-using System.Reflection;
+#if NETFRAMEWORK
+using AwesomeAssertions;
 
 using Microsoft.VisualStudio.TestPlatform.MSTestAdapter.PlatformServices.Deployment;
 using Microsoft.VisualStudio.TestPlatform.MSTestAdapter.PlatformServices.Utilities;
@@ -21,7 +21,7 @@ public class AssemblyLoadWorkerTests : TestContainer
         var v1AssemblyName = new AssemblyName("Microsoft.VisualStudio.QualityTools.UnitTestFramework");
         var testableAssembly = new TestableAssembly
         {
-            GetReferencedAssembliesSetter = () => new AssemblyName[] { v1AssemblyName },
+            GetReferencedAssembliesSetter = () => [v1AssemblyName],
         };
 
         var mockAssemblyUtility = new Mock<IAssemblyUtility>();
@@ -32,11 +32,11 @@ public class AssemblyLoadWorkerTests : TestContainer
         var worker = new AssemblyLoadWorker(mockAssemblyUtility.Object);
 
         // Act.
-        var dependentAssemblies = worker.GetFullPathToDependentAssemblies("C:\\temp\\test3424.dll", out var warnings);
+        IReadOnlyCollection<string> dependentAssemblies = worker.GetFullPathToDependentAssemblies("C:\\temp\\test3424.dll", out IList<string> warnings);
 
         // Assert.
-        var utfAssembly = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "Microsoft.VisualStudio.QualityTools.UnitTestFramework.dll");
-        Verify(dependentAssemblies.Contains(utfAssembly));
+        string utfAssembly = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "Microsoft.VisualStudio.QualityTools.UnitTestFramework.dll");
+        dependentAssemblies.Should().Contain(utfAssembly);
     }
 
     public void GetFullPathToDependentAssembliesShouldReturnV1FrameworkReferencedInADependency()
@@ -47,12 +47,12 @@ public class AssemblyLoadWorkerTests : TestContainer
         var dependentAssemblyName = new AssemblyName("Common.TestFramework");
         var dependentAssembly = new TestableAssembly(dependentAssemblyName.Name)
         {
-            GetReferencedAssembliesSetter = () => new AssemblyName[] { v1AssemblyName },
+            GetReferencedAssembliesSetter = () => [v1AssemblyName],
         };
 
         var testableAssembly = new TestableAssembly
         {
-            GetReferencedAssembliesSetter = () => new AssemblyName[] { dependentAssemblyName },
+            GetReferencedAssembliesSetter = () => [dependentAssemblyName],
         };
 
         var mockAssemblyUtility = new Mock<IAssemblyUtility>();
@@ -69,7 +69,7 @@ public class AssemblyLoadWorkerTests : TestContainer
                             return testableAssembly;
                         }
 
-                        return null;
+                        return null!;
                     });
 
         mockAssemblyUtility.Setup(au => au.ReflectionOnlyLoad(It.IsAny<string>()))
@@ -85,17 +85,17 @@ public class AssemblyLoadWorkerTests : TestContainer
                     return new TestableAssembly(v1AssemblyName.FullName);
                 }
 
-                return null;
+                return null!;
             });
 
         var worker = new AssemblyLoadWorker(mockAssemblyUtility.Object);
 
         // Act.
-        var dependentAssemblies = worker.GetFullPathToDependentAssemblies("C:\\temp\\test3424.dll", out var warnings);
+        IReadOnlyCollection<string> dependentAssemblies = worker.GetFullPathToDependentAssemblies("C:\\temp\\test3424.dll", out IList<string> warnings);
 
         // Assert.
-        var utfAssembly = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "Microsoft.VisualStudio.QualityTools.UnitTestFramework.dll");
-        Verify(dependentAssemblies.Contains(utfAssembly));
+        string utfAssembly = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "Microsoft.VisualStudio.QualityTools.UnitTestFramework.dll");
+        dependentAssemblies.Should().Contain(utfAssembly);
     }
 
     #region Testable Implementations
@@ -114,51 +114,25 @@ public class AssemblyLoadWorkerTests : TestContainer
                 Name = string.Concat(assemblyName, ".dll");
             }
 
-            FullNameSetter = () => { return assemblyName; };
+            FullNameSetter = () => assemblyName;
         }
 
-        public Func<AssemblyName[]> GetReferencedAssembliesSetter { get; set; }
+        public Func<AssemblyName[]> GetReferencedAssembliesSetter { get; set; } = null!;
 
-        public Func<string> FullNameSetter { get; set; }
+        public Func<string> FullNameSetter { get; set; } = null!;
 
         public override AssemblyName[] GetReferencedAssemblies()
-        {
-            return GetReferencedAssembliesSetter != null ? GetReferencedAssembliesSetter.Invoke() : Array.Empty<AssemblyName>();
-        }
+            => GetReferencedAssembliesSetter != null ? GetReferencedAssembliesSetter.Invoke() : [];
 
-        public string Name
-        {
-            get; set;
-        }
+        public string? Name { get; set; }
 
-        public override string FullName
-        {
-            get
-            {
-                return FullNameSetter != null ? FullNameSetter.Invoke() : GetExecutingAssembly().FullName;
-            }
-        }
+        public override string FullName => FullNameSetter != null ? FullNameSetter.Invoke() : GetExecutingAssembly().FullName;
 
-        public override bool GlobalAssemblyCache
-        {
-            get
-            {
-                return false;
-            }
-        }
+        public override bool GlobalAssemblyCache => false;
 
-        public override string Location
-        {
-            get
-            {
-                return Path.Combine(Path.GetDirectoryName(GetExecutingAssembly().Location), Name);
-            }
-        }
+        public override string Location => Path.Combine(Path.GetDirectoryName(GetExecutingAssembly().Location), Name);
 
-        public override Module[] GetModules(bool getResourceModules)
-        {
-            return Array.Empty<Module>();
-        }
+        public override Module[] GetModules(bool getResourceModules) => [];
     }
 
     #endregion

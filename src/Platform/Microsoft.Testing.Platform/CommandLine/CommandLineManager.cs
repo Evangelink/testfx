@@ -1,53 +1,68 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Microsoft.Testing.Platform.Configurations;
 using Microsoft.Testing.Platform.Extensions;
 using Microsoft.Testing.Platform.Extensions.CommandLine;
 using Microsoft.Testing.Platform.Helpers;
-using Microsoft.Testing.Platform.OutputDevice;
+using Microsoft.Testing.Platform.OutputDevice.Terminal;
 using Microsoft.Testing.Platform.Services;
+using Microsoft.Testing.Platform.Tools;
 
 namespace Microsoft.Testing.Platform.CommandLine;
 
-internal sealed class CommandLineManager(IRuntimeFeature runtimeFeature, IEnvironment environment, IProcessHandler processHandler, ITestApplicationModuleInfo testApplicationModuleInfo) : ICommandLineManager
+internal sealed class CommandLineManager(IRuntimeFeature runtimeFeature, ITestApplicationModuleInfo testApplicationModuleInfo) : ICommandLineManager
 {
-    private readonly List<Func<ICommandLineOptionsProvider>> _commandLineProviderFactory = [];
+    private readonly List<Func<IServiceProvider, ICommandLineOptionsProvider>> _commandLineProviderFactory = [];
     private readonly IRuntimeFeature _runtimeFeature = runtimeFeature;
-    private readonly IEnvironment _environment = environment;
-    private readonly IProcessHandler _processHandler = processHandler;
     private readonly ITestApplicationModuleInfo _testApplicationModuleInfo = testApplicationModuleInfo;
 
     public void AddProvider(Func<ICommandLineOptionsProvider> commandLineProviderFactory)
     {
-        ArgumentGuard.IsNotNull(commandLineProviderFactory);
+        if (commandLineProviderFactory is null)
+        {
+            throw new ArgumentNullException(nameof(commandLineProviderFactory));
+        }
+
+        _commandLineProviderFactory.Add(_ => commandLineProviderFactory());
+    }
+
+    public void AddProvider(Func<IServiceProvider, ICommandLineOptionsProvider> commandLineProviderFactory)
+    {
+        if (commandLineProviderFactory is null)
+        {
+            throw new ArgumentNullException(nameof(commandLineProviderFactory));
+        }
+
         _commandLineProviderFactory.Add(commandLineProviderFactory);
     }
 
-    internal async Task<CommandLineHandler> BuildAsync(string[] args, IPlatformOutputDevice platformOutputDisplay, CommandLineParseResult parseResult)
+    internal async Task<CommandLineHandler> BuildAsync(CommandLineParseResult parseResult, IServiceProvider serviceProvider, IConfiguration configuration)
     {
         List<ICommandLineOptionsProvider> commandLineOptionsProviders = [];
-        foreach (Func<ICommandLineOptionsProvider> commandLineProviderFactory in _commandLineProviderFactory)
+        foreach (Func<IServiceProvider, ICommandLineOptionsProvider> commandLineProviderFactory in _commandLineProviderFactory)
         {
-            ICommandLineOptionsProvider serviceInstance = commandLineProviderFactory();
-            if (!await serviceInstance.IsEnabledAsync())
+            ICommandLineOptionsProvider commandLineOptionsProvider = commandLineProviderFactory(serviceProvider);
+            if (!await commandLineOptionsProvider.IsEnabledAsync().ConfigureAwait(false))
             {
                 continue;
             }
 
-            if (serviceInstance is IAsyncInitializableExtension async)
-            {
-                await async.InitializeAsync();
-            }
+            await commandLineOptionsProvider.TryInitializeAsync().ConfigureAwait(false);
 
-            commandLineOptionsProviders.Add(new CommandLineOptionsProviderCache(serviceInstance));
+            commandLineOptionsProviders.Add(
+                commandLineOptionsProvider is IToolCommandLineOptionsProvider toolCommandLineOptionsProvider
+                    ? new ToolCommandLineOptionsProviderCache(toolCommandLineOptionsProvider)
+                    : new CommandLineOptionsProviderCache(commandLineOptionsProvider));
         }
 
-        ICommandLineOptionsProvider[] systemCommandLineOptionsProviders = new[]
-        {
+        ICommandLineOptionsProvider[] systemCommandLineOptionsProviders =
+        [
             new PlatformCommandLineProvider(),
-        };
+            new TerminalTestReporterCommandLineOptionsProvider()
+        ];
 
-        return new CommandLineHandler(args, parseResult, commandLineOptionsProviders.ToArray(),
-            systemCommandLineOptionsProviders, _testApplicationModuleInfo, _runtimeFeature, platformOutputDisplay, _environment, _processHandler);
+        return new CommandLineHandler(parseResult, commandLineOptionsProviders,
+            systemCommandLineOptionsProviders, _testApplicationModuleInfo, _runtimeFeature, configuration);
     }
 }

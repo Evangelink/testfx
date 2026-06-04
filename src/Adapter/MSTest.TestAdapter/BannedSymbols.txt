@@ -1,0 +1,2 @@
+﻿M:Microsoft.VisualStudio.TestPlatform.MSTest.TestAdapter.Helpers.ReflectHelper.#ctor; This is allowed only for tests.
+N:Microsoft.Testing.Platform

@@ -2,10 +2,14 @@
 
   <PropertyGroup>
     <NetStandardNetFrameworkHolder>net48</NetStandardNetFrameworkHolder>
-    <TargetFrameworks>net462;$(NetStandardNetFrameworkHolder);netcoreapp3.1;net6.0;$(WinUiMinimum)</TargetFrameworks>
-    <IsNetCoreApp Condition=" '$(TargetFramework)' == 'netcoreapp3.1' OR '$(TargetFramework)' == 'net6.0' OR '$(TargetFramework)' == '$(WinUiMinimum)' ">true</IsNetCoreApp>
+    <TargetFrameworks>$(NetStandardNetFrameworkHolder);net8.0;net9.0</TargetFrameworks>
+    <TargetFrameworks Condition=" '$(OS)' == 'Windows_NT' ">$(TargetFrameworks);$(WinUiMinimum)</TargetFrameworks>
+    <IsNetCoreApp Condition=" '$(TargetFramework)' == 'net8.0' OR '$(TargetFramework)' == 'net9.0' OR '$(TargetFramework)' == '$(WinUiMinimum)' ">true</IsNetCoreApp>
     <RootNamespace>Microsoft.VisualStudio.TestPlatform.TestFramework.UnitTests</RootNamespace>
     <AssemblyName>Microsoft.VisualStudio.TestPlatform.TestFramework.UnitTests</AssemblyName>
+    <UseInternalTestFramework>true</UseInternalTestFramework>
+    <OutputType>Exe</OutputType>
+    <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
   </PropertyGroup>
 
   <!-- Properties specific to WinUI -->
@@ -14,12 +18,16 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="$(RepoRoot)src\TestFramework\TestFramework\TestFramework.csproj"/>
-    <ProjectReference Include="$(RepoRoot)test\Utilities\TestFramework.ForTestingMSTest\TestFramework.ForTestingMSTest.csproj" />
+    <ProjectReference Include="$(RepoRoot)src\TestFramework\TestFramework\TestFramework.csproj" />
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="AwesomeAssertions" />
     <PackageReference Include="Moq" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="$(RepoRoot)src/Polyfills/**/*.cs" Link="Polyfills\%(RecursiveDir)%(Filename)%(Extension)" />
   </ItemGroup>
 
 </Project>

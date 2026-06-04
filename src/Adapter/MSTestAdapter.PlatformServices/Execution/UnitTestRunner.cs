@@ -1,0 +1,392 @@
+﻿// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT license. See LICENSE file in the project root for full license information.
+
+#if NETFRAMEWORK
+using System.Security;
+#endif
+
+using Microsoft.VisualStudio.TestPlatform.MSTest.TestAdapter.Extensions;
+using Microsoft.VisualStudio.TestPlatform.MSTest.TestAdapter.Helpers;
+using Microsoft.VisualStudio.TestPlatform.MSTest.TestAdapter.ObjectModel;
+using Microsoft.VisualStudio.TestPlatform.MSTestAdapter.PlatformServices;
+using Microsoft.VisualStudio.TestPlatform.MSTestAdapter.PlatformServices.Extensions;
+using Microsoft.VisualStudio.TestPlatform.MSTestAdapter.PlatformServices.Interface;
+using Microsoft.VisualStudio.TestPlatform.ObjectModel.Logging;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Microsoft.VisualStudio.TestTools.UnitTesting.Logging;
+
+namespace Microsoft.VisualStudio.TestPlatform.MSTest.TestAdapter.Execution;
+
+/// <summary>
+/// The runner that runs a single unit test. Also manages the assembly and class cleanup methods at the end of the run.
+/// </summary>
+internal sealed class UnitTestRunner
+#if NETFRAMEWORK
+    : MarshalByRefObject
+#endif
+{
+    private readonly TypeCache _typeCache;
+    private readonly ClassCleanupManager _classCleanupManager;
+
+    // Only needed to attach class cleanup failures to the right test.
+    // So we only add to this dictionary if the class has a class cleanup.
+    private readonly ConcurrentDictionary<string, UnitTestElement> _lastRunnableTestByClass = new();
+
+    // Used to attach assembly cleanup failures to the right test.
+    private UnitTestElement? _lastRunnableTestInWholeAssembly;
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="UnitTestRunner"/> class.
+    /// </summary>
+    /// <param name="settings"> Specifies adapter settings that need to be instantiated in the domain running these tests. </param>
+    /// <param name="testsToRun"> The tests to run. </param>
+    public UnitTestRunner(MSTestSettings settings, UnitTestElement[] testsToRun)
+        : this(settings, testsToRun, ReflectHelper.Instance)
+    {
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="UnitTestRunner"/> class.
+    /// </summary>
+    /// <param name="settings"> Specifies adapter settings. </param>
+    /// <param name="testsToRun"> The tests to run. </param>
+    /// <param name="reflectHelper"> The reflect Helper. </param>
+    internal UnitTestRunner(MSTestSettings settings, UnitTestElement[] testsToRun, ReflectHelper reflectHelper)
+    {
+        // Populate the settings into the domain(Desktop workflow) performing discovery.
+        // This would just be resetting the settings to itself in non desktop workflows.
+        MSTestSettings.PopulateSettings(settings);
+
+        // Bridge the adapter setting to the TestFramework for assertion failure behavior.
+        AssertionFailureSettings.LaunchDebuggerOnAssertionFailure = MSTestSettings.CurrentSettings.LaunchDebuggerOnAssertionFailure;
+
+        Logger.OnLogMessage += message => (TestContext.Current as TestContextImplementation)?.WriteConsoleOut(message);
+
+        if (MSTestSettings.CurrentSettings.CaptureDebugTraces)
+        {
+            Console.SetOut(new ConsoleOutRouter(Console.Out));
+            Console.SetError(new ConsoleErrorRouter(Console.Error));
+            Trace.Listeners.Add(new TextWriterTraceListener(new TraceTextWriter()));
+        }
+
+        PlatformServiceProvider.Instance.TestRunCancellationToken ??= new TestRunCancellationToken();
+        _typeCache = new TypeCache(reflectHelper);
+
+        _classCleanupManager = new ClassCleanupManager(testsToRun);
+
+        // Expose the planned (post-filter) test list so that user code (typically [AssemblyInitialize]
+        // or fixtures) can query TestRun.Current.PlannedTests to decide whether expensive setup is
+        // needed. Set here so the snapshot lives in the same AppDomain/process that will execute the
+        // assembly initialize and the tests themselves.
+        TestRun.SetCurrent(TestRunInfo.CreateFrom(testsToRun));
+    }
+
+#pragma warning disable CA1822 // Mark members as static
+    public void Cancel()
+        => PlatformServiceProvider.Instance.TestRunCancellationToken?.Cancel();
+#pragma warning restore CA1822 // Mark members as static
+
+#if NETFRAMEWORK
+    /// <summary>
+    /// Returns object to be used for controlling lifetime, null means infinite lifetime.
+    /// </summary>
+    /// <returns>
+    /// The <see cref="object"/>.
+    /// </returns>
+    [SecurityCritical]
+    public override object? InitializeLifetimeService() => null;
+#endif
+
+    // Task cannot cross app domains.
+    // For now, TestExecutionManager will call this sync method which is hacky.
+    internal TestResult[] RunSingleTest(UnitTestElement unitTestElement, IDictionary<string, object?> testContextProperties, IMessageLogger messageLogger)
+        => RunSingleTestAsync(unitTestElement, testContextProperties, messageLogger).GetAwaiter().GetResult();
+
+    /// <summary>
+    /// Runs a single test.
+    /// </summary>
+    /// <param name="unitTestElement"> The test Method. </param>
+    /// <param name="testContextProperties"> The test context properties. </param>
+    /// <param name="messageLogger"> The message logger. </param>
+    /// <returns> The <see cref="TestResult"/>. </returns>
+    internal async Task<TestResult[]> RunSingleTestAsync(UnitTestElement unitTestElement, IDictionary<string, object?> testContextProperties, IMessageLogger messageLogger)
+    {
+        if (unitTestElement is null)
+        {
+            throw new ArgumentNullException(nameof(unitTestElement));
+        }
+
+        if (testContextProperties is null)
+        {
+            throw new ArgumentNullException(nameof(testContextProperties));
+        }
+
+        TestMethod testMethod = unitTestElement.TestMethod;
+        ITestContext? testContextForTestExecution = null;
+        ITestContext? testContextForAssemblyInit = null;
+        ITestContext? testContextForClassInit = null;
+        ITestContext? testContextForClassCleanup = null;
+        ITestContext? testContextForAssemblyCleanup = null;
+
+        try
+        {
+            testContextForTestExecution = PlatformServiceProvider.Instance.GetTestContext(testMethod, null, testContextProperties, messageLogger, UnitTestOutcome.InProgress);
+
+            // Get the testMethod
+            TestMethodInfo? testMethodInfo = _typeCache.GetTestMethodInfo(testMethod);
+
+            TestResult[] result;
+            if (!IsTestMethodRunnable(testMethod, testMethodInfo, out TestResult[]? notRunnableResult))
+            {
+                result = notRunnableResult;
+            }
+            else
+            {
+                DebugEx.Assert(testMethodInfo is not null, "testMethodInfo should not be null.");
+
+                testContextForAssemblyInit = PlatformServiceProvider.Instance.GetTestContext(testMethod: null, null, testContextProperties, messageLogger, testContextForTestExecution.Context.CurrentTestOutcome);
+
+                TestResult assemblyInitializeResult = await RunAssemblyInitializeIfNeededAsync(testMethodInfo, testContextForAssemblyInit).ConfigureAwait(false);
+
+                if (assemblyInitializeResult.Outcome != UnitTestOutcome.Passed)
+                {
+                    result = [assemblyInitializeResult];
+                }
+                else
+                {
+                    if (testMethodInfo.Parent.HasExecutableCleanupMethod)
+                    {
+                        _lastRunnableTestByClass[testMethod.FullClassName] = unitTestElement;
+                    }
+
+                    _lastRunnableTestInWholeAssembly = unitTestElement;
+
+                    testContextForClassInit = PlatformServiceProvider.Instance.GetTestContext(testMethod: null, testMethod.FullClassName, testContextProperties, messageLogger, testContextForAssemblyInit.Context.CurrentTestOutcome);
+
+                    // Flow properties set during AssemblyInitialize into the class-init context so the
+                    // ClassInitialize method observes them.
+                    ((TestContextImplementation)testContextForClassInit.Context).MergeProperties(testMethodInfo.Parent.Parent.PostAssemblyInitProperties);
+
+                    TestResult classInitializeResult = await testMethodInfo.Parent.GetResultOrRunClassInitializeAsync(testContextForClassInit, assemblyInitializeResult.LogOutput, assemblyInitializeResult.LogError, assemblyInitializeResult.DebugTrace, assemblyInitializeResult.TestContextMessages).ConfigureAwait(false);
+                    DebugEx.Assert(testMethodInfo.Parent.IsClassInitializeExecuted, "IsClassInitializeExecuted should be true after attempting to run it.");
+                    if (classInitializeResult.Outcome != UnitTestOutcome.Passed)
+                    {
+                        result = [classInitializeResult];
+                    }
+                    else
+                    {
+                        // Run the test method
+                        testContextForTestExecution.SetOutcome(testContextForClassInit.Context.CurrentTestOutcome);
+
+                        // Flow properties set during AssemblyInitialize and ClassInitialize into the
+                        // per-test execution context so the test class constructor, [TestInitialize],
+                        // the test method itself and [TestCleanup] observe them.
+                        // Note: when a test method has multiple data rows, the merge is applied once
+                        // before all rows; data rows share the same execution context (and bag).
+                        var testExecImpl = (TestContextImplementation)testContextForTestExecution.Context;
+                        testExecImpl.MergeProperties(testMethodInfo.Parent.Parent.PostAssemblyInitProperties);
+                        testExecImpl.MergeProperties(testMethodInfo.Parent.PostClassInitProperties);
+
+                        RetryBaseAttribute? retryAttribute = testMethodInfo.RetryAttribute;
+                        var testMethodRunner = new TestMethodRunner(testMethodInfo, testMethod, testContextForTestExecution);
+                        result = await testMethodRunner.ExecuteAsync(classInitializeResult.LogOutput, classInitializeResult.LogError, classInitializeResult.DebugTrace, classInitializeResult.TestContextMessages).ConfigureAwait(false);
+                        if (retryAttribute is not null && !RetryBaseAttribute.IsAcceptableResultForRetry(result))
+                        {
+                            RetryResult retryResult = await retryAttribute.ExecuteAsync(
+                                new RetryContext(
+                                    async () => await testMethodRunner.ExecuteAsync(classInitializeResult.LogOutput, classInitializeResult.LogError, classInitializeResult.DebugTrace, classInitializeResult.TestContextMessages).ConfigureAwait(false),
+                                    result)).ConfigureAwait(false);
+
+                            result = retryResult.TryGetLast() ?? throw ApplicationStateGuard.Unreachable();
+                        }
+                    }
+                }
+            }
+
+            testContextForClassCleanup = PlatformServiceProvider.Instance.GetTestContext(testMethod: null, testMethod.FullClassName, testContextProperties, messageLogger, testContextForTestExecution.Context.CurrentTestOutcome);
+
+            _classCleanupManager.MarkTestComplete(testMethod, out bool isLastTestInClass);
+            if (isLastTestInClass)
+            {
+                if (testMethodInfo is not null)
+                {
+                    // Flow properties set during AssemblyInitialize and ClassInitialize so the
+                    // ClassCleanup method observes them. Done here rather than on every test to
+                    // avoid wasted dictionary copies for non-last tests.
+                    var classCleanupImpl = (TestContextImplementation)testContextForClassCleanup.Context;
+                    classCleanupImpl.MergeProperties(testMethodInfo.Parent.Parent.PostAssemblyInitProperties);
+                    classCleanupImpl.MergeProperties(testMethodInfo.Parent.PostClassInitProperties);
+
+                    TestResult? cleanupResult = await testMethodInfo.Parent.RunClassCleanupAsync(testContextForClassCleanup, result).ConfigureAwait(false);
+                    if (cleanupResult is not null)
+                    {
+                        if (notRunnableResult is not null)
+                        {
+                            // Current test is ignored, and we have a class cleanup failure. We need to attach to the right test.
+                            if (_lastRunnableTestByClass.TryGetValue(testMethod.FullClassName, out UnitTestElement? lastRunnableUnitTest))
+                            {
+                                cleanupResult.AssociatedUnitTestElement = lastRunnableUnitTest;
+                            }
+                        }
+
+                        result = [.. result, cleanupResult];
+                    }
+                }
+
+                // Mark the class as complete when all class cleanups are complete. When all classes are complete we progress to running assembly cleanup.
+                // Class is not complete until after all class cleanups are done, to prevent running assembly cleanup too early.
+                // Do not mark the class as complete when the last test method in the class completed. That is too early, we need to run class cleanups before marking class as complete.
+                _classCleanupManager.MarkClassComplete(testMethod.FullClassName);
+            }
+
+            if (testMethodInfo?.Parent.Parent.IsAssemblyInitializeExecuted == true &&
+                _classCleanupManager.ShouldRunEndOfAssemblyCleanup)
+            {
+                testContextForAssemblyCleanup = PlatformServiceProvider.Instance.GetTestContext(testMethod: null, null, testContextProperties, messageLogger, testContextForClassCleanup.Context.CurrentTestOutcome);
+
+                // Flow properties set during AssemblyInitialize so the AssemblyCleanup method
+                // observes them. Class-init properties are intentionally NOT flowed here because
+                // AssemblyCleanup is assembly-scoped and runs once across many classes; picking
+                // a single class's snapshot would be arbitrary.
+                // testMethodInfo is non-null inside this block thanks to the guard above.
+                ((TestContextImplementation)testContextForAssemblyCleanup.Context).MergeProperties(testMethodInfo.Parent.Parent.PostAssemblyInitProperties);
+
+                TestResult? assemblyCleanupResult = await RunAssemblyCleanupAsync(testContextForAssemblyCleanup, _typeCache, result).ConfigureAwait(false);
+                if (assemblyCleanupResult is not null)
+                {
+                    if (notRunnableResult is not null)
+                    {
+                        // Current test is ignored, and we have an assembly cleanup failure. We need to attach to the right test.
+                        assemblyCleanupResult.AssociatedUnitTestElement = _lastRunnableTestInWholeAssembly;
+                    }
+
+                    result = [.. result, assemblyCleanupResult];
+                }
+            }
+
+            return result;
+        }
+        catch (Exception ex)
+        {
+            // Catch any exception thrown while inspecting the test method and return failure.
+            return
+            [
+                new TestResult
+                {
+                    Outcome = UnitTestOutcome.Error,
+                    IgnoreReason = ex.Message,
+                }
+            ];
+        }
+        finally
+        {
+            (testContextForTestExecution as IDisposable)?.Dispose();
+            (testContextForAssemblyInit as IDisposable)?.Dispose();
+            (testContextForClassInit as IDisposable)?.Dispose();
+            (testContextForClassCleanup as IDisposable)?.Dispose();
+            (testContextForAssemblyCleanup as IDisposable)?.Dispose();
+        }
+    }
+
+    private static async Task<TestResult> RunAssemblyInitializeIfNeededAsync(TestMethodInfo testMethodInfo, ITestContext testContext)
+    {
+        TestResult? result = null;
+
+        try
+        {
+            result = await testMethodInfo.Parent.Parent.RunAssemblyInitializeAsync(testContext.Context).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            var testFailureException = new TestFailedException(UnitTestOutcome.Error, ex.TryGetMessage(), ex.TryGetStackTraceInformation());
+            result = new TestResult { TestFailureException = testFailureException, Outcome = UnitTestOutcome.Error };
+        }
+        finally
+        {
+            var testContextImpl = testContext.Context as TestContextImplementation;
+            result!.LogOutput = testContextImpl?.GetAndClearOutput();
+            result.LogError = testContextImpl?.GetAndClearError();
+            result.DebugTrace = testContextImpl?.GetAndClearTrace();
+            result.TestContextMessages = testContext.GetAndClearDiagnosticMessages();
+        }
+
+        return result;
+    }
+
+    private static async Task<TestResult?> RunAssemblyCleanupAsync(ITestContext testContext, TypeCache typeCache, TestResult[] results)
+    {
+        var testContextImpl = testContext as TestContextImplementation;
+        IEnumerable<TestAssemblyInfo> assemblyInfoCache = typeCache.AssemblyInfoListWithExecutableCleanupMethods;
+        foreach (TestAssemblyInfo assemblyInfo in assemblyInfoCache)
+        {
+            TestFailedException? ex = await assemblyInfo.ExecuteAssemblyCleanupAsync(testContext.Context).ConfigureAwait(false);
+
+            if (ex is not null)
+            {
+                return new TestResult()
+                {
+                    Outcome = UnitTestOutcome.Failed,
+                    TestFailureException = ex,
+                    LogOutput = testContextImpl?.GetAndClearOutput(),
+                    LogError = testContextImpl?.GetAndClearError(),
+                    DebugTrace = testContextImpl?.GetAndClearTrace(),
+                    TestContextMessages = testContext.GetAndClearDiagnosticMessages(),
+                };
+            }
+
+            if (results.Length > 0)
+            {
+                TestResult lastResult = results[results.Length - 1];
+                lastResult.LogOutput += testContextImpl?.GetAndClearOutput();
+                lastResult.LogError += testContextImpl?.GetAndClearError();
+                lastResult.DebugTrace += testContextImpl?.GetAndClearTrace();
+                lastResult.TestContextMessages += testContext.GetAndClearDiagnosticMessages();
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Whether the given testMethod is runnable.
+    /// </summary>
+    /// <param name="testMethod">The testMethod.</param>
+    /// <param name="testMethodInfo">The testMethodInfo.</param>
+    /// <param name="notRunnableResult">The results to return if the test method is not runnable.</param>
+    /// <returns>whether the given testMethod is runnable.</returns>
+    private static bool IsTestMethodRunnable(
+        TestMethod testMethod,
+        TestMethodInfo? testMethodInfo,
+        [NotNullWhen(false)] out TestResult[]? notRunnableResult)
+    {
+        // If the specified TestMethod could not be found, return a NotFound result.
+        if (testMethodInfo is null)
+        {
+            notRunnableResult =
+            [
+                new TestResult
+                {
+                    Outcome = UnitTestOutcome.NotFound,
+                    IgnoreReason = string.Format(CultureInfo.CurrentCulture, Resource.TestNotFound, testMethod.Name),
+                },
+            ];
+            return false;
+        }
+
+        bool shouldIgnoreClass = testMethodInfo.Parent.ClassType.IsIgnored(out string? ignoreMessageOnClass);
+        bool shouldIgnoreMethod = testMethodInfo.MethodInfo.IsIgnored(out string? ignoreMessageOnMethod);
+
+        if (shouldIgnoreClass || shouldIgnoreMethod)
+        {
+            string? ignoreMessage = shouldIgnoreMethod && StringEx.IsNullOrEmpty(ignoreMessageOnClass) ? ignoreMessageOnMethod : ignoreMessageOnClass;
+            notRunnableResult =
+                [TestResult.CreateIgnoredResult(ignoreMessage)];
+            return false;
+        }
+
+        notRunnableResult = null;
+        return true;
+    }
+
+    internal void ForceCleanup(IDictionary<string, object?> sourceLevelParameters, IMessageLogger logger) => ClassCleanupManager.ForceCleanup(_typeCache, sourceLevelParameters, logger);
+}

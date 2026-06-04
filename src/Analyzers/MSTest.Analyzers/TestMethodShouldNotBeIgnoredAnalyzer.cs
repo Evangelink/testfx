@@ -12,6 +12,9 @@ using MSTest.Analyzers.Helpers;
 
 namespace MSTest.Analyzers;
 
+/// <summary>
+/// MSTEST0015: <inheritdoc cref="Resources.TestMethodShouldNotBeIgnoredAnalyzerTitle"/>.
+/// </summary>
 [DiagnosticAnalyzer(LanguageNames.CSharp, LanguageNames.VisualBasic)]
 public sealed class TestMethodShouldNotBeIgnoredAnalyzer : DiagnosticAnalyzer
 {
@@ -19,26 +22,30 @@ public sealed class TestMethodShouldNotBeIgnoredAnalyzer : DiagnosticAnalyzer
     private static readonly LocalizableResourceString Description = new(nameof(Resources.TestMethodShouldNotBeIgnoredAnalyzerDescription), Resources.ResourceManager, typeof(Resources));
     private static readonly LocalizableResourceString MessageFormat = new(nameof(Resources.TestMethodShouldNotBeIgnoredAnalyzerFormat), Resources.ResourceManager, typeof(Resources));
 
-    internal static readonly DiagnosticDescriptor TestMethodShouldNotBeIgnoredRule = DiagnosticDescriptorHelper.Create(
+    /// <inheritdoc cref="Resources.TestMethodShouldNotBeIgnoredAnalyzerTitle" />
+    public static readonly DiagnosticDescriptor TestMethodShouldNotBeIgnoredRule = DiagnosticDescriptorHelper.Create(
         DiagnosticIds.TestMethodShouldNotBeIgnoredRuleId,
         Title,
         MessageFormat,
         Description,
         Category.Design,
         DiagnosticSeverity.Info,
-        isEnabledByDefault: true);
+        isEnabledByDefault: false,
+        disableInAllMode: true);
 
+    /// <inheritdoc />
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; }
         = ImmutableArray.Create(TestMethodShouldNotBeIgnoredRule);
 
+    /// <inheritdoc />
     public override void Initialize(AnalysisContext context)
     {
         context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
         context.EnableConcurrentExecution();
         context.RegisterCompilationStartAction(context =>
         {
-            if (context.Compilation.TryGetOrCreateTypeByMetadataName(WellKnownTypeNames.MicrosoftVisualStudioTestToolsUnitTestingIgnoreAttribute, out var ignoreAttributeSymbol)
-                && context.Compilation.TryGetOrCreateTypeByMetadataName(WellKnownTypeNames.MicrosoftVisualStudioTestToolsUnitTestingTestMethodAttribute, out var testMethodAttributeSymbol))
+            if (context.Compilation.TryGetOrCreateTypeByMetadataName(WellKnownTypeNames.MicrosoftVisualStudioTestToolsUnitTestingIgnoreAttribute, out INamedTypeSymbol? ignoreAttributeSymbol)
+                && context.Compilation.TryGetOrCreateTypeByMetadataName(WellKnownTypeNames.MicrosoftVisualStudioTestToolsUnitTestingTestMethodAttribute, out INamedTypeSymbol? testMethodAttributeSymbol))
             {
                 context.RegisterSymbolAction(
                     context => AnalyzeSymbol(context, ignoreAttributeSymbol, testMethodAttributeSymbol),
@@ -50,24 +57,13 @@ public sealed class TestMethodShouldNotBeIgnoredAnalyzer : DiagnosticAnalyzer
     private static void AnalyzeSymbol(SymbolAnalysisContext context, INamedTypeSymbol ignoreAttributeSymbol, INamedTypeSymbol testMethodAttributeSymbol)
     {
         var methodSymbol = (IMethodSymbol)context.Symbol;
-        var methodAttributes = methodSymbol.GetAttributes();
-        bool isTestMethod = false;
-        bool isMethodIgnored = false;
-        foreach (var methodAttribute in methodAttributes)
+        ImmutableArray<AttributeData> methodAttributes = methodSymbol.GetAttributes();
+        if (!methodAttributes.IsTestMethod(testMethodAttributeSymbol))
         {
-            // Current method should be a test method or should inherit from the TestMethod attribute.
-            if (methodAttribute.AttributeClass.Inherits(testMethodAttributeSymbol))
-            {
-                isTestMethod = true;
-            }
-
-            if (SymbolEqualityComparer.Default.Equals(methodAttribute.AttributeClass, ignoreAttributeSymbol))
-            {
-                isMethodIgnored = true;
-            }
+            return;
         }
 
-        if (!isTestMethod || !isMethodIgnored)
+        if (!methodAttributes.Any(methodAttribute => SymbolEqualityComparer.Default.Equals(methodAttribute.AttributeClass, ignoreAttributeSymbol)))
         {
             return;
         }

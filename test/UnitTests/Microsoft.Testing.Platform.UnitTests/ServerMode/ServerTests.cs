@@ -3,10 +3,7 @@
 
 using System.Net;
 using System.Net.Sockets;
-using System.Text;
 
-using Microsoft.Testing.Internal.Framework;
-using Microsoft.Testing.Platform.Builder;
 using Microsoft.Testing.Platform.Capabilities;
 using Microsoft.Testing.Platform.Capabilities.TestFramework;
 using Microsoft.Testing.Platform.Extensions.TestFramework;
@@ -14,15 +11,14 @@ using Microsoft.Testing.Platform.Extensions.TestHost;
 using Microsoft.Testing.Platform.Helpers;
 using Microsoft.Testing.Platform.ServerMode;
 using Microsoft.Testing.Platform.Services;
-using Microsoft.Testing.TestInfrastructure;
 
 namespace Microsoft.Testing.Platform.UnitTests;
 
-[TestGroup]
-public class ServerTests : TestBase
+[TestClass]
+[UnsupportedOSPlatform("browser")]
+public sealed class ServerTests
 {
-    public ServerTests(ITestExecutionContext testExecutionContext)
-        : base(testExecutionContext)
+    public ServerTests()
     {
         if (IsHotReloadEnabled(new SystemEnvironment()))
         {
@@ -31,49 +27,49 @@ public class ServerTests : TestBase
     }
 
     private static bool IsHotReloadEnabled(SystemEnvironment environment)
-     => environment.GetEnvironmentVariable(EnvironmentVariableConstants.DOTNET_WATCH) == "1"
-    || environment.GetEnvironmentVariable(EnvironmentVariableConstants.TESTINGPLATFORM_HOTRELOAD_ENABLED) == "1";
+        => environment.GetEnvironmentVariable(EnvironmentVariableConstants.DOTNET_WATCH) == "1"
+        || environment.GetEnvironmentVariable(EnvironmentVariableConstants.TESTINGPLATFORM_HOTRELOAD_ENABLED) == "1";
 
+    [TestMethod]
     public async Task ServerCanBeStartedAndAborted_TcpIp()
-        => await RetryHelper.RetryAsync(
-            async () =>
-            {
-                using var server = TcpServer.Create();
+    {
+        using var server = TcpServer.Create();
 
-                var testApplicationHooks = new TestApplicationHooks();
-                string[] args = ["--no-banner", "--server", "--client-host", "localhost", "--client-port", $"{server.Port}", "--internal-testingplatform-skipbuildercheck"];
-                ITestApplicationBuilder builder = await TestApplication.CreateBuilderAsync(args);
-                builder.TestHost.AddTestApplicationLifecycleCallbacks(_ => testApplicationHooks);
-                builder.RegisterTestFramework(_ => new TestFrameworkCapabilities(), (_, __) => new MockTestAdapter());
-                var testApplication = (TestApplication)await builder.BuildAsync();
-                testApplication.ServiceProvider.GetRequiredService<SystemConsole>().SuppressOutput();
-                Task<int> serverTask = testApplication.RunAsync();
+        TestApplicationHooks testApplicationHooks = new();
+        string[] args = ["--no-banner", "--server", "--client-host", "localhost", "--client-port", $"{server.Port}", "--internal-testingplatform-skipbuildercheck"];
+        ITestApplicationBuilder builder = await TestApplication.CreateBuilderAsync(args);
+        builder.TestHost.AddTestHostApplicationLifetime(_ => testApplicationHooks);
+        builder.RegisterTestFramework(_ => new TestFrameworkCapabilities(), (_, __) => new MockTestAdapter());
+        var testApplication = (TestApplication)await builder.BuildAsync();
+        testApplication.ServiceProvider.GetRequiredService<SystemConsole>().SuppressOutput();
+        Task<int> serverTask = testApplication.RunAsync();
 
-                await testApplicationHooks.WaitForBeforeRunAsync();
-                ITestApplicationCancellationTokenSource stopService = testApplication.ServiceProvider.GetTestApplicationCancellationTokenSource();
+        await testApplicationHooks.WaitForBeforeRunAsync();
+        ITestApplicationCancellationTokenSource stopService = testApplication.ServiceProvider.GetTestApplicationCancellationTokenSource();
 
-                stopService.Cancel();
-                Assert.AreEqual(ExitCodes.TestSessionAborted, await serverTask);
-            }, 3, TimeSpan.FromSeconds(10));
+        stopService.Cancel();
+        Assert.AreEqual((int)ExitCode.TestSessionAborted, await serverTask);
+    }
 
+    [TestMethod]
     public async Task ServerCanInitialize()
     {
         using var server = TcpServer.Create();
 
-        string[] args = ["--no-banner", $"--server", "--client-port", $"{server.Port}", "--internal-testingplatform-skipbuildercheck"];
-        var testApplicationHooks = new TestApplicationHooks();
+        string[] args = ["--no-banner", "--server", "--client-port", $"{server.Port}", "--internal-testingplatform-skipbuildercheck"];
+        TestApplicationHooks testApplicationHooks = new();
         ITestApplicationBuilder builder = await TestApplication.CreateBuilderAsync(args);
-        builder.TestHost.AddTestApplicationLifecycleCallbacks(_ => testApplicationHooks);
+        builder.TestHost.AddTestHostApplicationLifetime(_ => testApplicationHooks);
         builder.RegisterTestFramework(_ => new TestFrameworkCapabilities(), (_, __) => new MockTestAdapter());
         var testApplication = (TestApplication)await builder.BuildAsync();
         testApplication.ServiceProvider.GetRequiredService<SystemConsole>().SuppressOutput();
-        var serverTask = Task.Run(() => testApplication.RunAsync());
+        Task<int> serverTask = Task.Run(testApplication.RunAsync);
 
-        using var timeout = new CancellationTokenSource(TimeoutHelper.DefaultHangTimeSpanTimeout);
+        using CancellationTokenSource timeout = new(TimeoutHelper.DefaultHangTimeSpanTimeout);
         using TcpClient client = await server.WaitForConnectionAsync(timeout.Token);
         using NetworkStream stream = client.GetStream();
-        using var writer = new StreamWriter(stream, Encoding.UTF8);
-        var messageHandler = new TcpMessageHandler(
+        using StreamWriter writer = new(stream, Encoding.UTF8);
+        TcpMessageHandler messageHandler = new(
                 client,
                 clientToServerStream: client.GetStream(),
                 serverToClientStream: client.GetStream(),
@@ -102,45 +98,48 @@ public class ServerTests : TestBase
         // Wait for initialize response
         RpcMessage? msg = null;
         using CancellationTokenSource cancellationTokenSource = new(TimeSpan.FromSeconds(30));
+        CancellationToken cancellationToken = cancellationTokenSource.Token;
         try
         {
-            msg = await WaitForMessage(messageHandler, (RpcMessage? rpcMessage) => rpcMessage is ResponseMessage, "Wait initialize", cancellationTokenSource.Token);
+            msg = await WaitForMessage(messageHandler, rpcMessage => rpcMessage is ResponseMessage, "Wait initialize", cancellationToken);
         }
-        catch (OperationCanceledException ex) when (ex.CancellationToken == cancellationTokenSource.Token)
+        catch (OperationCanceledException ex) when (ex.CancellationToken == cancellationToken)
         {
             // Try to observe if we had some exceptions
-            await serverTask.TimeoutAfterAsync(TimeSpan.FromSeconds(30));
+            await serverTask.TimeoutAfterAsync(TimeSpan.FromSeconds(30), cancellationToken);
         }
 
         Assert.IsNotNull(msg);
 
         InitializeResponseArgs resultJson = SerializerUtilities.Deserialize<InitializeResponseArgs>((IDictionary<string, object?>)((ResponseMessage)msg).Result!);
 
-        var expectedResponse = new InitializeResponseArgs(
+        InitializeResponseArgs expectedResponse = new(
+                   1,
                    new ServerInfo("test-anywhere", "this is dynamic"),
-                   new ServerCapabilities(new ServerTestingCapabilities(SupportsDiscovery: true, MultiRequestSupport: false, VSTestProviderSupport: false)));
+                   new ServerCapabilities(new ServerTestingCapabilities(SupportsDiscovery: true, MultiRequestSupport: false, VSTestProviderSupport: false, SupportsAttachments: true, MultiConnectionProvider: false)));
 
         Assert.AreEqual(expectedResponse.Capabilities, resultJson.Capabilities);
         Assert.AreEqual(expectedResponse.ServerInfo.Name, resultJson.ServerInfo.Name);
 
         await WriteMessageAsync(writer, """{ "jsonrpc": "2.0", "method": "exit", "params": { } }""");
 
-        var result = await serverTask;
+        int result = await serverTask;
         Assert.AreEqual(0, result);
     }
 
+    [TestMethod]
     public async Task DiscoveryRequestCanBeCanceled()
     {
         using var server = TcpServer.Create();
 
-        var discoveryStartedTaskCompletionSource = new TaskCompletionSource<bool>();
-        var discoveryCanceledTaskCompletionSource = new TaskCompletionSource<bool>();
+        TaskCompletionSource<bool> discoveryStartedTaskCompletionSource = new();
+        TaskCompletionSource<bool> discoveryCanceledTaskCompletionSource = new();
 
-        string[] args = ["--no-banner", $"--server", "--client-port", $"{server.Port}", "--internal-testingplatform-skipbuildercheck"];
+        string[] args = ["--no-banner", "--server", "--client-port", $"{server.Port}", "--internal-testingplatform-skipbuildercheck"];
         ITestApplicationBuilder builder = await TestApplication.CreateBuilderAsync(args);
         builder.RegisterTestFramework(_ => new TestFrameworkCapabilities(), (_, __) => new MockTestAdapter
         {
-            DiscoveryAction = async (ExecuteRequestContext context) =>
+            DiscoveryAction = async context =>
             {
                 using (context.CancellationToken.Register(() => discoveryCanceledTaskCompletionSource.SetResult(true)))
                 {
@@ -151,13 +150,13 @@ public class ServerTests : TestBase
         });
         var testApplication = (TestApplication)await builder.BuildAsync();
         testApplication.ServiceProvider.GetRequiredService<SystemConsole>().SuppressOutput();
-        var serverTask = Task.Run(() => testApplication.RunAsync());
+        Task<int> serverTask = Task.Run(testApplication.RunAsync);
 
-        using var timeout = new CancellationTokenSource(TimeoutHelper.DefaultHangTimeSpanTimeout);
+        using CancellationTokenSource timeout = new(TimeoutHelper.DefaultHangTimeSpanTimeout);
         using TcpClient client = await server.WaitForConnectionAsync(timeout.Token);
         using NetworkStream stream = client.GetStream();
-        using var writer = new StreamWriter(stream, Encoding.UTF8);
-        var messageHandler = new TcpMessageHandler(
+        using StreamWriter writer = new(stream, Encoding.UTF8);
+        TcpMessageHandler messageHandler = new(
                 client,
                 clientToServerStream: client.GetStream(),
                 serverToClientStream: client.GetStream(),
@@ -183,7 +182,7 @@ public class ServerTests : TestBase
 
         // Wait for initialize response
         using CancellationTokenSource cancellationTokenSource = new(TimeoutHelper.DefaultHangTimeSpanTimeout);
-        await WaitForMessage(messageHandler, (RpcMessage? rpcMessage) => rpcMessage is ResponseMessage, "Wait initialize", cancellationTokenSource.Token);
+        await WaitForMessage(messageHandler, rpcMessage => rpcMessage is ResponseMessage, "Wait initialize", cancellationTokenSource.Token);
 
         RpcMessage? msg;
 
@@ -193,7 +192,7 @@ public class ServerTests : TestBase
                 "id": 2,
                 "method": "testing/discoverTests",
                 "params": {
-                    "runId": "Run1"
+                    "runId": "00000000-0000-0000-0000-000000000001"
                 }
             }
             """;
@@ -212,14 +211,84 @@ public class ServerTests : TestBase
         await WriteMessageAsync(writer, cancelRequestMessage);
 
         using CancellationTokenSource cancellationTokenSource2 = new(TimeoutHelper.DefaultHangTimeSpanTimeout);
-        msg = await WaitForMessage(messageHandler, (RpcMessage? rpcMessage) => rpcMessage is ErrorMessage, "Wait cancelRequest", cancellationTokenSource.Token);
+        msg = await WaitForMessage(messageHandler, rpcMessage => rpcMessage is ErrorMessage, "Wait cancelRequest", cancellationTokenSource.Token);
 
         var error = (ErrorMessage)msg!;
-        Assert.AreEqual(ErrorCodes.RequestCancelled, error.ErrorCode);
+        Assert.AreEqual(ErrorCodes.RequestCanceled, error.ErrorCode);
 
         await WriteMessageAsync(writer, """{ "jsonrpc": "2.0", "method": "exit", "params": { } }""");
 
-        var result = await serverTask;
+        int result = await serverTask;
+        Assert.AreEqual(0, result);
+    }
+
+    [DataRow(JsonRpcMethods.TestingDiscoverTests)]
+    [DataRow(JsonRpcMethods.TestingRunTests)]
+    [TestMethod]
+    public async Task RequestWithInvalidRunId_ReturnsInvalidParamsError(string method)
+    {
+        using var server = TcpServer.Create();
+
+        string[] args = ["--no-banner", "--server", "--client-port", $"{server.Port}", "--internal-testingplatform-skipbuildercheck"];
+        ITestApplicationBuilder builder = await TestApplication.CreateBuilderAsync(args);
+        builder.RegisterTestFramework(_ => new TestFrameworkCapabilities(), (_, __) => new MockTestAdapter());
+        var testApplication = (TestApplication)await builder.BuildAsync();
+        testApplication.ServiceProvider.GetRequiredService<SystemConsole>().SuppressOutput();
+        Task<int> serverTask = Task.Run(testApplication.RunAsync);
+
+        using CancellationTokenSource timeout = new(TimeoutHelper.DefaultHangTimeSpanTimeout);
+        using TcpClient client = await server.WaitForConnectionAsync(timeout.Token);
+        using NetworkStream stream = client.GetStream();
+        using StreamWriter writer = new(stream, Encoding.UTF8);
+        TcpMessageHandler messageHandler = new(
+                client,
+                clientToServerStream: client.GetStream(),
+                serverToClientStream: client.GetStream(),
+                FormatterUtilities.CreateFormatter());
+
+        const string initializeMessage = """
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "initialize",
+                "params": {
+                    "processId": 32,
+                    "clientInfo": { "name": "testingplatform-unittests", "version": "1.0.0" },
+                    "capabilities": {
+                        "testing": {
+                            "debuggerProvider": true
+                        }
+                    }
+                }
+            }
+            """;
+        await WriteMessageAsync(writer, initializeMessage);
+
+        using CancellationTokenSource cancellationTokenSource = new(TimeoutHelper.DefaultHangTimeSpanTimeout);
+        await WaitForMessage(messageHandler, rpcMessage => rpcMessage is ResponseMessage, "Wait initialize", cancellationTokenSource.Token);
+
+        // Send a malformed request with an invalid runId.
+        string malformedMessage = $$"""
+            {
+                "jsonrpc": "2.0",
+                "id": 2,
+                "method": "{{method}}",
+                "params": {
+                    "runId": "not-a-guid"
+                }
+            }
+            """;
+        await WriteMessageAsync(writer, malformedMessage);
+
+        RpcMessage? msg = await WaitForMessage(messageHandler, rpcMessage => rpcMessage is ErrorMessage, "Wait invalid-runId error", cancellationTokenSource.Token);
+        var error = (ErrorMessage)msg!;
+        Assert.AreEqual(2, error.Id);
+        Assert.AreEqual(ErrorCodes.InvalidParams, error.ErrorCode);
+
+        // The server should still be alive and able to handle the exit notification after the rejection.
+        await WriteMessageAsync(writer, """{ "jsonrpc": "2.0", "method": "exit", "params": { } }""");
+
+        int result = await serverTask;
         Assert.AreEqual(0, result);
     }
 
@@ -247,13 +316,13 @@ public class ServerTests : TestBase
     private static async Task WriteMessageAsync(StreamWriter writer, string message)
     {
         await writer.WriteLineAsync($"Content-Length: {message.Length}");
-        await writer.WriteLineAsync($"Content-Type: application/testingplatform");
+        await writer.WriteLineAsync("Content-Type: application/testingplatform");
         await writer.WriteLineAsync();
         await writer.WriteAsync(message);
         await writer.FlushAsync();
     }
 
-    private sealed class TestApplicationHooks : ITestApplicationLifecycleCallbacks, IDisposable
+    private sealed class TestApplicationHooks : ITestHostApplicationLifetime, IDisposable
     {
         private readonly SemaphoreSlim _waitForBeforeRunAsync = new(0, 1);
 
@@ -267,8 +336,7 @@ public class ServerTests : TestBase
 
         public Task<bool> IsEnabledAsync() => Task.FromResult(true);
 
-        public Task WaitForBeforeRunAsync()
-            => _waitForBeforeRunAsync.WaitAsync();
+        public Task WaitForBeforeRunAsync() => _waitForBeforeRunAsync.WaitAsync();
 
         public Task AfterRunAsync(int returnValue, CancellationToken cancellationToken) => Task.CompletedTask;
 
@@ -285,7 +353,7 @@ public class ServerTests : TestBase
     {
         public Func<ExecuteRequestContext, Task>? DiscoveryAction { get; set; }
 
-        public ICapability[] Capabilities => Array.Empty<ICapability>();
+        public ICapability[] Capabilities => [];
 
         public string Uid => nameof(MockTestAdapter);
 
@@ -297,12 +365,11 @@ public class ServerTests : TestBase
 
         public Task<bool> IsEnabledAsync() => Task.FromResult(true);
 
-        public Task<CreateTestSessionResult> CreateTestSessionAsync(CreateTestSessionContext context) => Task.FromResult(new CreateTestSessionResult() { IsSuccess = true });
+        public Task<CreateTestSessionResult> CreateTestSessionAsync(CreateTestSessionContext context) => Task.FromResult(new CreateTestSessionResult { IsSuccess = true });
 
-        public Task<CloseTestSessionResult> CloseTestSessionAsync(CloseTestSessionContext context) => Task.FromResult(new CloseTestSessionResult() { IsSuccess = true });
+        public Task<CloseTestSessionResult> CloseTestSessionAsync(CloseTestSessionContext context) => Task.FromResult(new CloseTestSessionResult { IsSuccess = true });
 
-        public Task ExecuteRequestAsync(ExecuteRequestContext context)
-            => DiscoveryAction is not null ? DiscoveryAction(context) : Task.CompletedTask;
+        public Task ExecuteRequestAsync(ExecuteRequestContext context) => DiscoveryAction is not null ? DiscoveryAction(context) : Task.CompletedTask;
     }
 
     private sealed class TcpServer : IDisposable
@@ -331,8 +398,8 @@ public class ServerTests : TestBase
 
         internal static TcpServer Create()
         {
-            var endPoint = new IPEndPoint(IPAddress.Loopback, port: 0);
-            var listener = new TcpListener(endPoint);
+            IPEndPoint endPoint = new(IPAddress.Loopback, port: 0);
+            TcpListener listener = new(endPoint);
             listener.Start();
 
             return new(listener);

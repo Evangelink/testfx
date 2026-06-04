@@ -1,14 +1,12 @@
-// Copyright (c) Microsoft Corporation. All rights reserved.
+﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
-
-using System.Xml;
 
 namespace Microsoft.VisualStudio.TestPlatform.MSTestAdapter.PlatformServices.Interface;
 
 /// <summary>
 /// To read settings from the runsettings xml for the corresponding platform service.
 /// </summary>
-public interface ISettingsProvider
+internal interface ISettingsProvider
 {
     /// <summary>
     /// Load settings from the xml reader instance which are specific

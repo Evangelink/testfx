@@ -1,8 +1,6 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System.Text;
-
 using Microsoft.Testing.Platform.TestHost;
 
 namespace Microsoft.Testing.Platform.Extensions.Messages;
@@ -19,10 +17,7 @@ public abstract class DataWithSessionUid : PropertyBagData
     /// <param name="description">The description of the data.</param>
     /// <param name="sessionUid">The session UID.</param>
     protected DataWithSessionUid(string displayName, string? description, SessionUid sessionUid)
-        : base(displayName, description)
-    {
-        SessionUid = sessionUid;
-    }
+        : base(displayName, description) => SessionUid = sessionUid;
 
     /// <summary>
     /// Gets the session UID.
@@ -50,7 +45,7 @@ public abstract class DataWithSessionUid : PropertyBagData
                 builder.Append(',');
             }
 
-            builder.Append(' ').Append(property.ToString());
+            builder.Append(' ').Append(property);
         }
 
         if (hasAnyProperty)

@@ -4,9 +4,17 @@
 namespace Microsoft.VisualStudio.TestTools.UnitTesting;
 
 /// <summary>
-/// The test class attribute.
+/// This attribute is used to mark test classes.
 /// </summary>
-[AttributeUsage(AttributeTargets.Class, AllowMultiple = false)]
+/// <remarks>
+/// Test classes must be:
+/// <list type="bullet">
+/// <item><description>public, or if <see cref="DiscoverInternalsAttribute"/> is used then it can be internal.</description></item>
+/// <item><description>not static</description></item>
+/// <item><description>not generic</description></item>
+/// </list>
+/// </remarks>
+[AttributeUsage(AttributeTargets.Class, Inherited = false)]
 public class TestClassAttribute : Attribute
 {
     /// <summary>
@@ -15,9 +23,7 @@ public class TestClassAttribute : Attribute
     /// <param name="testMethodAttribute">The test method attribute instance defined on this method.</param>
     /// <returns>The <see cref="TestMethodAttribute"/> to be used to run this test.</returns>
     /// <remarks>Extensions can override this method to customize how all methods in a class are run.</remarks>
-    public virtual TestMethodAttribute? GetTestMethodAttribute(TestMethodAttribute? testMethodAttribute)
-    {
+    public virtual TestMethodAttribute? GetTestMethodAttribute(TestMethodAttribute testMethodAttribute) =>
         // If TestMethod is not extended by derived class then return back the original TestMethodAttribute
-        return testMethodAttribute;
-    }
+        testMethodAttribute;
 }

@@ -5,8 +5,39 @@ namespace Microsoft.Testing.TestInfrastructure;
 
 public static class WellKnownEnvironmentVariables
 {
-    public static readonly string[] ToSkipEnvironmentVariables = new[]
-   {
+    /// <summary>
+    /// Environment variables that the Microsoft.Testing.Platform LLM detector inspects.
+    /// Keep in sync with <c>LLMEnvironmentDetector</c>.
+    /// </summary>
+    public static readonly IReadOnlyList<string> LLMEnvironmentVariables =
+    [
+        "CLAUDECODE",
+        "CLAUDE_CODE_ENTRYPOINT",
+        "CURSOR_EDITOR",
+        "CURSOR_AI",
+        "GEMINI_CLI",
+        "GITHUB_COPILOT_CLI_MODE",
+        "GH_COPILOT_WORKING_DIRECTORY",
+        "COPILOT_CLI",
+        "CODEX_CLI",
+        "CODEX_SANDBOX",
+        "OR_APP_NAME",
+        "AMP_HOME",
+        "QWEN_CODE",
+        "DROID_CLI",
+        "OPENCODE_AI",
+        "ZED_ENVIRONMENT",
+        "ZED_TERM",
+        "KIMI_CLI",
+        "GOOSE_TERMINAL",
+        "CLINE_TASK_ID",
+        "ROO_CODE_TASK_ID",
+        "WINDSURF_SESSION",
+        "AGENT_CLI",
+    ];
+
+    public static readonly string[] ToSkipEnvironmentVariables =
+    [
         // Skip dotnet root, we redefine it below.
         "DOTNET_ROOT",
 
@@ -25,6 +56,11 @@ public static class WellKnownEnvironmentVariables
         "COMPlus_DbgEnableElfDumpOnMacOS",
         "COMPlus_DbgMiniDumpName",
         "COMPlus_DbgMiniDumpType",
+        "COMPlus_CreateDumpDiagnostics",
+        "COMPlus_CreateDumpVerboseDiagnostics",
+        "COMPlus_CreateDumpLogToFile",
+        "COMPlus_EnableCrashReport",
+        "COMPlus_EnableCrashReportOnly",
 
         // Hot reload mode
         "TESTINGPLATFORM_HOTRELOAD_ENABLED",
@@ -36,10 +72,25 @@ public static class WellKnownEnvironmentVariables
         "DOTNET_NOLOGO",
         "TESTINGPLATFORM_NOBANNER",
 
+        // Azure DevOps output device opt-out. Tests inject this explicitly when needed, so we
+        // keep the parent process value from bleeding into child test hosts.
+        "TESTINGPLATFORM_AZDO_OUTPUT",
+
         // Diagnostics
         "TESTINGPLATFORM_DIAGNOSTIC",
 
+        // dotnet test
+        "TESTINGPLATFORM_DOTNETTEST_EXECUTIONID",
+        "DOTNET_CLI_TEST_COMMAND_WORKING_DIRECTORY",
+
         // Isolate from the skip banner in case of parent, children tests
         "TESTINGPLATFORM_CONSOLEOUTPUTDEVICE_SKIP_BANNER",
-   };
+
+        // LLM / AI agent CLI environment variables - keep in sync with
+        // src/Platform/Microsoft.Testing.Platform/Helpers/LLMEnvironmentDetector.cs.
+        // We filter these out so acceptance tests are not affected by the ambient
+        // shell the developer (or CI) happens to be running them from. Tests that
+        // need to exercise LLM-aware behavior must set the relevant variable explicitly.
+        .. LLMEnvironmentVariables,
+    ];
 }

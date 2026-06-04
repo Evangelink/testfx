@@ -117,11 +117,14 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
+  <data name="BrowserPlatformNotSupportedOnOlderFrameworks" xml:space="preserve">
+    <value>Browser platform is only supported on .NET 7.0 or greater.</value>
+  </data>
   <data name="CannotCreateTestExecutionFilterErrorMessage" xml:space="preserve">
     <value>Failed to create a test execution filter</value>
   </data>
   <data name="CompositeServiceFactoryInstanceAlreadyRegistered" xml:space="preserve">
-    <value>The same instance of 'CompositeExtensonFactory' is already registered</value>
+    <value>The same instance of 'CompositeExtensionFactory' is already registered</value>
   </data>
   <data name="ConfigurationManagerCannotFindDefaultJsonConfigurationErrorMessage" xml:space="preserve">
     <value>Could not find the default json configuration</value>
@@ -136,7 +139,7 @@
     <value>Extension of type '{0}' is not implementing the required '{1}' interface</value>
   </data>
   <data name="ExtensionWithSameUidAlreadyRegisteredErrorMessage" xml:space="preserve">
-    <value>Another extension with same the same UID '{0}' has already been registered. Registered extension is of type '{1}'</value>
+    <value>Extensions with the same UID '{0}' have already been registered. Registered extensions are of types: {1}</value>
   </data>
   <data name="JsonConfigurationFileParserDuplicateKeyErrorMessage" xml:space="preserve">
     <value>A duplicate key '{0}' was found</value>
@@ -146,6 +149,35 @@
   </data>
   <data name="JsonConfigurationFileParserUnsupportedTokenErrorMessage" xml:space="preserve">
     <value>Unsupported JSON token '{0}' was found</value>
+  </data>
+  <data name="JsonConfigurationSectionMustBeAnObjectErrorMessage" xml:space="preserve">
+    <value>The '{0}' section in the testconfig.json file ('{1}') must be a JSON object.</value>
+    <comment>{0} is the section name (e.g. environmentVariables). {1} is the path to the testconfig.json file.</comment>
+  </data>
+  <data name="JsonConfigurationSectionEntryMustBeScalarErrorMessage" xml:space="preserve">
+    <value>The entry '{0}' under section '{1}' in the testconfig.json file ('{2}') must be a scalar string value. Nested objects and arrays are not supported.</value>
+    <comment>{0} is the full dotted/colon-separated key. {1} is the section name. {2} is the path to the testconfig.json file.</comment>
+  </data>
+  <data name="JsonCommandLineOptionsEntryMustBeScalarOrArrayErrorMessage" xml:space="preserve">
+    <value>The entry '{0}' under section '{1}' in the testconfig.json file ('{2}') must be either a scalar value (string, number, boolean) or an array of scalar values. Nested objects are not supported.</value>
+    <comment>{0} is the entry name relative to the section (e.g. an option name like 'timeout' or an indexed key like 'timeout:0'). {1} is the section name (commandLineOptions). {2} is the path to the testconfig.json file.</comment>
+  </data>
+  <data name="JsonCommandLineOptionsValidationErrorPrefix" xml:space="preserve">
+    <value>In testconfig.json under 'commandLineOptions': {0}</value>
+    <comment>{0} is the underlying validation error message (unknown option, arity mismatch, invalid arguments...).</comment>
+  </data>
+  <data name="TestConfigurationEnvironmentVariableProviderDisplayName" xml:space="preserve">
+    <value>testconfig.json environment variables provider</value>
+  </data>
+  <data name="TestConfigurationEnvironmentVariableProviderDescription" xml:space="preserve">
+    <value>Applies environment variables declared in the 'environmentVariables' section of the testconfig.json file to the test host child process.</value>
+  </data>
+  <data name="TestConfigurationEnvironmentVariableNameCannotBeEmptyErrorMessage" xml:space="preserve">
+    <value>Environment variable names declared in the 'environmentVariables' section of the testconfig.json file must not be empty.</value>
+  </data>
+  <data name="TestConfigurationEnvironmentVariableInvalidNameErrorMessage" xml:space="preserve">
+    <value>Environment variable name '{0}' declared in the 'environmentVariables' section of the testconfig.json file is invalid. Names must not contain '=' or null characters.</value>
+    <comment>{0} is the invalid environment variable name.</comment>
   </data>
   <data name="ServerTestExecutionFilterFactoryDescription" xml:space="preserve">
     <value>Creates the right test execution filter for server mode</value>
@@ -211,6 +243,10 @@
   <data name="TreeNodeFilterUnexpectedSlashOperatorErrorMessage" xml:space="preserve">
     <value>Filter contains an unexpected '/' operator inside a parenthesized expression</value>
   </data>
+  <data name="TreeNodeFilterUnexpectedSlashOperatorInPathSegmentErrorMessage" xml:space="preserve">
+    <value>Filter contains an unexpected '/' operator inside a parenthesized expression. Filter: '{0}'. To combine alternatives for one path segment, use syntax like '/A/B/C/(X|Y)'.</value>
+    <comment>{0} is the filter expression string. Diagnostic thrown by the TreeNodeFilter parser when a '/' is encountered inside a parenthesized alternative such as '/A/(B/C)'.</comment>
+  </data>
   <data name="TEstExecutionFilterFactoryFactoryAlreadySetErrorMessage" xml:space="preserve">
     <value>An 'ITestExecutionFilterFactory' factory is already set</value>
   </data>
@@ -264,7 +300,7 @@
     <value>Failed to flush logs before the timeout of '{0}' seconds</value>
   </data>
   <data name="UnexpectedExceptionInFileLoggerErrorMessage" xml:space="preserve">
-    <value>An unexpected exception occured in 'FileLogger.WriteLogToFileAsync'.
+    <value>An unexpected exception occurred in 'FileLogger.WriteLogToFileAsync'.
 {0}</value>
     <comment>{0} exception ToString</comment>
   </data>
@@ -301,6 +337,10 @@
   <data name="InvalidCommandLineArguments" xml:space="preserve">
     <value>Invalid command line arguments:</value>
   </data>
+  <data name="CommandLineValidationCommandLine" xml:space="preserve">
+    <value>Command line: {0}</value>
+    <comment>{0} is the command line used to run the application.</comment>
+  </data>
   <data name="CommandLineInvalidArityErrorMessage" xml:space="preserve">
     <value>Invalid arity, maximum must be greater than minimum</value>
   </data>
@@ -308,19 +348,16 @@
     <value>Invalid option name '{0}', it must contain only letter and '-' (e.g. my-option)</value>
   </data>
   <data name="CommandLineOptionIsDeclaredByMultipleProviders" xml:space="preserve">
-    <value>Option '--{0}' is declared by multiple extensions: '{0}'</value>
+    <value>Option '--{0}' is declared by multiple providers: '{1}'</value>
   </data>
   <data name="CommandLineOptionIsDeclaredByMultipleProvidersWorkaround" xml:space="preserve">
     <value>You can fix the previous option clash by overriding the option name using the configuration file</value>
   </data>
   <data name="CommandLineOptionIsReserved" xml:space="preserve">
-    <value>Option '--{0}' is reserved and cannot be used by providers: '{0}'</value>
+    <value>Option '--{0}' is reserved and cannot be used by providers: '{1}'</value>
   </data>
   <data name="CommandLineParserUnexpectedArgument" xml:space="preserve">
     <value>Unexpected argument {0}</value>
-  </data>
-  <data name="CommandLineParserUnexpectedNullArgument" xml:space="preserve">
-    <value>Unexpected null argument at index {0}</value>
   </data>
   <data name="CommandLineParserUnexpectedSingleQuoteInArgument" xml:space="preserve">
     <value>Unexpected single quote in argument: {0}</value>
@@ -355,20 +392,17 @@
   <data name="PlatformCommandLineClientHostOptionDescription" xml:space="preserve">
     <value>Specify the hostname of the client.</value>
   </data>
-  <data name="PlatformCommandLineClientHostOptionSingleArgument" xml:space="preserve">
-    <value>'--client-host' expects a single host name as argument</value>
-  </data>
   <data name="PlatformCommandLineClientPortOptionDescription" xml:space="preserve">
     <value>Specify the port of the client.</value>
   </data>
   <data name="PlatformCommandLineDiagnosticFileLoggerSynchronousWriteOptionDescription" xml:space="preserve">
-    <value>Force the built-in file logger to write the log synchronously. Useful for scenario where you don't want to lose any log (i.e. in case of crash). Note that this is slowing down the test execution.</value>
-  </data>
-  <data name="PlatformCommandLineDiagnosticFilePrefixOptionSingleArgument" xml:space="preserve">
-    <value>'--diagnostic-output-fileprefix' expects a single file name prefix argument</value>
+    <value>Force the built-in file logger to write the log synchronously.
+Useful for scenario where you don't want to lose any log (i.e. in case of crash).
+Note that this is slowing down the test execution.</value>
   </data>
   <data name="PlatformCommandLineDiagnosticOptionDescription" xml:space="preserve">
-    <value>Enable the diagnostic logging. The default log level is 'Trace'. The file will be written in the output directory with the name log_[MMddHHssfff].diag</value>
+    <value>Enable the diagnostic logging. The default log level is 'Trace'.
+The file will be written in the output directory with the name log_[yyMMddHHmmssfff].diag</value>
   </data>
   <data name="PlatformCommandLineDiagnosticOptionExpectsSingleArgumentErrorMessage" xml:space="preserve">
     <value>'--diagnostic-verbosity' expects a single level argument ('Trace', 'Debug', 'Information', 'Warning', 'Error', or 'Critical')</value>
@@ -377,19 +411,22 @@
     <value>'--{0}' requires '--diagnostic' to be provided</value>
   </data>
   <data name="PlatformCommandLineDiagnosticOutputDirectoryOptionDescription" xml:space="preserve">
-    <value>Output directory of the diagnostic logging, if not specified the file will be generated inside the default 'TestResults' directory.</value>
-  </data>
-  <data name="PlatformCommandLineDiagnosticOutputDirectoryOptionSingleArgument" xml:space="preserve">
-    <value>'--diagnostic-output-directory' expects a single directory name argument</value>
+    <value>Output directory of the diagnostic logging.
+If not specified the file will be generated inside the default 'TestResults' directory.</value>
   </data>
   <data name="PlatformCommandLineDiagnosticOutputFilePrefixOptionDescription" xml:space="preserve">
     <value>Prefix for the log file name that will replace '[log]_.'</value>
   </data>
   <data name="PlatformCommandLineDiagnosticVerbosityOptionDescription" xml:space="preserve">
-    <value>Define the level of the verbosity for the --diagnostic. The available values are 'Trace', 'Debug', 'Information', 'Warning', 'Error', and 'Critical'</value>
+    <value>Define the level of the verbosity for the --diagnostic.
+The available values are 'Trace', 'Debug', 'Information', 'Warning', 'Error', and 'Critical'.</value>
   </data>
   <data name="PlatformCommandLineDiscoverTestsOptionDescription" xml:space="preserve">
-    <value>List available tests.</value>
+    <value>List available tests.
+Optionally accepts 'text' (the default human-readable output) or 'json' to print the discovered tests as a JSON document on standard output.</value>
+  </data>
+  <data name="PlatformCommandLineDiscoverTestsInvalidArgument" xml:space="preserve">
+    <value>'--list-tests' received unexpected value '{0}'. Supported values are: {1}.</value>
   </data>
   <data name="PlatformCommandLineHelpOptionDescription" xml:space="preserve">
     <value>Show the command line help.</value>
@@ -401,13 +438,11 @@
     <value>'--list-tests' and '--minimum-expected-tests' are incompatible options</value>
   </data>
   <data name="PlatformCommandLineMinimumExpectedTestsOptionSingleArgument" xml:space="preserve">
-    <value>'--minimum-expected-tests' expects a single non-zero positive integer value (e.g. '--minimum-expected-tests 10')</value>
+    <value>'--minimum-expected-tests' expects a single non-zero positive integer value
+(e.g. '--minimum-expected-tests 10')</value>
   </data>
   <data name="PlatformCommandLineNoBannerOptionDescription" xml:space="preserve">
     <value>Do not display the startup banner, the copyright message or the telemetry banner.</value>
-  </data>
-  <data name="PlatformCommandLineOptionExpectsNoArgumentErrorMessage" xml:space="preserve">
-    <value>'--{0}' expects no argument</value>
   </data>
   <data name="PlatformCommandLinePortOptionDescription" xml:space="preserve">
     <value>Specify the port of the server.</value>
@@ -422,10 +457,18 @@
     <value>Platform command line provider</value>
   </data>
   <data name="PlatformCommandLineResultDirectoryOptionDescription" xml:space="preserve">
-    <value>The directory where the test results are going to be placed. If the specified directory doesn't exist, it's created. The default is TestResults in the directory that contains the test application.</value>
+    <value>The directory where the test results are going to be placed.
+If the specified directory doesn't exist, it's created.
+The default is TestResults in the directory that contains the test application.</value>
   </data>
   <data name="PlatformCommandLineServerOptionDescription" xml:space="preserve">
     <value>Enable the server mode.</value>
+  </data>
+  <data name="PlatformCommandLineServerInvalidArgument" xml:space="preserve">
+    <value>'--server' received unexpected value '{0}'. Supported values are: {1}.</value>
+  </data>
+  <data name="PlatformCommandLineDotnetTestCliRequiresPipe" xml:space="preserve">
+    <value>'--server {0}' requires '--{1}' to be specified.</value>
   </data>
   <data name="PlatformCommandLineSkipBuildersNumberCheckOptionDescription" xml:space="preserve">
     <value>For testing purposes</value>
@@ -433,14 +476,11 @@
   <data name="PlatformCommandLineTestHostControllerPIDOptionDescription" xml:space="preserve">
     <value>Eventual parent test host controller PID.</value>
   </data>
-  <data name="PlatformCommandLineVSTestAdapterModeOptionDescription" xml:space="preserve">
-    <value>Bridge to VSTest APIs</value>
+  <data name="PlatformCommandLineDotnetTestPipe" xml:space="preserve">
+    <value>dotnet test pipe.</value>
   </data>
   <data name="TreeNodeFilterDescription" xml:space="preserve">
     <value>Use a tree filter to filter down the tests to execute</value>
-  </data>
-  <data name="TreeNodeFilterInvalidArgumentCount" xml:space="preserve">
-    <value>A single argument is expected (e.g. '/MyAssembly/MyNamespace/MyClass/MyTestMethod*[OS=Linux]')</value>
   </data>
   <data name="ConnectingToClientHost" xml:space="preserve">
     <value>Connecting to client host '{0}' port '{1}'</value>
@@ -450,12 +490,6 @@
   </data>
   <data name="JsonRpcTcpServerToSingleClientDescription" xml:space="preserve">
     <value>JsonRpc server to client handshake, implementation based on the test platform protocol specification.</value>
-  </data>
-  <data name="StartingServer" xml:space="preserve">
-    <value>Starting server. Listening on port '{0}'</value>
-  </data>
-  <data name="UnknownCommunicationProtocolErrorMessage" xml:space="preserve">
-    <value>The communication protocol '{0}' is not supported</value>
   </data>
   <data name="TelemetryNotice" xml:space="preserve">
     <value>Telemetry
@@ -477,17 +511,9 @@ Read more about Microsoft Testing Platform telemetry: https://aka.ms/testingplat
   <data name="InternalLoopAsyncDidNotExitSuccessfullyErrorMessage" xml:space="preserve">
     <value>Method '{0}' did not exit successfully</value>
   </data>
-  <data name="NoSerializerRegisteredWithIdErrorMessage" xml:space="preserve">
-    <value>No serializer registered with ID '{0}'</value>
-  </data>
-  <data name="NoSerializerRegisteredWithTypeErrorMessage" xml:space="preserve">
-    <value>No serializer registered with type '{0}'</value>
-  </data>
-  <data name="UnexpectedExceptionDuringByteConversionErrorMessage" xml:space="preserve">
-    <value>An unexpected exception occured during byte conversion</value>
-  </data>
   <data name="PlatformCommandLineIgnoreExitCodeOptionDescription" xml:space="preserve">
-    <value>Do not report non successful exit value for specific exit codes (e.g. '--ignore-exit-code 8;9' ignore exit code 8 and 9 and will return 0 in these case)</value>
+    <value>Do not report non successful exit value for specific exit codes
+(e.g. '--ignore-exit-code 8;9' ignore exit code 8 and 9 and will return 0 in these case)</value>
   </data>
   <data name="PlatformCommandLineExitOnProcessExitOptionDescription" xml:space="preserve">
     <value>Exit the test process if dependent process exits. PID must be provided.</value>
@@ -495,8 +521,302 @@ Read more about Microsoft Testing Platform telemetry: https://aka.ms/testingplat
   <data name="PlatformCommandLineExitOnProcessExitSingleArgument" xml:space="preserve">
     <value>'--{0}' expects a single int PID argument</value>
   </data>
-  <data name="PlatformCommandLineExitOnProcessExitInvalidDependantProcess" xml:space="preserve">
+  <data name="PlatformCommandLineExitOnProcessExitInvalidDependentProcess" xml:space="preserve">
     <value>Invalid PID '{0}'
 {1}</value>
+  </data>
+  <data name="PlatformCommandLineExitOnProcessExitNotSupportedInBrowser" xml:space="preserve">
+    <value>The '--exit-on-process-exit' option is not supported in browser environments.</value>
+  </data>
+  <data name="Aborted" xml:space="preserve">
+    <value>Aborted</value>
+  </data>
+  <data name="Actual" xml:space="preserve">
+    <value>Actual</value>
+  </data>
+  <data name="CancelledLowercase" xml:space="preserve">
+    <value>canceled</value>
+  </data>
+  <data name="CancellingTestSession" xml:space="preserve">
+    <value>Canceling the test session...</value>
+  </data>
+  <data name="PressCtrlCAgainToForceExit" xml:space="preserve">
+    <value>Press Ctrl+C again to force exit.</value>
+  </data>
+  <data name="ShutdownProgressStillWaitingPrefix" xml:space="preserve">
+    <value>Still waiting for: </value>
+    <comment>Prefix for the message that lists extensions that have not yet completed their shutdown work. Each entry is formatted as "{DisplayName} ({Phase}, {Seconds}s)" and entries are separated by "; ".</comment>
+  </data>
+  <data name="DiagnosticFileLevelWithAsyncFlush" xml:space="preserve">
+    <value>Diagnostic file (level '{0}' with async flush): {1}</value>
+    <comment>0 level such as verbose,
+1 path to file</comment>
+  </data>
+  <data name="DiagnosticFileLevelWithFlush" xml:space="preserve">
+    <value>Diagnostic file (level '{0}' with sync flush): {1}</value>
+    <comment>0 level such as verbose,
+1 path to file</comment>
+  </data>
+  <data name="Expected" xml:space="preserve">
+    <value>Expected</value>
+  </data>
+  <data name="Failed" xml:space="preserve">
+    <value>Failed</value>
+  </data>
+  <data name="FailedLowercase" xml:space="preserve">
+    <value>failed</value>
+  </data>
+  <data name="ForTest" xml:space="preserve">
+    <value>For test</value>
+    <comment>is followed by test name</comment>
+  </data>
+  <data name="InProcessArtifactsProduced" xml:space="preserve">
+    <value>In process file artifacts produced:</value>
+  </data>
+  <data name="MinimumExpectedTestsPolicyViolation" xml:space="preserve">
+    <value>Minimum expected tests policy violation, tests ran {0}, minimum expected {1}</value>
+    <comment>{0}, {1} number of tests</comment>
+  </data>
+  <data name="OutOfProcessArtifactsProduced" xml:space="preserve">
+    <value>Out of process file artifacts produced:</value>
+  </data>
+  <data name="Passed" xml:space="preserve">
+    <value>Passed</value>
+  </data>
+  <data name="PassedLowercase" xml:space="preserve">
+    <value>passed</value>
+  </data>
+  <data name="Skipped" xml:space="preserve">
+    <value>Skipped</value>
+  </data>
+  <data name="SkippedLowercase" xml:space="preserve">
+    <value>skipped</value>
+  </data>
+  <data name="StackTrace" xml:space="preserve">
+    <value>Stack Trace</value>
+  </data>
+  <data name="Total" xml:space="preserve">
+    <value>Total</value>
+  </data>
+  <data name="TotalLowercase" xml:space="preserve">
+    <value>total</value>
+  </data>
+  <data name="ZeroTestsRan" xml:space="preserve">
+    <value>Zero tests ran</value>
+  </data>
+  <data name="ConsoleIsAlreadyInBatchingMode" xml:space="preserve">
+    <value>Console is already in batching mode.</value>
+    <comment>Exception that is thrown when console is already collecting input into a batch (into a string builder), and code asks to enable batching mode again.</comment>
+  </data>
+  <data name="DurationLowercase" xml:space="preserve">
+    <value>duration</value>
+  </data>
+  <data name="FailedWithErrors" xml:space="preserve">
+    <value>failed with {0} error(s)</value>
+  </data>
+  <data name="FailedWithErrorsAndWarnings" xml:space="preserve">
+    <value>failed with {0} error(s) and {1} warning(s)</value>
+  </data>
+  <data name="FailedWithWarnings" xml:space="preserve">
+    <value>failed with {0} warning(s)</value>
+  </data>
+  <data name="RunningTestsFrom" xml:space="preserve">
+    <value>Running tests from</value>
+  </data>
+  <data name="TestRunSummary" xml:space="preserve">
+    <value>Test run summary:</value>
+  </data>
+  <data name="FromFile" xml:space="preserve">
+    <value>from</value>
+    <comment>from followed by a file name to point to the file from which test is originating</comment>
+  </data>
+  <data name="StackFrameAt" xml:space="preserve">
+    <value>at</value>
+    <comment>at that is used for a stack frame location in a stack trace, is followed by a class and method name</comment>
+  </data>
+  <data name="StackFrameIn" xml:space="preserve">
+    <value>in</value>
+    <comment>in that is used in stack frame it is followed by file name</comment>
+  </data>
+  <data name="TerminalNoAnsiOptionDescription" xml:space="preserve">
+    <value>Disable outputting ANSI escape characters to screen.</value>
+  </data>
+  <data name="TerminalAnsiOptionDescription" xml:space="preserve">
+    <value>Control whether ANSI escape characters are emitted.
+Valid values are 'auto' (default), 'on' (also accepts 'true', 'enable', '1') or 'off' (also accepts 'false', 'disable', '0').
+'on' forces ANSI escape codes (including cursor movement) even when stdout is redirected; pair it with --no-progress if you only want colors.
+When both --ansi and --no-ansi are provided, --ansi wins.</value>
+  </data>
+  <data name="TerminalAnsiOptionInvalidArgument" xml:space="preserve">
+    <value>--ansi expects a single parameter with value 'auto', 'on' (or 'true', 'enable', '1') or 'off' (or 'false', 'disable', '0').</value>
+  </data>
+  <data name="TerminalNoProgressOptionDescription" xml:space="preserve">
+    <value>Disable reporting progress to screen.</value>
+  </data>
+  <data name="TerminalTestReporterDescription" xml:space="preserve">
+    <value>Writes test results to terminal.</value>
+  </data>
+  <data name="TerminalTestReporterDisplayName" xml:space="preserve">
+    <value>Terminal test reporter</value>
+  </data>
+  <data name="TerminalOutputOptionDescription" xml:space="preserve">
+    <value>Output verbosity when reporting tests.
+Valid values are 'Normal', 'Detailed'. Default is 'Normal'.</value>
+  </data>
+  <data name="TerminalOutputOptionInvalidArgument" xml:space="preserve">
+    <value>--output expects a single parameter with value 'Normal' or 'Detailed'.</value>
+  </data>
+  <data name="TerminalShowStdoutOptionDescription" xml:space="preserve">
+    <value>Determines when to show captured standard output of a test.
+Valid values are 'All', 'Failed', 'None'. Default is 'All' (or 'Failed' when an LLM/AI agent environment is detected).</value>
+  </data>
+  <data name="TerminalShowStderrOptionDescription" xml:space="preserve">
+    <value>Determines when to show captured error output of a test.
+Valid values are 'All', 'Failed', 'None'. Default is 'All' (or 'Failed' when an LLM/AI agent environment is detected).</value>
+  </data>
+  <data name="TerminalShowOutputOptionInvalidArgument" xml:space="preserve">
+    <value>--show-stdout and --show-stderr expect a single parameter with value 'All', 'Failed', or 'None'.</value>
+  </data>
+  <data name="PlatformCommandLineTimeoutArgumentErrorMessage" xml:space="preserve">
+    <value>'timeout' option should have one argument as a time value with an explicit unit suffix and a positive numeric value within the supported range (up to ~49.7 days). Accepted suffixes are 'ms'/'mil(s)'/'millisecond(s)', 's'/'sec(s)'/'second(s)', 'm'/'min(s)'/'minute(s)', 'h'/'hour(s)', and 'd'/'day(s)', e.g. '500ms', '5400s', '90m', '1.5h', '1d'.</value>
+  </data>
+  <data name="PlatformCommandLineTimeoutOptionDescription" xml:space="preserve">
+    <value>A global test execution timeout.
+Takes one argument as a time value with an explicit unit suffix. Accepted suffixes are 'ms'/'mil(s)'/'millisecond(s)', 's'/'sec(s)'/'second(s)', 'm'/'min(s)'/'minute(s)', 'h'/'hour(s)', and 'd'/'day(s)', e.g. '500ms', '5400s', '90m', '1.5h', '1d'.</value>
+  </data>
+  <data name="LoggerFactoryNotReady" xml:space="preserve">
+    <value>The ILoggerFactory has not been built yet.</value>
+  </data>
+  <data name="MessageBusNotReady" xml:space="preserve">
+    <value>The message bus has not been built yet or is no more usable at this stage.</value>
+  </data>
+  <data name="CommandLineOptionsNotReady" xml:space="preserve">
+    <value>The ICommandLineOptions has not been built yet.</value>
+  </data>
+  <data name="MissingClientPortFoJsonRpc" xml:space="preserve">
+    <value>Expected --client-port when jsonRpc protocol is used.</value>
+  </data>
+  <data name="StandardError" xml:space="preserve">
+    <value>Error output</value>
+  </data>
+  <data name="StandardOutput" xml:space="preserve">
+    <value>Standard output</value>
+  </data>
+  <data name="DiscoveringTestsFrom" xml:space="preserve">
+    <value>Discovering tests from</value>
+  </data>
+  <data name="TestDiscoverySummary" xml:space="preserve">
+    <value>Test discovery summary: found {0} test(s) in {1} assemblies.</value>
+    <comment>0 is number of tests, 1 is count of assemblies</comment>
+  </data>
+  <data name="DiscoveredTestsInAssembly" xml:space="preserve">
+    <value>Discovered {0} test(s) in assembly</value>
+    <comment>0 is count, the sentence is followed by the path of the assebly</comment>
+  </data>
+  <data name="TestDiscoverySummarySingular" xml:space="preserve">
+    <value>Test discovery summary: found {0} test(s)</value>
+    <comment>0 is number of tests</comment>
+  </data>
+  <data name="ExitCode" xml:space="preserve">
+    <value>Exit code</value>
+  </data>
+  <data name="CommandLineParserResponseFileNotFound" xml:space="preserve">
+    <value>The response file '{0}' was not found</value>
+  </data>
+  <data name="CommandLineParserFailedToReadResponseFile" xml:space="preserve">
+    <value>Failed to read response file '{0}'. {1}.</value>
+    <comment>{1} is the exception</comment>
+  </data>
+  <data name="CommandLineParserUnclosedQuoteInResponseFile" xml:space="preserve">
+    <value>Unclosed quote in response file at line {0}</value>
+    <comment>{0} is the line number</comment>
+  </data>
+  <data name="CommandLineParserUnclosedQuoteInCommandLine" xml:space="preserve">
+    <value>Unclosed quote in command line</value>
+  </data>
+  <data name="PlatformCommandLineMinimumExpectedTestsOptionDescription" xml:space="preserve">
+    <value>Specifies the minimum number of tests that are expected to run.</value>
+  </data>
+  <data name="PlatformCommandLineConfigFileOptionDescription" xml:space="preserve">
+    <value>Specifies a testconfig.json file.</value>
+  </data>
+  <data name="ConfigurationFileNotFound" xml:space="preserve">
+    <value>The configuration file '{0}' specified with '--config-file' could not be found.</value>
+  </data>
+  <data name="ActiveTestsRunning_MoreTestsCount" xml:space="preserve">
+    <value>and {0} more</value>
+  </data>
+  <data name="ActiveTestsRunning_FullTestsCount" xml:space="preserve">
+    <value>{0} tests running</value>
+  </data>
+  <data name="StartingTestSession" xml:space="preserve">
+    <value>Starting test session.</value>
+  </data>
+  <data name="StartingTestSessionWithLogFilePath" xml:space="preserve">
+    <value>Starting test session. The log file path is '{0}'.</value>
+  </data>
+  <data name="FinishedTestSession" xml:space="preserve">
+    <value>Finished test session.</value>
+  </data>
+  <data name="ServerTestHostDisplayName" xml:space="preserve">
+    <value>Server mode test host</value>
+  </data>
+  <data name="ServerTestHostDescription" xml:space="preserve">
+    <value>The 'ITestHost' implementation used when running server mode.</value>
+  </data>
+  <data name="UnobservedTaskExceptionWarningMessage" xml:space="preserve">
+    <value>[ServerTestHost.OnTaskSchedulerUnobservedTaskException] Unhandled exception: {0}</value>
+    <comment>{0} is the exception that was unhandled/unobserved</comment>
+  </data>
+  <data name="ExceptionDuringCancellationWarningMessage" xml:space="preserve">
+    <value>Exception during the cancellation of request id '{0}'</value>
+    <comment>{0} is the request id</comment>
+  </data>
+  <data name="DeprecatedEnvironmentVariableWarning" xml:space="preserve">
+    <value>Warning: The environment variable '{0}' is deprecated and will be removed in a future major version. Use '{1}' instead.</value>
+    <comment>{0} is the deprecated environment variable name, {1} is the replacement environment variable name.</comment>
+  </data>
+  <data name="PlatformCommandLineMaxFailedTestsOptionDescription" xml:space="preserve">
+    <value>Specifies a maximum number of test failures that, when exceeded, will abort the test run.</value>
+  </data>
+  <data name="MaxFailedTestsMustBePositive" xml:space="preserve">
+    <value>The option '--maximum-failed-tests' must be a positive integer. The value '{0}' is not valid.</value>
+  </data>
+  <data name="AbortForMaxFailedTestsDescription" xml:space="preserve">
+    <value>Extension used to support '--maximum-failed-tests'. When a given failures threshold is reached, the test run will be aborted.</value>
+  </data>
+  <data name="ReachedMaxFailedTestsMessage" xml:space="preserve">
+    <value>Test session is aborting due to reaching failures ('{0}') specified by the '--maximum-failed-tests' option.</value>
+    <comment>{0} is the number of max failed tests.</comment>
+  </data>
+  <data name="AbortForMaxFailedTestsCapabilityNotAvailable" xml:space="preserve">
+    <value>The current test framework does not implement 'IGracefulStopTestExecutionCapability' which is required for '--maximum-failed-tests' feature.</value>
+  </data>
+  <data name="PlatformCommandLineFilterUidOptionDescription" xml:space="preserve">
+    <value>Provides a list of test node UIDs to filter by.</value>
+  </data>
+  <data name="OnlyOneFilterSupported" xml:space="preserve">
+    <value>Passing both '--treenode-filter' and '--filter-uid' is unsupported.</value>
+  </data>
+  <data name="PlatformCommandLineDebugAttachOptionDescription" xml:space="preserve">
+    <value>Allows to pause execution in order to attach to the process for debug purposes.</value>
+  </data>
+  <data name="SucceededLowercase" xml:space="preserve">
+    <value>succeeded</value>
+  </data>
+  <data name="ChatClientProviderAlreadyRegistered" xml:space="preserve">
+    <value>A chat client provider has already been registered.</value>
+  </data>
+  <data name="TestHostControllerProcessRestartNotSupportedOnWebAssembly" xml:space="preserve">
+    <value>Test host controller extensions that require process restart are not supported on browser/WebAssembly platforms.</value>
+  </data>
+  <data name="SyncFlushNotSupportedInBrowserErrorMessage" xml:space="preserve">
+    <value>Synchronous flush is not supported in browser environments.</value>
+  </data>
+  <data name="WaitDebuggerAttachNotSupportedInBrowserErrorMessage" xml:space="preserve">
+    <value>Waiting for debugger to attach (TESTINGPLATFORM_WAIT_ATTACH_DEBUGGER=1) is not supported in browser environments.</value>
+  </data>
+  <data name="WaitDebuggerAttachNotSupportedInWasiErrorMessage" xml:space="preserve">
+    <value>Waiting for debugger to attach (TESTINGPLATFORM_WAIT_ATTACH_DEBUGGER=1) is not supported on wasi.</value>
   </data>
 </root>

@@ -12,6 +12,9 @@ using MSTest.Analyzers.Helpers;
 
 namespace MSTest.Analyzers;
 
+/// <summary>
+/// MSTEST0020: <inheritdoc cref="Resources.PreferConstructorOverTestInitializeTitle"/>.
+/// </summary>
 [DiagnosticAnalyzer(LanguageNames.CSharp, LanguageNames.VisualBasic)]
 public sealed class PreferConstructorOverTestInitializeAnalyzer : DiagnosticAnalyzer
 {
@@ -25,11 +28,14 @@ public sealed class PreferConstructorOverTestInitializeAnalyzer : DiagnosticAnal
         null,
         Category.Design,
         DiagnosticSeverity.Info,
-        isEnabledByDefault: false);
+        isEnabledByDefault: false,
+        disableInAllMode: true);
 
+    /// <inheritdoc />
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; }
         = ImmutableArray.Create(Rule);
 
+    /// <inheritdoc />
     public override void Initialize(AnalysisContext context)
     {
         context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
@@ -37,7 +43,7 @@ public sealed class PreferConstructorOverTestInitializeAnalyzer : DiagnosticAnal
 
         context.RegisterCompilationStartAction(context =>
         {
-            if (context.Compilation.TryGetOrCreateTypeByMetadataName(WellKnownTypeNames.MicrosoftVisualStudioTestToolsUnitTestingTestInitializeAttribute, out var testInitAttributeSymbol))
+            if (context.Compilation.TryGetOrCreateTypeByMetadataName(WellKnownTypeNames.MicrosoftVisualStudioTestToolsUnitTestingTestInitializeAttribute, out INamedTypeSymbol? testInitAttributeSymbol))
             {
                 context.RegisterSymbolAction(context => AnalyzeSymbol(context, testInitAttributeSymbol), SymbolKind.Method);
             }
@@ -46,9 +52,9 @@ public sealed class PreferConstructorOverTestInitializeAnalyzer : DiagnosticAnal
 
     private static void AnalyzeSymbol(SymbolAnalysisContext context, INamedTypeSymbol testInitAttributeSymbol)
     {
-        IMethodSymbol methodSymbol = (IMethodSymbol)context.Symbol;
+        var methodSymbol = (IMethodSymbol)context.Symbol;
 
-        if (methodSymbol.IsTestInitializeMethod(testInitAttributeSymbol) && methodSymbol.ReturnsVoid)
+        if (methodSymbol.HasAttribute(testInitAttributeSymbol) && methodSymbol.ReturnsVoid)
         {
             context.ReportDiagnostic(methodSymbol.CreateDiagnostic(Rule));
         }

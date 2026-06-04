@@ -1,9 +1,8 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-#if NET462
-
-using System.Reflection;
+#if NETFRAMEWORK
+using AwesomeAssertions;
 
 using Microsoft.VisualStudio.TestPlatform.MSTestAdapter.PlatformServices;
 
@@ -17,48 +16,47 @@ public class DesktopReflectionOperationsTests : TestContainer
 {
     private readonly ReflectionOperations _reflectionOperations;
 
-    public DesktopReflectionOperationsTests()
-    {
-        _reflectionOperations = new ReflectionOperations();
-    }
+    public DesktopReflectionOperationsTests() => _reflectionOperations = new ReflectionOperations();
 
     public void GetCustomAttributesShouldReturnAllAttributes()
     {
-        var methodInfo = typeof(ReflectionUtilityTests.DummyBaseTestClass).GetMethod("DummyVTestMethod1");
+        MethodInfo methodInfo = typeof(ReflectionUtilityTests.DummyBaseTestClass).GetMethod("DummyVTestMethod1");
 
-        var attributes = _reflectionOperations.GetCustomAttributes(methodInfo, false);
+        object[] attributes = _reflectionOperations.GetCustomAttributes(methodInfo);
 
-        Verify(attributes is not null);
-        Verify(attributes.Length == 2);
+        attributes.Should().NotBeNull();
+        attributes.Length.Should().Be(2);
 
-        var expectedAttributes = new string[] { "DummyA : base", "DummySingleA : base" };
-        Verify(expectedAttributes.SequenceEqual(ReflectionUtilityTests.GetAttributeValuePairs(attributes)));
+        string[] expectedAttributes = ["DummyA : base", "DummySingleA : base"];
+        expectedAttributes.SequenceEqual(ReflectionUtilityTests.GetAttributeValuePairs(attributes)).Should().BeTrue();
     }
 
     public void GetCustomAttributesOnTypeShouldReturnAllAttributes()
     {
-        var typeInfo = typeof(ReflectionUtilityTests.DummyBaseTestClass).GetTypeInfo();
+        Type type = typeof(ReflectionUtilityTests.DummyBaseTestClass);
 
-        var attributes = _reflectionOperations.GetCustomAttributes(typeInfo, false);
+        object[] attributes = _reflectionOperations.GetCustomAttributes(type);
 
-        Verify(attributes is not null);
-        Verify(attributes.Length == 1);
+        attributes.Should().NotBeNull();
+        // Filter to only our test attributes (excludes compiler-generated attributes like NullableContextAttribute)
+        List<string> testAttributes = ReflectionUtilityTests.GetAttributeValuePairs(attributes);
+        testAttributes.Count.Should().Be(1);
 
-        var expectedAttributes = new string[] { "DummyA : ba" };
-        Verify(expectedAttributes.SequenceEqual(ReflectionUtilityTests.GetAttributeValuePairs(attributes)));
+        string[] expectedAttributes = ["DummyA : ba"];
+        expectedAttributes.SequenceEqual(testAttributes).Should().BeTrue();
     }
 
     public void GetSpecificCustomAttributesOnAssemblyShouldReturnAllAttributes()
     {
-        var asm = typeof(ReflectionUtilityTests.DummyTestClass).Assembly;
+        Assembly asm = typeof(ReflectionUtilityTests.DummyTestClass).Assembly;
 
-        var attributes = _reflectionOperations.GetCustomAttributes(asm, typeof(ReflectionUtilityTests.DummyAAttribute));
+        object[] attributes = _reflectionOperations.GetCustomAttributes(asm, typeof(ReflectionUtilityTests.DummyAAttribute));
 
-        Verify(attributes is not null);
-        Verify(attributes.Length == 2);
+        attributes.Should().NotBeNull();
+        attributes.Length.Should().Be(2);
 
-        var expectedAttributes = new string[] { "DummyA : a1", "DummyA : a2" };
-        Verify(expectedAttributes.SequenceEqual(ReflectionUtilityTests.GetAttributeValuePairs(attributes)));
+        string[] expectedAttributes = ["DummyA : a1", "DummyA : a2"];
+        expectedAttributes.SequenceEqual(ReflectionUtilityTests.GetAttributeValuePairs(attributes)).Should().BeTrue();
     }
 }
 #endif

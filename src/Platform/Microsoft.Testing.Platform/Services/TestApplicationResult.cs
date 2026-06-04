@@ -1,40 +1,53 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System.Collections.Concurrent;
-using System.Globalization;
-
 using Microsoft.Testing.Platform.CommandLine;
 using Microsoft.Testing.Platform.Extensions.Messages;
 using Microsoft.Testing.Platform.Extensions.OutputDevice;
 using Microsoft.Testing.Platform.Helpers;
-using Microsoft.Testing.Platform.Logging;
 using Microsoft.Testing.Platform.Messages;
 using Microsoft.Testing.Platform.OutputDevice;
 using Microsoft.Testing.Platform.Resources;
+using Microsoft.Testing.Platform.Telemetry;
 
 namespace Microsoft.Testing.Platform.Services;
 
-internal sealed class TestApplicationResult(
-    IOutputDevice outputService,
-    ITestApplicationCancellationTokenSource testApplicationCancellationTokenSource,
-    ICommandLineOptions commandLineOptions,
-    IEnvironment environment) : ITestApplicationProcessExitCode, ILoggerProvider, IOutputDeviceDataProducer
+internal sealed class TestApplicationResult : ITestApplicationProcessExitCode, IOutputDeviceDataProducer, IDisposable
 {
-    private readonly IOutputDevice _outputService = outputService;
-    private readonly ITestApplicationCancellationTokenSource _testApplicationCancellationTokenSource = testApplicationCancellationTokenSource;
-    private readonly ICommandLineOptions _commandLineOptions = commandLineOptions;
-    private readonly IEnvironment _environment = environment;
-    private readonly List<TestApplicationResultLogger> _testApplicationResultLoggers = [];
-    private readonly List<TestNode> _failedTests = [];
+    private readonly IOutputDevice _outputService;
+    private readonly ICommandLineOptions _commandLineOptions;
+    private readonly IEnvironment _environment;
+    private readonly IStopPoliciesService _policiesService;
+    private readonly OpenTelemetryResultHandler? _openTelemetryResultHandler;
+    private readonly bool _isDiscovery;
+    private int _failedTestsCount;
     private int _totalRanTests;
     private bool _testAdapterTestSessionFailure;
 
-    /// <inheritdoc />
-    public string Uid { get; } = nameof(TestApplicationResult);
+    public TestApplicationResult(
+        IOutputDevice outputService,
+        ICommandLineOptions commandLineOptions,
+        IEnvironment environment,
+        IStopPoliciesService policiesService,
+        IPlatformOpenTelemetryService? otelService)
+    {
+        _outputService = outputService;
+        _commandLineOptions = commandLineOptions;
+        _environment = environment;
+        _policiesService = policiesService;
+        if (otelService is not null)
+        {
+            _openTelemetryResultHandler = new OpenTelemetryResultHandler(otelService, environment);
+        }
+
+        _isDiscovery = _commandLineOptions.IsOptionSet(PlatformCommandLineProvider.DiscoverTestsOptionKey);
+    }
 
     /// <inheritdoc />
-    public string Version { get; } = AppVersion.DefaultSemVer;
+    public string Uid => nameof(TestApplicationResult);
+
+    /// <inheritdoc />
+    public string Version => PlatformVersion.Version;
 
     /// <inheritdoc />
     public string DisplayName { get; } = PlatformResources.TestApplicationResultDisplayName;
@@ -63,17 +76,62 @@ internal sealed class TestApplicationResult(
             return Task.CompletedTask;
         }
 
-        if (Array.IndexOf(TestNodePropertiesCategories.WellKnownTestNodeTestRunOutcomeFailedProperties, executionState.GetType()) != -1)
+        switch (executionState)
         {
-            _failedTests.Add(message.TestNode);
+            case DiscoveredTestNodeStateProperty:
+                _openTelemetryResultHandler?.NotifyDiscovered();
+                break;
+
+            case PassedTestNodeStateProperty passed:
+                _openTelemetryResultHandler?.NotifyPassed(message.TestNode, passed);
+                break;
+
+            case FailedTestNodeStateProperty:
+            case ErrorTestNodeStateProperty:
+            case TimeoutTestNodeStateProperty:
+#pragma warning disable CS0618, MTP0001 // Type or member is obsolete
+            case CancelledTestNodeStateProperty:
+#pragma warning restore CS0618, MTP0001 // Type or member is obsolete
+                _openTelemetryResultHandler?.NotifyFailed(message.TestNode, executionState);
+                break;
+
+            case SkippedTestNodeStateProperty skipped:
+                _openTelemetryResultHandler?.NotifySkipped(message.TestNode, skipped);
+                break;
+
+            case InProgressTestNodeStateProperty:
+                _openTelemetryResultHandler?.NotifyInProgress(message.TestNode, message.ParentTestNodeUid);
+                break;
+
+            default:
+                _openTelemetryResultHandler?.NotifyUnknown();
+                break;
         }
 
-        if (_commandLineOptions.IsOptionSet(PlatformCommandLineProvider.DiscoverTestsOptionKey)
-            && Array.IndexOf(TestNodePropertiesCategories.WellKnownTestNodeDiscoveredProperties, executionState.GetType()) != -1)
+        Type outcomeType = executionState.GetType();
+        if (Array.IndexOf(TestNodePropertiesCategories.WellKnownTestNodeTestRunOutcomeFailedProperties, outcomeType) != -1)
+        {
+            _failedTestsCount++;
+        }
+
+        if (_isDiscovery
+            && Array.IndexOf(TestNodePropertiesCategories.WellKnownTestNodeDiscoveredProperties, outcomeType) != -1)
         {
             _totalRanTests++;
         }
-        else if (Array.IndexOf(TestNodePropertiesCategories.WellKnownTestNodeTestRunOutcomeProperties, executionState.GetType()) != -1)
+
+        // DESIGN: Skipped tests are intentionally excluded from `_totalRanTests`.
+        // `WellKnownTestNodeTestRunOutcomeProperties` does not contain `SkippedTestNodeStateProperty`, so an
+        // all-skipped (or zero-test) run leaves `_totalRanTests == 0` and yields exit code `ExitCode.ZeroTests` (8)
+        // in `GetProcessExitCode`. This is the strict default chosen in #3216 / #3243 ("Skipped tests count as not
+        // run") to surface the common "invalid filter ran nothing" mistake. The documented opt-out for users who
+        // legitimately expect all-skipped runs is `--ignore-exit-code 8`.
+        //
+        // Two other layers mirror this decision and must stay in lockstep:
+        //   - TerminalTestReporter.Summary.cs (`allTestsWereSkipped`)
+        //   - Microsoft.Testing.Platform.MSBuild InvokeTestingPlatformTask (run-summary verdict)
+        // Do not relax this without revisiting those sites and the design discussion above.
+        else if (Array.IndexOf(TestNodePropertiesCategories.WellKnownTestNodeTestRunOutcomeProperties, outcomeType) != -1)
         {
             _totalRanTests++;
         }
@@ -81,38 +139,18 @@ internal sealed class TestApplicationResult(
         return Task.CompletedTask;
     }
 
-    public ILogger CreateLogger(string categoryName)
+    public int GetProcessExitCode()
     {
-        var logger = new TestApplicationResultLogger(categoryName);
-        _testApplicationResultLoggers.Add(logger);
-
-        return logger;
-    }
-
-    public async Task<int> GetProcessExitCodeAsync()
-    {
-        bool anyError = false;
-        foreach ((string categoryName, string error) in _testApplicationResultLoggers.SelectMany(logger => logger.Errors.Select(error => (logger.CategoryName, error))))
-        {
-            anyError = true;
-            await _outputService.DisplayAsync(this, FormattedTextOutputDeviceDataBuilder.CreateRedConsoleColorText($"[{categoryName}] {error}"));
-        }
-
-        int exitCode = ExitCodes.Success;
-        exitCode = anyError ? ExitCodes.GenericFailure : exitCode;
-        exitCode = exitCode == ExitCodes.Success && _testAdapterTestSessionFailure ? ExitCodes.TestAdapterTestSessionFailure : exitCode;
-        exitCode = exitCode == ExitCodes.Success && _failedTests.Count > 0 ? ExitCodes.AtLeastOneTestFailed : exitCode;
-        exitCode = exitCode == ExitCodes.Success && _testApplicationCancellationTokenSource.CancellationToken.IsCancellationRequested ? ExitCodes.TestSessionAborted : exitCode;
-
-        // If the user has specified the VSTestAdapterMode option, then we don't want to return a non-zero exit code if no tests ran.
-        if (!_commandLineOptions.IsOptionSet(PlatformCommandLineProvider.VSTestAdapterModeOptionKey))
-        {
-            exitCode = exitCode == ExitCodes.Success && _totalRanTests == 0 ? ExitCodes.ZeroTests : exitCode;
-        }
+        ExitCode exitCode = ExitCode.Success;
+        exitCode = exitCode == ExitCode.Success && _policiesService.IsMaxFailedTestsTriggered ? ExitCode.TestExecutionStoppedForMaxFailedTests : exitCode;
+        exitCode = exitCode == ExitCode.Success && _testAdapterTestSessionFailure ? ExitCode.TestAdapterTestSessionFailure : exitCode;
+        exitCode = exitCode == ExitCode.Success && _failedTestsCount > 0 ? ExitCode.AtLeastOneTestFailed : exitCode;
+        exitCode = exitCode == ExitCode.Success && _policiesService.IsAbortTriggered ? ExitCode.TestSessionAborted : exitCode;
+        exitCode = exitCode == ExitCode.Success && _totalRanTests == 0 ? ExitCode.ZeroTests : exitCode;
 
         if (_commandLineOptions.TryGetOptionArgumentList(PlatformCommandLineProvider.MinimumExpectedTestsOptionKey, out string[]? argumentList))
         {
-            exitCode = exitCode == ExitCodes.Success && _totalRanTests < int.Parse(argumentList[0], CultureInfo.InvariantCulture) ? ExitCodes.MinimumExpectedTestsPolicyViolation : exitCode;
+            exitCode = exitCode == ExitCode.Success && _totalRanTests < int.Parse(argumentList[0], CultureInfo.InvariantCulture) ? ExitCode.MinimumExpectedTestsPolicyViolation : exitCode;
         }
 
         // If the user has specified the IgnoreExitCode, then we don't want to return a non-zero exit code if the exit code matches the one specified.
@@ -127,43 +165,25 @@ internal sealed class TestApplicationResult(
 
         if (exitCodeToIgnore is not null)
         {
-            if (exitCodeToIgnore.Split(';').Any(code => int.TryParse(code, out int parsedExitCode) && parsedExitCode == exitCode))
+            if (exitCodeToIgnore.Split(';').Any(code => int.TryParse(code, out int parsedExitCode) && parsedExitCode == (int)exitCode))
             {
-                exitCode = ExitCodes.Success;
+                exitCode = ExitCode.Success;
             }
         }
 
-        return exitCode;
+        return (int)exitCode;
     }
 
-    public async Task SetTestAdapterTestSessionFailureAsync(string errorMessage)
+    public async Task SetTestAdapterTestSessionFailureAsync(string errorMessage, CancellationToken cancellationToken)
     {
         TestAdapterTestSessionFailureErrorMessage = errorMessage;
         _testAdapterTestSessionFailure = true;
-        await _outputService.DisplayAsync(this, FormattedTextOutputDeviceDataBuilder.CreateRedConsoleColorText(errorMessage));
+        await _outputService.DisplayAsync(this, new ErrorMessageOutputDeviceData(errorMessage), cancellationToken).ConfigureAwait(false);
     }
 
     public Statistics GetStatistics()
-        => new() { TotalRanTests = _totalRanTests, TotalFailedTests = _failedTests.Count };
+        => new() { TotalRanTests = _totalRanTests, TotalFailedTests = _failedTestsCount };
 
-    private sealed class TestApplicationResultLogger(string categoryName) : ILogger
-    {
-        private readonly ConcurrentBag<string> _errors = [];
-
-        public IReadOnlyCollection<string> Errors => _errors;
-
-        public string CategoryName { get; } = categoryName;
-
-        public bool IsEnabled(LogLevel logLevel)
-            => logLevel is LogLevel.Error or LogLevel.Critical;
-
-        public Task LogAsync<TState>(LogLevel logLevel, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
-        {
-            _errors.Add(formatter(state, exception));
-            return Task.CompletedTask;
-        }
-
-        public void Log<TState>(LogLevel logLevel, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
-            => _errors.Add(formatter(state, exception));
-    }
+    public void Dispose()
+        => _openTelemetryResultHandler?.Dispose();
 }

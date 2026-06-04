@@ -1,17 +1,14 @@
-// Copyright (c) Microsoft Corporation. All rights reserved.
+﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 #if NETFRAMEWORK
-
-using System.Collections;
-
 namespace Microsoft.VisualStudio.TestPlatform.MSTestAdapter.PlatformServices;
 
 /// <summary>
 /// Permutation of integers from 0 to (numberOfObjects - 1), in random order and in the end all values are returned.
 /// Used to get random permutation for data row access in data driven test.
 /// </summary>
-internal class RandomIntPermutation : IEnumerable<int>
+internal sealed class RandomIntPermutation : IEnumerable<int>
 {
     private readonly int[] _objects;
 
@@ -46,10 +43,7 @@ internal class RandomIntPermutation : IEnumerable<int>
         }
     }
 
-    IEnumerator IEnumerable.GetEnumerator()
-    {
-        return GetEnumerator();
-    }
+    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 }
 
 #endif

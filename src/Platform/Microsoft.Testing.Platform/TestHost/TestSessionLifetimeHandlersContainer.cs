@@ -3,12 +3,9 @@
 
 namespace Microsoft.Testing.Platform.Extensions.TestHost;
 
-internal class TestSessionLifetimeHandlersContainer
+internal sealed class TestSessionLifetimeHandlersContainer
 {
-    public TestSessionLifetimeHandlersContainer(IEnumerable<ITestSessionLifetimeHandler> testSessionLifetimeHandlers)
-    {
-        TestSessionLifetimeHandlers = testSessionLifetimeHandlers;
-    }
+    public TestSessionLifetimeHandlersContainer(IEnumerable<ITestSessionLifetimeHandler> testSessionLifetimeHandlers) => TestSessionLifetimeHandlers = testSessionLifetimeHandlers;
 
     public IEnumerable<ITestSessionLifetimeHandler> TestSessionLifetimeHandlers { get; }
 }

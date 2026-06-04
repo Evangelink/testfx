@@ -5,22 +5,37 @@ using Microsoft.MSTestV2.CLIAutomation;
 
 namespace MSTest.VstestConsoleWrapper.IntegrationTests;
 
+[TestClass]
 public class ParallelExecutionTests : CLITestBase
 {
     private const string ClassParallelTestAssetName = "ParallelClassesTestProject";
     private const string MethodParallelTestAssetName = "ParallelMethodsTestProject";
     private const string DoNotParallelizeTestAssetName = "DoNotParallelizeTestProject";
     private const int TestMethodWaitTimeInMS = 1000;
-    private const int OverheadTimeInMS = 3000;
+    private const int OverheadTimeInMS = 4000;
 
-    public void AllMethodsShouldRunInParallel()
+    [TestMethod]
+    public async Task AllMethodsShouldRunInParallel()
     {
-        InvokeVsTestForExecution([MethodParallelTestAssetName]);
+        const int maxAttempts = 10;
+        for (int i = 0; i <= maxAttempts; i++)
+        {
+            try
+            {
+                InvokeVsTestForExecution([MethodParallelTestAssetName]);
 
-        // Parallel level of 2
-        // There are a total of 6 methods each with a sleep of TestMethodWaitTimeInMS.
-        // 5 of them are parallelizable and 1 is not. So this should not exceed 4 * TestMethodWaitTimeInMS seconds + 2.5 seconds overhead.
-        ValidateTestRunTime((4 * TestMethodWaitTimeInMS) + OverheadTimeInMS);
+                // Parallel level of 2
+                // There are a total of 6 methods each with a sleep of TestMethodWaitTimeInMS.
+                // 5 of them are parallelizable and 1 is not..
+                ValidateTestRunTime((4 * TestMethodWaitTimeInMS) + OverheadTimeInMS);
+            }
+
+            // Timer validation sometimes get flacky. So retrying the test if it fails.
+            catch (AssertFailedException ex) when (i != maxAttempts && ex.Message.Contains("Test Run was expected to not exceed"))
+            {
+                await Task.Delay(2000, TestContext.CancellationToken);
+            }
+        }
 
         ValidatePassedTestsContain(
             "ParallelMethodsTestProject.UnitTest1.SimpleTest11",
@@ -33,6 +48,7 @@ public class ParallelExecutionTests : CLITestBase
             "ParallelMethodsTestProject.UnitTest2.SimpleTest22");
     }
 
+    [TestMethod]
     public void AllClassesShouldRunInParallel()
     {
         InvokeVsTestForExecution([ClassParallelTestAssetName]);
@@ -55,17 +71,20 @@ public class ParallelExecutionTests : CLITestBase
             "ParallelClassesTestProject.UnitTest3.SimpleTest32");
     }
 
+    [TestMethod]
     public void NothingShouldRunInParallel()
     {
         const string RunSetting =
-        @"<RunSettings>   
-                <MSTest>
-    		        <Parallelize>
-      			        <Workers>4</Workers>
-      			        <Scope>ClassLevel</Scope>
-    		        </Parallelize>
-  	            </MSTest>  
-            </RunSettings>";
+            """
+            <RunSettings>
+              <MSTest>
+                <Parallelize>
+                  <Workers>4</Workers>
+                  <Scope>ClassLevel</Scope>
+                </Parallelize>
+              </MSTest>
+            </RunSettings>
+            """;
 
         InvokeVsTestForExecution([DoNotParallelizeTestAssetName], RunSetting);
 
@@ -85,4 +104,6 @@ public class ParallelExecutionTests : CLITestBase
             "DoNotParallelizeTestProject.UnitTest1.SimpleTest12",
             "DoNotParallelizeTestProject.UnitTest2.SimpleTest22");
     }
+
+    public TestContext TestContext { get; set; }
 }

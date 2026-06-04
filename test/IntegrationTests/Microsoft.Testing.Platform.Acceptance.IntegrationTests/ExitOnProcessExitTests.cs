@@ -1,42 +1,34 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System.Diagnostics;
-
 namespace Microsoft.Testing.Platform.Acceptance.IntegrationTests;
 
-[TestGroup]
-public class ExitOnProcessExitTests : AcceptanceTestBase
+[TestClass]
+public class ExitOnProcessExitTests : AcceptanceTestBase<ExitOnProcessExitTests.TestAssetFixture>
 {
     private const string AssetName = "ExecutionTests";
-    private readonly TestAssetFixture _testAssetFixture;
 
-    public ExitOnProcessExitTests(ITestExecutionContext testExecutionContext, TestAssetFixture testAssetFixture)
-        : base(testExecutionContext)
+    [DynamicData(nameof(TargetFrameworks.AllForDynamicData), typeof(TargetFrameworks))]
+    [TestMethod]
+    public async Task ExitOnProcessExit_Succeed(string tfm)
     {
-        _testAssetFixture = testAssetFixture;
-    }
-
-    [ArgumentsProvider(nameof(TargetFrameworks.All), typeof(TargetFrameworks))]
-    public void ExitOnProcessExit_Succeed(string tfm)
-    {
-        TestInfrastructure.TestHost testHost = TestInfrastructure.TestHost.LocateFrom(_testAssetFixture.TargetAssetPath, AssetName, tfm);
+        var testHost = TestInfrastructure.TestHost.LocateFrom(AssetFixture.TargetAssetPath, AssetName, tfm);
 
         // Create the mutex name used to wait for the PID file created by the test host.
         string waitPid = Guid.NewGuid().ToString("N");
-        _ = testHost.ExecuteAsync(environmentVariables: new Dictionary<string, string> { { "WaitPid", waitPid } });
+        _ = testHost.ExecuteAsync(environmentVariables: new Dictionary<string, string?> { ["WaitPid"] = waitPid }, cancellationToken: TestContext.CancellationToken);
 
         Process? process;
         var startTime = Stopwatch.StartNew();
         while (true)
         {
-            Thread.Sleep(500);
+            await Task.Delay(500, TestContext.CancellationToken);
 
             // Look for the pid file created by the test host.
-            var pidFile = Directory.GetFiles(Path.GetDirectoryName(testHost.FullName)!, "PID").ToArray();
+            string[] pidFile = [.. Directory.GetFiles(Path.GetDirectoryName(testHost.FullName)!, "PID")];
             if (pidFile.Length > 0)
             {
-                var pid = File.ReadAllText(pidFile[0]);
+                string pid = File.ReadAllText(pidFile[0]);
                 if (int.TryParse(pid, out int pidValue))
                 {
                     // Create the process object from the test host one.
@@ -45,7 +37,7 @@ public class ExitOnProcessExitTests : AcceptanceTestBase
                 }
             }
 
-            if (startTime.Elapsed.TotalSeconds > 55)
+            if (startTime.Elapsed.TotalSeconds > 60)
             {
                 throw new Exception("Process PID not found in 60 seconds");
             }
@@ -56,15 +48,15 @@ public class ExitOnProcessExitTests : AcceptanceTestBase
         startTime = Stopwatch.StartNew();
         while (!process.HasExited)
         {
-            if (startTime.Elapsed.TotalSeconds > 55)
+            await Task.Delay(1000, TestContext.CancellationToken);
+            if (startTime.Elapsed.TotalSeconds > 60)
             {
                 throw new Exception("Process did not exit in 60 seconds");
             }
         }
     }
 
-    [TestFixture(TestFixtureSharingStrategy.PerTestGroup)]
-    public sealed class TestAssetFixture(AcceptanceFixture acceptanceFixture) : TestAssetFixtureBase(acceptanceFixture.NuGetGlobalPackagesFolder)
+    public sealed class TestAssetFixture() : TestAssetFixtureBase()
     {
         private const string TestCode = """
 #file ExecutionTests.csproj
@@ -86,14 +78,13 @@ public class ExitOnProcessExitTests : AcceptanceTestBase
 using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.InteropServices;
-
 using Microsoft.Testing.Platform.Builder;
 using Microsoft.Testing.Platform.Capabilities;
 using Microsoft.Testing.Platform.Capabilities.TestFramework;
 using Microsoft.Testing.Platform.Extensions.Messages;
 using Microsoft.Testing.Platform.Extensions.TestFramework;
 
-if (args.Length == 0)
+if (!args.Contains("--exit-on-process-exit"))
 {
     int currentPid = Process.GetCurrentProcess().Id;
     var currentEntryPoint = Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly()!.Location)!, Path.GetFileNameWithoutExtension(Assembly.GetEntryAssembly()!.Location)
@@ -103,7 +94,7 @@ if (args.Length == 0)
     Environment.SetEnvironmentVariable("WaitTestHost", mutexName);
     ProcessStartInfo processStartInfo = new();
     processStartInfo.FileName = currentEntryPoint;
-    processStartInfo.Arguments = $"--exit-on-process-exit {currentPid}";
+    processStartInfo.Arguments = $"--exit-on-process-exit {currentPid} --no-progress --no-ansi";
     processStartInfo.UseShellExecute = false;
     var process = Process.Start(processStartInfo);
     while (!Mutex.TryOpenExisting(mutexName, out Mutex? _))
@@ -118,21 +109,21 @@ if (args.Length == 0)
 else
 {
     ITestApplicationBuilder builder = await TestApplication.CreateBuilderAsync(args);
-    builder.RegisterTestFramework(_ => new TestFrameworkCapabilities(), (_, __) => new DummyTestAdapter());
+    builder.RegisterTestFramework(_ => new TestFrameworkCapabilities(), (_, __) => new DummyTestFramework());
     using ITestApplication app = await builder.BuildAsync();
     return await app.RunAsync();
 }
 
 
-public class DummyTestAdapter : ITestFramework, IDataProducer
+public class DummyTestFramework : ITestFramework, IDataProducer
 {
-    public string Uid => nameof(DummyTestAdapter);
+    public string Uid => nameof(DummyTestFramework);
 
     public string Version => "2.0.0";
 
-    public string DisplayName => nameof(DummyTestAdapter);
+    public string DisplayName => nameof(DummyTestFramework);
 
-    public string Description => nameof(DummyTestAdapter);
+    public string Description => nameof(DummyTestFramework);
 
     public Task<bool> IsEnabledAsync() => Task.FromResult(true);
 
@@ -170,12 +161,11 @@ public class DummyTestAdapter : ITestFramework, IDataProducer
 
         public string TargetAssetPath => GetAssetPath(AssetName);
 
-        public override IEnumerable<(string ID, string Name, string Code)> GetAssetsToGenerate()
-        {
-            yield return (AssetName, AssetName,
+        public override (string ID, string Name, string Code) GetAssetsToGenerate() => (AssetName, AssetName,
                 TestCode
                 .PatchTargetFrameworks(TargetFrameworks.All)
                 .PatchCodeWithReplace("$MicrosoftTestingPlatformVersion$", MicrosoftTestingPlatformVersion));
-        }
     }
+
+    public TestContext TestContext { get; set; }
 }

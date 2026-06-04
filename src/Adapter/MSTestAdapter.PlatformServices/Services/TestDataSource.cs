@@ -1,20 +1,17 @@
-// Copyright (c) Microsoft Corporation. All rights reserved.
+﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 #if NETFRAMEWORK
 using System.Configuration;
 using System.Data;
-using System.Diagnostics;
-using System.Globalization;
 
 using Microsoft.VisualStudio.TestPlatform.MSTestAdapter.PlatformServices.Data;
 using Microsoft.VisualStudio.TestPlatform.MSTestAdapter.PlatformServices.Extensions;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 #endif
 using Microsoft.VisualStudio.TestPlatform.MSTestAdapter.PlatformServices.Interface;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 using ITestDataSource = Microsoft.VisualStudio.TestPlatform.MSTestAdapter.PlatformServices.Interface.ITestDataSource;
-using UTF = Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace Microsoft.VisualStudio.TestPlatform.MSTestAdapter.PlatformServices;
 
@@ -26,12 +23,18 @@ namespace Microsoft.VisualStudio.TestPlatform.MSTestAdapter.PlatformServices;
 /// the tests since it can only be found at the test output directory. DO NOT call into this platform service outside of the appdomain context if you do not want to hit
 /// a ReflectionTypeLoadException.
 /// </remarks>
-public class TestDataSource : ITestDataSource
+internal sealed class TestDataSource : ITestDataSource
 {
+    /// <summary>
+    /// Gets the test data from custom test data source and sets dbconnection in testContext object.
+    /// </summary>
+    /// <param name="testMethodInfo">The test method info.</param>
+    /// <param name="testContext">The test context.</param>
+    /// <returns>The test data.</returns>
 #if NETFRAMEWORK
-    public IEnumerable<object>? GetData(UTF.ITestMethod testMethodInfo, ITestContext testContext)
+    public IEnumerable<object>? GetData(ITestMethod testMethodInfo, ITestContext testContext)
 #else
-    IEnumerable<object>? ITestDataSource.GetData(UTF.ITestMethod testMethodInfo, ITestContext testContext)
+    IEnumerable<object>? ITestDataSource.GetData(ITestMethod testMethodInfo, ITestContext testContext)
 #endif
     {
 #if NETFRAMEWORK
@@ -42,25 +45,12 @@ public class TestDataSource : ITestDataSource
             Path.GetDirectoryName(new Uri(testMethodInfo.MethodInfo.Module.Assembly.CodeBase).LocalPath),
         ];
 
-        List<UTF.TestResult> dataRowResults = [];
+        List<TestResult> dataRowResults = [];
 
         // Connect to data source.
         TestDataConnectionFactory factory = new();
 
-        string providerNameInvariant;
-        string? connectionString;
-        string? tableName;
-        UTF.DataAccessMethod dataAccessMethod;
-
-        try
-        {
-            GetConnectionProperties(testMethodInfo.GetAttributes<UTF.DataSourceAttribute>(false)[0], out providerNameInvariant, out connectionString, out tableName, out dataAccessMethod);
-        }
-        catch
-        {
-            // REVIEW ME: @Haplois, was there any good reason to mess up stack trace?
-            throw;
-        }
+        GetConnectionProperties(testMethodInfo.GetAttributes<DataSourceAttribute>()[0], out string providerNameInvariant, out string? connectionString, out string? tableName, out DataAccessMethod dataAccessMethod);
 
         try
         {
@@ -90,11 +80,11 @@ public class TestDataSource : ITestDataSource
         }
         catch (Exception ex)
         {
-            string message = ExceptionExtensions.GetExceptionMessage(ex);
+            string message = ex.GetExceptionMessage();
 
-            // TODO: Change exception type to more specific one.
+            // TODO: Change exception type to more specific one (tracked by https://github.com/microsoft/testfx/issues/8086).
 #pragma warning disable CA2201 // Do not raise reserved exception types
-            throw new Exception(string.Format(CultureInfo.CurrentCulture, Resource.UTA_ErrorDataConnectionFailed, ex.Message), ex);
+            throw new Exception(string.Format(CultureInfo.CurrentCulture, Resource.UTA_ErrorDataConnectionFailed, message), ex);
 #pragma warning restore CA2201 // Do not raise reserved exception types
         }
 #else
@@ -109,7 +99,7 @@ public class TestDataSource : ITestDataSource
     /// <param name="dataAccessMethod">The data access method.</param>
     /// <param name="length">Number of permutations.</param>
     /// <returns>Permutations.</returns>
-    private static IEnumerable<int> GetPermutation(UTF.DataAccessMethod dataAccessMethod, int length)
+    private static IEnumerable<int> GetPermutation(DataAccessMethod dataAccessMethod, int length)
     {
         switch (dataAccessMethod)
         {
@@ -133,8 +123,8 @@ public class TestDataSource : ITestDataSource
     /// <param name="connectionString">The connection string.</param>
     /// <param name="tableName">The table name.</param>
     /// <param name="dataAccessMethod">The data access method.</param>
-    private static void GetConnectionProperties(UTF.DataSourceAttribute dataSourceAttribute, out string providerNameInvariant,
-        out string? connectionString, out string? tableName, out UTF.DataAccessMethod dataAccessMethod)
+    private static void GetConnectionProperties(DataSourceAttribute dataSourceAttribute, out string providerNameInvariant,
+        out string? connectionString, out string? tableName, out DataAccessMethod dataAccessMethod)
     {
         if (StringEx.IsNullOrEmpty(dataSourceAttribute.DataSourceSettingName))
         {
@@ -145,14 +135,18 @@ public class TestDataSource : ITestDataSource
             return;
         }
 
-        UTF.DataSourceElement element = TestConfiguration.ConfigurationSection.DataSources[dataSourceAttribute.DataSourceSettingName]
+        DataSourceElement element = TestConfiguration.ConfigurationSection.DataSources[dataSourceAttribute.DataSourceSettingName]
 #pragma warning disable CA2201 // Do not raise reserved exception types
             ?? throw new Exception(string.Format(CultureInfo.CurrentCulture, Resource.UTA_DataSourceConfigurationSectionMissing, dataSourceAttribute.DataSourceSettingName));
 #pragma warning restore CA2201 // Do not raise reserved exception types
         providerNameInvariant = ConfigurationManager.ConnectionStrings[element.ConnectionString].ProviderName;
         connectionString = ConfigurationManager.ConnectionStrings[element.ConnectionString].ConnectionString;
         tableName = element.DataTableName;
-        dataAccessMethod = (UTF.DataAccessMethod)Enum.Parse(typeof(UTF.DataAccessMethod), element.DataAccessMethod);
+#if NETCOREAPP
+        dataAccessMethod = Enum.Parse<DataAccessMethod>(element.DataAccessMethod);
+#else
+        dataAccessMethod = (DataAccessMethod)Enum.Parse(typeof(DataAccessMethod), element.DataAccessMethod);
+#endif
     }
 #endif
 }

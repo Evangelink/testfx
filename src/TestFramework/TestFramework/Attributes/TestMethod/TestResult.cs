@@ -1,21 +1,18 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using System.ComponentModel;
+
 namespace Microsoft.VisualStudio.TestTools.UnitTesting;
 
 /// <summary>
 /// TestResult object to be returned to adapter.
 /// </summary>
+#if NETFRAMEWORK
+[Serializable]
+#endif
 public class TestResult
 {
-    /// <summary>
-    /// Initializes a new instance of the <see cref="TestResult"/> class.
-    /// </summary>
-    public TestResult()
-    {
-        DatarowIndex = -1;
-    }
-
     /// <summary>
     /// Gets or sets the display name of the result. Useful when returning multiple results.
     /// If null then Method name is used as DisplayName.
@@ -27,10 +24,60 @@ public class TestResult
     /// </summary>
     public UnitTestOutcome Outcome { get; set; }
 
+    internal string? IgnoreReason { get; set; }
+
+    // NOTE: On .NET Framework, TestResult can cross appdomain boundary, so the exception should generally be serializable.
+    // But that's not always the case and we can't see good guarantees.
+    // Alternatively, we set ExceptionMessage and ExceptionStackTrace, and serialize those instead of the exception.
+    // That means, after crossing app domain, you shouldn't access TestFailureException.
+    // On modern .NET targets there are no AppDomains, so [Serializable]/[NonSerialized] are not needed.
+
     /// <summary>
     /// Gets or sets the exception thrown when test is failed.
     /// </summary>
-    public Exception? TestFailureException { get; set; }
+#if NETFRAMEWORK
+    [field: NonSerialized]
+#endif
+    public Exception? TestFailureException
+    {
+        get
+        {
+            if ((ExceptionMessage is not null || ExceptionStackTrace is not null) && field is null)
+            {
+                // That means this property is accessed after crossing appdomain boundary.
+                // So, we fail.
+                throw new InvalidOperationException();
+            }
+
+            return field;
+        }
+
+        set
+        {
+            if (value is null)
+            {
+                // If the field is already null, we don't need to do anything.
+                // If the field is non-null, it means we are trying to clear an exception, which is something we shouldn't do.
+                // If it happened that we attempted to set it to null after it was non-null, we return and do
+                // nothing. This is better than potentially masking real failures silently.
+                Debug.Assert(field is null, "TestFailureException should not be set to null after it was non-null");
+                return;
+            }
+
+            field = field is null
+                ? value
+                : field is AggregateException aggregateException
+                    ? new AggregateException(aggregateException.InnerExceptions.Concat([value]))
+                    : new AggregateException(field, value);
+
+            ExceptionMessage = field.Message;
+            ExceptionStackTrace = field.StackTrace;
+        }
+    }
+
+    internal string? ExceptionMessage { get; set; }
+
+    internal string? ExceptionStackTrace { get; set; }
 
     /// <summary>
     /// Gets or sets the output of the message logged by test code.
@@ -65,6 +112,8 @@ public class TestResult
     /// <summary>
     /// Gets or sets the inner results count of the result.
     /// </summary>
+    [Obsolete("This API is unused and has no effect.", error: true)]
+    [EditorBrowsable(EditorBrowsableState.Never)]
     public int InnerResultsCount { get; set; }
 
     /// <summary>
@@ -76,15 +125,30 @@ public class TestResult
     /// Gets or sets the data row index in data source. Set only for results of individual
     /// run of data row of a data driven test.
     /// </summary>
-    public int DatarowIndex { get; set; }
+    [Obsolete("This API is unused and has no effect.", error: true)]
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    public int DatarowIndex { get; set; } = -1;
 
     /// <summary>
     /// Gets or sets the return value of the test method. (Currently null always).
     /// </summary>
+    [Obsolete("This API is unused and has no effect.", error: true)]
+    [EditorBrowsable(EditorBrowsableState.Never)]
     public object? ReturnValue { get; set; }
 
     /// <summary>
     /// Gets or sets the result files attached by the test.
     /// </summary>
     public IList<string>? ResultFiles { get; set; }
+
+    // UnitTestElement is not part of TestFramework, so we don't have strong typing here and we use object instead.
+    // The value of this property should either be null, or be of type UnitTestElement.
+    internal object? AssociatedUnitTestElement { get; set; }
+
+    internal static TestResult CreateIgnoredResult(string? ignoreReason)
+        => new()
+        {
+            Outcome = UnitTestOutcome.Ignored,
+            IgnoreReason = ignoreReason,
+        };
 }

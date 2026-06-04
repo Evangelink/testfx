@@ -1,16 +1,14 @@
-// Copyright (c) Microsoft Corporation. All rights reserved.
+﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 #if NETFRAMEWORK
-using System.Diagnostics.CodeAnalysis;
-using System.Reflection;
 
 namespace Microsoft.VisualStudio.TestTools.UnitTesting;
 
 /// <summary>
 /// Provides method signature discovery for generic methods.
 /// </summary>
-internal class RuntimeTypeHelper
+internal sealed class RuntimeTypeHelper
 {
     /// <summary>
     /// Compares the method signatures of these two methods.
@@ -115,12 +113,10 @@ internal class RuntimeTypeHelper
     [SuppressMessage("StyleCop.CSharp.NamingRules", "SA1305:FieldNamesMustNotUseHungarianNotation", Justification = "Reviewed. Suppression is OK here.")]
     internal static MethodBase? SelectMethod(MethodBase[] match, Type[] types)
     {
-        _ = match ?? throw new ArgumentNullException(nameof(match));
-
         int i;
         int j;
 
-        Type[] realTypes = new Type[types.Length];
+        var realTypes = new Type[types.Length];
         for (i = 0; i < types.Length; i++)
         {
             realTypes[i] = types[i].UnderlyingSystemType;
@@ -335,8 +331,7 @@ internal class RuntimeTypeHelper
             //              in which case paramOrder[i] == p1.Length - 1 for that element
             //      or the user did not re-order the parameters in which case
             //          the paramOrder array could contain indexes larger than p.Length - 1
-            ////          so any index >= p.Length - 1 is being put in the param array
-
+            //          so any index >= p.Length - 1 is being put in the param array
             c1 = paramArrayType1 != null && paramOrder1[i] >= p1.Length - 1 ? paramArrayType1 : p1[paramOrder1[i]].ParameterType;
 
             c2 = paramArrayType2 != null && paramOrder2[i] >= p2.Length - 1 ? paramArrayType2 : p2[paramOrder2[i]].ParameterType;

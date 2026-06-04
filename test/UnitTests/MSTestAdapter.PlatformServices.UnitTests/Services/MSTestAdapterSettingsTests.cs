@@ -1,11 +1,14 @@
-// Copyright (c) Microsoft Corporation. All rights reserved.
+﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System.Xml;
+using AwesomeAssertions;
 
 using Microsoft.VisualStudio.TestPlatform.MSTestAdapter.PlatformServices;
+using Microsoft.VisualStudio.TestPlatform.MSTestAdapter.PlatformServices.Interface;
 using Microsoft.VisualStudio.TestPlatform.ObjectModel;
 using Microsoft.VisualStudio.TestPlatform.ObjectModel.Utilities;
+
+using Moq;
 
 using TestFramework.ForTestingMSTest;
 
@@ -30,36 +33,36 @@ public class MSTestAdapterSettingsTests : TestContainer
     public void ResolveEnvironmentVariableShouldResolvePathWhenPassedAbsolutePath()
     {
         string path = @"C:\unitTesting\..\MsTest\Adapter";
-        string baseDirectory = null;
+        string? baseDirectory = null;
         string expectedResult = @"C:\MsTest\Adapter";
 
         var adapterSettings = new TestableMSTestAdapterSettings
         {
-            DoesDirectoryExistSetter = (str) => true,
+            DoesDirectoryExistSetter = _ => true,
         };
 
-        string result = adapterSettings.ResolveEnvironmentVariableAndReturnFullPathIfExist(path, baseDirectory);
+        string? result = adapterSettings.ResolveEnvironmentVariableAndReturnFullPathIfExist(path, baseDirectory);
 
-        Verify(result is not null);
-        Verify(string.Equals(result, expectedResult, StringComparison.OrdinalIgnoreCase));
+        result.Should().NotBeNull();
+        result.Should().BeEquivalentTo(expectedResult, options => options.IgnoringCase());
     }
 
     public void ResolveEnvironmentVariableShouldResolvePathWithAnEnvironmentVariable()
     {
         string path = @"%temp%\unitTesting\MsTest\Adapter";
-        string baseDirectory = null;
+        string? baseDirectory = null;
         string expectedResult = @"C:\foo\unitTesting\MsTest\Adapter";
 
         var adapterSettings = new TestableMSTestAdapterSettings
         {
-            ExpandEnvironmentVariablesSetter = (str) => str.Replace("%temp%", "C:\\foo"),
-            DoesDirectoryExistSetter = (str) => true,
+            ExpandEnvironmentVariablesSetter = str => str.Replace("%temp%", "C:\\foo"),
+            DoesDirectoryExistSetter = _ => true,
         };
 
-        string result = adapterSettings.ResolveEnvironmentVariableAndReturnFullPathIfExist(path, baseDirectory);
+        string? result = adapterSettings.ResolveEnvironmentVariableAndReturnFullPathIfExist(path, baseDirectory);
 
-        Verify(result is not null);
-        Verify(string.Equals(result, expectedResult, StringComparison.OrdinalIgnoreCase));
+        result.Should().NotBeNull();
+        result.Should().BeEquivalentTo(expectedResult, options => options.IgnoringCase());
     }
 
     public void ResolveEnvironmentVariableShouldResolvePathWhenPassedRelativePathWithoutDot()
@@ -70,13 +73,13 @@ public class MSTestAdapterSettingsTests : TestContainer
 
         var adapterSettings = new TestableMSTestAdapterSettings
         {
-            DoesDirectoryExistSetter = (str) => true,
+            DoesDirectoryExistSetter = _ => true,
         };
 
-        string result = adapterSettings.ResolveEnvironmentVariableAndReturnFullPathIfExist(path, baseDirectory);
+        string? result = adapterSettings.ResolveEnvironmentVariableAndReturnFullPathIfExist(path, baseDirectory);
 
-        Verify(result is not null);
-        Verify(string.Equals(result, expectedResult, StringComparison.OrdinalIgnoreCase));
+        result.Should().NotBeNull();
+        result.Should().BeEquivalentTo(expectedResult, options => options.IgnoringCase());
     }
 
     public void ResolveEnvironmentVariableShouldResolvePathWhenPassedRelativePathWithDot()
@@ -87,13 +90,13 @@ public class MSTestAdapterSettingsTests : TestContainer
 
         var adapterSettings = new TestableMSTestAdapterSettings
         {
-            DoesDirectoryExistSetter = (str) => true,
+            DoesDirectoryExistSetter = _ => true,
         };
 
-        string result = adapterSettings.ResolveEnvironmentVariableAndReturnFullPathIfExist(path, baseDirectory);
+        string? result = adapterSettings.ResolveEnvironmentVariableAndReturnFullPathIfExist(path, baseDirectory);
 
-        Verify(result is not null);
-        Verify(string.Equals(result, expectedResult, StringComparison.OrdinalIgnoreCase));
+        result.Should().NotBeNull();
+        result.Should().BeEquivalentTo(expectedResult, options => options.IgnoringCase());
     }
 
     public void ResolveEnvironmentVariableShouldResolvePathWhenPassedRelativePath()
@@ -110,13 +113,13 @@ public class MSTestAdapterSettingsTests : TestContainer
 
         var adapterSettings = new TestableMSTestAdapterSettings
         {
-            DoesDirectoryExistSetter = (str) => true,
+            DoesDirectoryExistSetter = _ => true,
         };
 
-        string result = adapterSettings.ResolveEnvironmentVariableAndReturnFullPathIfExist(path, baseDirectory);
+        string? result = adapterSettings.ResolveEnvironmentVariableAndReturnFullPathIfExist(path, baseDirectory);
 
-        Verify(result is not null);
-        Verify(string.Equals(result, expectedResult, StringComparison.OrdinalIgnoreCase));
+        result.Should().NotBeNull();
+        result.Should().BeEquivalentTo(expectedResult, options => options.IgnoringCase());
     }
 
     public void ResolveEnvironmentVariableShouldResolvePathWhenPassedNetworkPath()
@@ -128,13 +131,13 @@ public class MSTestAdapterSettingsTests : TestContainer
 
         var adapterSettings = new TestableMSTestAdapterSettings
         {
-            DoesDirectoryExistSetter = (str) => true,
+            DoesDirectoryExistSetter = _ => true,
         };
 
-        string result = adapterSettings.ResolveEnvironmentVariableAndReturnFullPathIfExist(path, baseDirectory);
+        string? result = adapterSettings.ResolveEnvironmentVariableAndReturnFullPathIfExist(path, baseDirectory);
 
-        Verify(result is not null);
-        Verify(string.Equals(result, expectedResult, StringComparison.OrdinalIgnoreCase));
+        result.Should().NotBeNull();
+        result.Should().BeEquivalentTo(expectedResult, options => options.IgnoringCase());
     }
 
     public void ResolveEnvironmentVariableShouldReturnFalseForInvalidPath()
@@ -142,9 +145,9 @@ public class MSTestAdapterSettingsTests : TestContainer
         string path = @"Z:\Program Files (x86)\MsTest\Adapter";
         string baseDirectory = @"C:\unitTesting";
 
-        string result = new TestableMSTestAdapterSettings().ResolveEnvironmentVariableAndReturnFullPathIfExist(path, baseDirectory);
+        string? result = new TestableMSTestAdapterSettings().ResolveEnvironmentVariableAndReturnFullPathIfExist(path, baseDirectory);
 
-        Verify(result is null);
+        result.Should().BeNull();
     }
 
     #endregion
@@ -163,18 +166,18 @@ public class MSTestAdapterSettingsTests : TestContainer
 
         var adapterSettings = new TestableMSTestAdapterSettings(expectedResult)
         {
-            ExpandEnvironmentVariablesSetter = (str) => str.Replace("%temp%", "C:\\foo"),
-            DoesDirectoryExistSetter = (str) => true,
+            ExpandEnvironmentVariablesSetter = str => str.Replace("%temp%", "C:\\foo"),
+            DoesDirectoryExistSetter = _ => true,
         };
 
         IList<RecursiveDirectoryPath> result = adapterSettings.GetDirectoryListWithRecursiveProperty(baseDirectory);
-        Verify(result is not null);
-        Verify(result.Count == 2);
+        result.Should().NotBeNull();
+        result.Count.Should().Be(2);
 
         for (int i = 0; i < 2; i++)
         {
-            Verify(string.Equals(result[i].DirectoryPath, expectedResult[i].DirectoryPath, StringComparison.OrdinalIgnoreCase));
-            Verify(result[i].IncludeSubDirectories == expectedResult[i].IncludeSubDirectories);
+            result[i].DirectoryPath.Should().BeEquivalentTo(expectedResult[i].DirectoryPath, options => options.IgnoringCase());
+            result[i].IncludeSubDirectories.Should().Be(expectedResult[i].IncludeSubDirectories);
         }
     }
 
@@ -185,19 +188,21 @@ public class MSTestAdapterSettingsTests : TestContainer
     public void ToSettingsShouldNotThrowExceptionWhenRunSettingsXmlUnderTagMSTestV2IsWrong()
     {
         string runSettingsXml =
-              @"<MSTestV2>
-                    <IgnoreTestImpact>true</IgnoreTestImpact>
-                    <AssemblyResolutionBug>
-                        <Directory  path=""C:\\MsTest\\Adapter"" includeSubDirectories =""true"" />
-                        <Directory  path=""%temp%\\unitTesting\\MsTest\\Adapter"" includeSubDirectories = ""false"" />
-                        <Directory path=""*MsTest\Adapter"" />
-                    </AssemblyResolutionBug>
-                    <InProcMode>true</InProcMode>
-                    <CleanUpCommunicationChannels>false</CleanUpCommunicationChannels>
-                  </MSTestV2>";
+            """
+            <MSTestV2>
+              <IgnoreTestImpact>true</IgnoreTestImpact>
+              <AssemblyResolutionBug>
+                <Directory  path="C:\\MsTest\\Adapter" includeSubDirectories ="true" />
+                <Directory  path="%temp%\\unitTesting\\MsTest\\Adapter" includeSubDirectories = "false" />
+                <Directory path="*MsTest\Adapter" />
+              </AssemblyResolutionBug>
+              <InProcMode>true</InProcMode>
+              <CleanUpCommunicationChannels>false</CleanUpCommunicationChannels>
+            </MSTestV2>
+            """;
 
         StringReader stringReader = new(runSettingsXml);
-        XmlReader reader = XmlReader.Create(stringReader, XmlRunSettingsUtilities.ReaderSettings);
+        var reader = XmlReader.Create(stringReader, XmlRunSettingsUtilities.ReaderSettings);
         reader.Read();
 
         MSTestAdapterSettings.ToSettings(reader);
@@ -206,22 +211,23 @@ public class MSTestAdapterSettingsTests : TestContainer
     public void ToSettingsShouldThrowExceptionWhenRunSettingsXmlIsWrong()
     {
         string runSettingsXml =
-              @"<MSTestV2>
-                    <AssemblyResolution>
-                        <DirectoryBug  path=""C:\\MsTest\\Adapter"" includeSubDirectories =""true"" />
-                        <Directory  path=""%temp%\\unitTesting\\MsTest\\Adapter"" includeSubDirectories = ""false"" />
-                        <Directory path=""*MsTest\Adapter"" />
-                    </AssemblyResolution>
-                  </MSTestV2>";
+            """
+            <MSTestV2>
+              <AssemblyResolution>
+                <DirectoryBug  path="C:\\MsTest\\Adapter" includeSubDirectories ="true" />
+                <Directory  path="%temp%\\unitTesting\\MsTest\\Adapter" includeSubDirectories = "false" />
+                <Directory path="*MsTest\Adapter" />
+              </AssemblyResolution>
+            </MSTestV2>
+            """;
 
         StringReader stringReader = new(runSettingsXml);
-        XmlReader reader = XmlReader.Create(stringReader, XmlRunSettingsUtilities.ReaderSettings);
+        var reader = XmlReader.Create(stringReader, XmlRunSettingsUtilities.ReaderSettings);
         reader.Read();
 
         void ShouldThrowException() => MSTestAdapterSettings.ToSettings(reader);
 
-        var ex = VerifyThrows(ShouldThrowException);
-        Verify(ex is SettingsException);
+        new Action(ShouldThrowException).Should().Throw<SettingsException>();
     }
 
     #endregion
@@ -231,26 +237,30 @@ public class MSTestAdapterSettingsTests : TestContainer
     public void DeploymentEnabledIsByDefaultTrueWhenNotSpecified()
     {
         string runSettingsXml =
-            @"<MSTestV2>
-                  </MSTestV2>";
+            """
+            <MSTestV2>
+            </MSTestV2>
+            """;
         StringReader stringReader = new(runSettingsXml);
-        XmlReader reader = XmlReader.Create(stringReader, XmlRunSettingsUtilities.ReaderSettings);
+        var reader = XmlReader.Create(stringReader, XmlRunSettingsUtilities.ReaderSettings);
         reader.Read();
-        MSTestAdapterSettings adapterSettings = MSTestAdapterSettings.ToSettings(reader);
-        Verify(adapterSettings.DeploymentEnabled);
+        var adapterSettings = MSTestAdapterSettings.ToSettings(reader);
+        adapterSettings.DeploymentEnabled.Should().BeTrue();
     }
 
     public void DeploymentEnabledShouldBeConsumedFromRunSettingsWhenSpecified()
     {
         string runSettingsXml =
-            @"<MSTestV2>
-                        <DeploymentEnabled>False</DeploymentEnabled>
-                  </MSTestV2>";
+            """
+            <MSTestV2>
+              <DeploymentEnabled>False</DeploymentEnabled>
+            </MSTestV2>
+            """;
         StringReader stringReader = new(runSettingsXml);
-        XmlReader reader = XmlReader.Create(stringReader, XmlRunSettingsUtilities.ReaderSettings);
+        var reader = XmlReader.Create(stringReader, XmlRunSettingsUtilities.ReaderSettings);
         reader.Read();
-        MSTestAdapterSettings adapterSettings = MSTestAdapterSettings.ToSettings(reader);
-        Verify(!adapterSettings.DeploymentEnabled);
+        var adapterSettings = MSTestAdapterSettings.ToSettings(reader);
+        adapterSettings.DeploymentEnabled.Should().BeFalse();
     }
 
     #endregion
@@ -260,66 +270,122 @@ public class MSTestAdapterSettingsTests : TestContainer
     public void DeployTestSourceDependenciesIsEnabledByDefault()
     {
         string runSettingsXml =
-            @"<MSTestV2>
-                  </MSTestV2>";
+            """
+            <MSTestV2>
+            </MSTestV2>
+            """;
         StringReader stringReader = new(runSettingsXml);
-        XmlReader reader = XmlReader.Create(stringReader, XmlRunSettingsUtilities.ReaderSettings);
+        var reader = XmlReader.Create(stringReader, XmlRunSettingsUtilities.ReaderSettings);
         reader.Read();
-        MSTestAdapterSettings adapterSettings = MSTestAdapterSettings.ToSettings(reader);
-        Verify(adapterSettings.DeployTestSourceDependencies);
+        var adapterSettings = MSTestAdapterSettings.ToSettings(reader);
+        adapterSettings.DeployTestSourceDependencies.Should().BeTrue();
     }
 
     public void DeployTestSourceDependenciesWhenFalse()
     {
         string runSettingsXml =
-            @"<MSTestV2>
-                     <DeployTestSourceDependencies>False</DeployTestSourceDependencies>
-                  </MSTestV2>";
+            """
+            <MSTestV2>
+              <DeployTestSourceDependencies>False</DeployTestSourceDependencies>
+            </MSTestV2>
+            """;
         StringReader stringReader = new(runSettingsXml);
-        XmlReader reader = XmlReader.Create(stringReader, XmlRunSettingsUtilities.ReaderSettings);
+        var reader = XmlReader.Create(stringReader, XmlRunSettingsUtilities.ReaderSettings);
         reader.Read();
-        MSTestAdapterSettings adapterSettings = MSTestAdapterSettings.ToSettings(reader);
-        Verify(!adapterSettings.DeployTestSourceDependencies);
+        var adapterSettings = MSTestAdapterSettings.ToSettings(reader);
+        adapterSettings.DeployTestSourceDependencies.Should().BeFalse();
     }
 
     public void DeployTestSourceDependenciesWhenTrue()
     {
         string runSettingsXml =
-            @"<MSTestV2>
-                     <DeployTestSourceDependencies>True</DeployTestSourceDependencies>
-                  </MSTestV2>";
+            """
+            <MSTestV2>
+              <DeployTestSourceDependencies>True</DeployTestSourceDependencies>
+            </MSTestV2>
+            """;
         StringReader stringReader = new(runSettingsXml);
-        XmlReader reader = XmlReader.Create(stringReader, XmlRunSettingsUtilities.ReaderSettings);
+        var reader = XmlReader.Create(stringReader, XmlRunSettingsUtilities.ReaderSettings);
         reader.Read();
-        MSTestAdapterSettings adapterSettings = MSTestAdapterSettings.ToSettings(reader);
-        Verify(adapterSettings.DeployTestSourceDependencies);
+        var adapterSettings = MSTestAdapterSettings.ToSettings(reader);
+        adapterSettings.DeployTestSourceDependencies.Should().BeTrue();
+    }
+
+    #endregion
+
+    #region ConfigJson
+    public void ToSettings_ShouldInitializeDeploymentAndAssemblyResolutionSettingsCorrectly()
+    {
+        // Arrange
+        var configDictionary = new Dictionary<string, string>
+        {
+            { "mstest:deployment:enabled", "true" },
+            { "mstest:deployment:deployTestSourceDependencies", "true" },
+            { "mstest:deployment:deleteDeploymentDirectoryAfterTestRunIsComplete", "false" },
+            { "mstest:assemblyResolution:0:path", "C:\\project\\dependencies" },
+            { "mstest:assemblyResolution:0:includeSubDirectories", "true" },
+            { "mstest:assemblyResolution:1:path", "C:\\project\\libs" },
+            { "mstest:assemblyResolution:1:includeSubDirectories", "false" },
+            { "mstest:assemblyResolution:2:path", "C:\\project\\plugins" },
+        };
+
+        var mockConfig = new Mock<IConfiguration>();
+        mockConfig.Setup(config => config[It.IsAny<string>()])
+                  .Returns((string key) => configDictionary.TryGetValue(key, out string? value) ? value : null);
+
+        // Act
+        var settings = MSTestAdapterSettings.ToSettings(mockConfig.Object);
+
+        // Assert
+        settings.DeploymentEnabled.Should().BeTrue();
+        settings.DeployTestSourceDependencies.Should().BeTrue();
+        settings.DeleteDeploymentDirectoryAfterTestRunIsComplete.Should().BeFalse();
+    }
+
+    public void IsAppDomainCreationDisabled_ShouldPreferJsonConfigurationOverSettingsXml()
+    {
+        // Arrange
+        string settingsXml =
+            """
+        <RunSettings>
+            <RunConfiguration>
+                <DisableAppDomain>false</DisableAppDomain>
+            </RunConfiguration>
+        </RunSettings>
+        """;
+
+        var configDictionary = new Dictionary<string, string>
+        {
+            { "mstest:execution:disableAppDomain", "true" },
+        };
+        var mockConfig = new Mock<IConfiguration>();
+        mockConfig.Setup(config => config[It.IsAny<string>()])
+                  .Returns((string key) => configDictionary.TryGetValue(key, out string? value) ? value : null);
+
+        // Act
+        MSTestAdapterSettings.Configuration = mockConfig.Object;
+        bool result = MSTestAdapterSettings.IsAppDomainCreationDisabled(settingsXml);
+
+        // Assert
+        result.Should().BeTrue();
     }
 
     #endregion
 }
 
-public class TestableMSTestAdapterSettings : MSTestAdapterSettings
+internal class TestableMSTestAdapterSettings : MSTestAdapterSettings
 {
     public TestableMSTestAdapterSettings()
     {
     }
 
-    public TestableMSTestAdapterSettings(List<RecursiveDirectoryPath> expectedResult)
-    {
-        SearchDirectories.AddRange(expectedResult);
-    }
+    public TestableMSTestAdapterSettings(List<RecursiveDirectoryPath> expectedResult) => SearchDirectories.AddRange(expectedResult);
 
-    public Func<string, bool> DoesDirectoryExistSetter { get; set; }
+    public Func<string, bool>? DoesDirectoryExistSetter { get; set; }
 
-    public Func<string, string> ExpandEnvironmentVariablesSetter { get; set; }
+    public Func<string, string>? ExpandEnvironmentVariablesSetter { get; set; }
 
-    protected override bool DoesDirectoryExist(string path)
-    {
-        return DoesDirectoryExistSetter == null ? base.DoesDirectoryExist(path) : DoesDirectoryExistSetter(path);
-    }
+    protected override bool DoesDirectoryExist(string path) => DoesDirectoryExistSetter?.Invoke(path) ?? base.DoesDirectoryExist(path);
 
-    protected override string ExpandEnvironmentVariables(string path)
-    {
-        return ExpandEnvironmentVariablesSetter == null ? base.ExpandEnvironmentVariables(path) : ExpandEnvironmentVariablesSetter(path);
-    }
+    protected override string ExpandEnvironmentVariables(string path) => ExpandEnvironmentVariablesSetter == null ? base.ExpandEnvironmentVariables(path) : ExpandEnvironmentVariablesSetter(path);
 }

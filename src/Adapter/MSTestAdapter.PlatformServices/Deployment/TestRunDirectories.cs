@@ -1,4 +1,4 @@
-// Copyright (c) Microsoft Corporation. All rights reserved.
+﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 #if !WINDOWS_UWP
@@ -10,8 +10,10 @@ namespace Microsoft.VisualStudio.TestPlatform.MSTestAdapter.PlatformServices.Dep
 /// <summary>
 /// The test run directories.
 /// </summary>
+#if NETFRAMEWORK
 [Serializable]
-public class TestRunDirectories
+#endif
+internal sealed class TestRunDirectories
 {
     /// <summary>
     /// The default deployment root directory. We do not want to localize it.
@@ -28,35 +30,53 @@ public class TestRunDirectories
     /// </summary>
     internal const string DeploymentOutDirectorySuffix = "Out";
 
-    public TestRunDirectories(string rootDirectory)
+    /// <summary>
+    /// Initializes a new instance of the <see cref="TestRunDirectories"/> class.
+    /// </summary>
+    /// <param name="rootDirectory">The root directory path.</param>
+    /// <param name="firstTestSource">
+    /// The path to the test assembly of the first test case. In most cases, all
+    /// test cases belong to the same assembly, but not guaranteed. We are using the path from
+    /// the first test case as a "best effort" implementation. DeploymentItem isn't correctly designed and should be deprecated in future.
+    /// </param>
+    /// <param name="isAppDomainCreationDisabled">Whether or not app domain is disabled.</param>
+    public TestRunDirectories(string rootDirectory, string? firstTestSource, bool isAppDomainCreationDisabled)
     {
         DebugEx.Assert(!StringEx.IsNullOrEmpty(rootDirectory), "rootDirectory");
 
         RootDeploymentDirectory = rootDirectory;
+        InDirectory = Path.Combine(RootDeploymentDirectory, DeploymentInDirectorySuffix);
+
+        string? testSourceDirectory = isAppDomainCreationDisabled && !StringEx.IsNullOrEmpty(firstTestSource)
+            ? Path.GetDirectoryName(firstTestSource)
+            : null;
+
+        OutDirectory = StringEx.IsNullOrEmpty(testSourceDirectory)
+            ? Path.Combine(RootDeploymentDirectory, DeploymentOutDirectorySuffix)
+            : testSourceDirectory;
+
+        InMachineNameDirectory = Path.Combine(InDirectory, Environment.MachineName);
     }
 
     /// <summary>
-    /// Gets or sets the root deployment directory.
+    /// Gets the root deployment directory.
     /// </summary>
-    public string RootDeploymentDirectory { get; set; }
+    public string RootDeploymentDirectory { get; }
 
     /// <summary>
     /// Gets the In directory.
     /// </summary>
-    public string InDirectory
-        => Path.Combine(RootDeploymentDirectory, DeploymentInDirectorySuffix);
+    public string InDirectory { get; private set; }
 
     /// <summary>
     /// Gets the Out directory.
     /// </summary>
-    public string OutDirectory
-        => Path.Combine(RootDeploymentDirectory, DeploymentOutDirectorySuffix);
+    public string OutDirectory { get; private set; }
 
     /// <summary>
     /// Gets In\MachineName directory.
     /// </summary>
-    public string InMachineNameDirectory
-        => Path.Combine(Path.Combine(RootDeploymentDirectory, DeploymentInDirectorySuffix), Environment.MachineName);
+    public string InMachineNameDirectory { get; private set; }
 }
 
 #endif

@@ -1,6 +1,8 @@
-// Copyright (c) Microsoft Corporation. All rights reserved.
+﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Microsoft.VisualStudio.TestPlatform.MSTestAdapter.PlatformServices;
+using Microsoft.VisualStudio.TestPlatform.MSTestAdapter.PlatformServices.Interface;
 using Microsoft.VisualStudio.TestPlatform.ObjectModel;
 using Microsoft.VisualStudio.TestPlatform.ObjectModel.Adapter;
 using Microsoft.VisualStudio.TestPlatform.ObjectModel.Logging;
@@ -10,13 +12,36 @@ namespace Microsoft.VisualStudio.TestPlatform.MSTest.TestAdapter;
 /// <summary>
 /// Contains the discovery logic for this adapter.
 /// </summary>
-[DefaultExecutorUri(Constants.ExecutorUriString)]
+[DefaultExecutorUri(MSTestAdapter.PlatformServices.EngineConstants.ExecutorUriString)]
 [FileExtension(".xap")]
 [FileExtension(".appx")]
 [FileExtension(".dll")]
 [FileExtension(".exe")]
-public class MSTestDiscoverer : ITestDiscoverer
+internal sealed class MSTestDiscoverer : ITestDiscoverer
 {
+    private readonly ITestSourceHandler _testSourceHandler;
+#if !WINDOWS_UWP && !WIN_UI
+    private readonly Func<string, IDictionary<string, object>, Task>? _telemetrySender;
+#endif
+
+    // The parameterless constructor is required by VSTest, which instantiates the
+    // discoverer via reflection. The internal constructor exists for tests and for the
+    // MTP bridge (MSTestBridgedTestFramework) which injects a telemetry sender.
+    public MSTestDiscoverer()
+        : this(new TestSourceHandler())
+    {
+    }
+
+    internal MSTestDiscoverer(ITestSourceHandler testSourceHandler, Func<string, IDictionary<string, object>, Task>? telemetrySender = null)
+    {
+        _testSourceHandler = testSourceHandler;
+#if !WINDOWS_UWP && !WIN_UI
+        _telemetrySender = telemetrySender;
+#else
+        _ = telemetrySender;
+#endif
+    }
+
     /// <summary>
     /// Discovers the tests available from the provided source. Not supported for .xap source.
     /// </summary>
@@ -25,16 +50,55 @@ public class MSTestDiscoverer : ITestDiscoverer
     /// <param name="logger">Logger used to log messages.</param>
     /// <param name="discoverySink">Used to send testcases and discovery related events back to Discoverer manager.</param>
     [System.Security.SecurityCritical]
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1062:Validate arguments of public methods", MessageId = "0", Justification = "Discovery context can be null.")]
+    [SuppressMessage("Microsoft.Design", "CA1062:Validate arguments of public methods", MessageId = "0", Justification = "Discovery context can be null.")]
     public void DiscoverTests(IEnumerable<string> sources, IDiscoveryContext discoveryContext, IMessageLogger logger, ITestCaseDiscoverySink discoverySink)
-    {
-        ValidateArg.NotNull(sources, "sources");
-        ValidateArg.NotNull(logger, "logger");
-        ValidateArg.NotNull(discoverySink, "discoverySink");
+        // VSTest's ITestDiscoverer is a synchronous interface. The telemetry sender is null in
+        // this code path (only the MTP bridge supplies one), so the awaited send below completes
+        // synchronously and GetAwaiter().GetResult() does not actually block on I/O.
+        => DiscoverTestsAsync(sources, discoveryContext, logger, discoverySink, configuration: null, isMTP: false).GetAwaiter().GetResult();
 
-        if (MSTestDiscovererHelpers.InitializeDiscovery(sources, discoveryContext, logger))
+    internal async Task DiscoverTestsAsync(IEnumerable<string> sources, IDiscoveryContext discoveryContext, IMessageLogger logger, ITestCaseDiscoverySink discoverySink, IConfiguration? configuration, bool isMTP)
+    {
+        if (sources is null)
         {
-            new UnitTestDiscoverer().DiscoverTests(sources, logger, discoverySink, discoveryContext);
+            throw new ArgumentNullException(nameof(sources));
+        }
+
+        if (logger is null)
+        {
+            throw new ArgumentNullException(nameof(logger));
+        }
+
+        if (discoverySink is null)
+        {
+            throw new ArgumentNullException(nameof(discoverySink));
+        }
+
+        // Initialize telemetry collection if not already set (e.g. first call in the session).
+#if !WINDOWS_UWP && !WIN_UI
+        if (!MSTestTelemetryDataCollector.IsTelemetryOptedOut())
+        {
+            _ = MSTestTelemetryDataCollector.EnsureInitialized();
+        }
+#endif
+
+        try
+        {
+            if (MSTestDiscovererHelpers.InitializeDiscovery(sources, discoveryContext, logger, configuration, _testSourceHandler))
+            {
+                new UnitTestDiscoverer(_testSourceHandler).DiscoverTests(sources, logger, discoverySink, discoveryContext, isMTP);
+            }
+        }
+        finally
+        {
+#if !WINDOWS_UWP && !WIN_UI
+            // Send the discovery telemetry event ('mstest/discovery'). This always runs at the
+            // end of discovery — for discover-only sessions it is the only event; for sessions
+            // where a run follows, MSTestExecutor will send a separate 'mstest/sessionexit' event
+            // carrying assertion usage. Keeping the two events distinct avoids settings/attribute
+            // duplication and lets each event be self-contained.
+            await MSTestTelemetryDataCollector.SendDiscoveryTelemetryAndResetAsync(_telemetrySender).ConfigureAwait(false);
+#endif
         }
     }
 }

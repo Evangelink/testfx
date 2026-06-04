@@ -1,4 +1,4 @@
-// Copyright (c) Microsoft Corporation. All rights reserved.
+﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 #if NETFRAMEWORK
@@ -49,7 +49,7 @@ internal class TestDataConnectionFactory
 
         // Most, but not all, connections are actually database based,
         // here we look for special cases
-        if (SpecializedProviders.TryGetValue(invariantProviderName, out var factory))
+        if (SpecializedProviders.TryGetValue(invariantProviderName, out TestDataConnectionFactory? factory))
         {
             DebugEx.Assert(factory != null, "factory");
             return factory.Create(invariantProviderName, connectionString, dataFolders);
@@ -64,20 +64,14 @@ internal class TestDataConnectionFactory
 
     #region TestDataConnectionFactories
 
-    private class XmlTestDataConnectionFactory : TestDataConnectionFactory
+    private sealed class XmlTestDataConnectionFactory : TestDataConnectionFactory
     {
-        public override TestDataConnection Create(string invariantProviderName, string connectionString, List<string> dataFolders)
-        {
-            return new XmlDataConnection(connectionString, dataFolders);
-        }
+        public override TestDataConnection Create(string invariantProviderName, string connectionString, List<string> dataFolders) => new XmlDataConnection(connectionString, dataFolders);
     }
 
-    private class CsvTestDataConnectionFactory : TestDataConnectionFactory
+    private sealed class CsvTestDataConnectionFactory : TestDataConnectionFactory
     {
-        public override TestDataConnection Create(string invariantProviderName, string connectionString, List<string> dataFolders)
-        {
-            return new CsvDataConnection(connectionString, dataFolders);
-        }
+        public override TestDataConnection Create(string invariantProviderName, string connectionString, List<string> dataFolders) => new CsvDataConnection(connectionString, dataFolders);
     }
 
     #endregion TestDataConnectionFactories

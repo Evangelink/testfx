@@ -1,109 +1,167 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-#if NETCOREAPP
-using System.Diagnostics.CodeAnalysis;
-#endif
-
-using System.Reflection;
-using System.Runtime.InteropServices;
-
 using Microsoft.Testing.Platform.Helpers;
 
 namespace Microsoft.Testing.Platform.Services;
 
-internal sealed class CurrentTestApplicationModuleInfo(IEnvironment environment, IProcessHandler process) : ITestApplicationModuleInfo
+internal sealed class CurrentTestApplicationModuleInfo : ITestApplicationModuleInfo
 {
-    private readonly IEnvironment _environment = environment;
-    private readonly IProcessHandler _process = process;
+    private readonly IEnvironment _environment;
+    private readonly IProcessHandler _process;
+    private readonly string[]? _commandLineArguments;
     private static readonly string[] MuxerExec = ["exec"];
+
+    public CurrentTestApplicationModuleInfo(IEnvironment environment, IProcessHandler process)
+        : this(environment, process, commandLineArguments: null)
+    {
+    }
+
+    public CurrentTestApplicationModuleInfo(IEnvironment environment, IProcessHandler process, string[]? commandLineArguments)
+    {
+        _environment = environment;
+        _process = process;
+
+        // Take a snapshot so later mutations of the caller's array don't affect
+        // GetCurrentExecutableInfo (and ExecutableInfo.Arguments exposes IEnumerable<string>).
+        _commandLineArguments = commandLineArguments is null ? null : (string[])commandLineArguments.Clone();
+    }
 
     public bool IsCurrentTestApplicationHostDotnetMuxer
     {
         get
         {
-            string? processPath = GetProcessPath(_environment, _process, false);
+            string? processPath = GetProcessPath(_environment, _process);
             return processPath is not null
                 && Path.GetFileNameWithoutExtension(processPath) == "dotnet";
         }
     }
 
-    public bool IsCurrentTestApplicationModuleExecutable
+    public bool IsCurrentTestApplicationHostMonoMuxer
     {
         get
         {
-            string? processPath = GetProcessPath(_environment, _process, true);
-            return processPath != ".dll";
+            string? processPath = GetProcessPath(_environment, _process);
+            return processPath is not null
+                && Path.GetFileNameWithoutExtension(processPath) is { } processName
+                && processName is "mono" or "mono-sgen";
         }
     }
 
     public bool IsAppHostOrSingleFileOrNativeAot
-        => IsCurrentTestApplicationModuleExecutable && !IsCurrentTestApplicationHostDotnetMuxer;
+        => !IsCurrentTestApplicationHostDotnetMuxer && !IsCurrentTestApplicationHostMonoMuxer;
 
-#if NETCOREAPP
-    [UnconditionalSuppressMessage("SingleFile", "IL3000:Avoid accessing Assembly file path when publishing as a single file", Justification = "We handle the singlefile/native aot use case")]
-#endif
     public string GetCurrentTestApplicationFullPath()
     {
-#pragma warning disable IL3000
-        // This is empty in native app, or in single file app.
-        string? moduleName = Assembly.GetEntryAssembly()?.Location;
-#pragma warning restore IL3000
-
-        moduleName = RoslynString.IsNullOrEmpty(moduleName)
-            ? GetProcessPath(_environment, _process)
-            : moduleName;
+        string? moduleName = TryGetCurrentTestApplicationFullPath();
 
         ApplicationStateGuard.Ensure(moduleName is not null);
         return moduleName;
     }
 
+#if NETCOREAPP
+    [UnconditionalSuppressMessage("SingleFile", "IL3000:Avoid accessing Assembly file path when publishing as a single file", Justification = "We handle the singlefile/native aot use case")]
+#endif
+    public string? TryGetCurrentTestApplicationFullPath()
+    {
+        // This is empty in native app, or in single file app.
+        string? moduleName = Assembly.GetEntryAssembly()?.Location;
+
+        return RoslynString.IsNullOrEmpty(moduleName)
+            ? GetProcessPath(_environment, _process)
+            : moduleName;
+    }
+
+    public string? TryGetAssemblyName()
+    {
+        string? executableName = Assembly.GetEntryAssembly()?.GetName().Name;
+        return RoslynString.IsNullOrEmpty(executableName)
+            ? Path.GetFileNameWithoutExtension(GetProcessPath(_environment, _process))
+            : executableName;
+    }
+
+    public string GetCurrentTestApplicationDirectory()
+        => Path.GetDirectoryName(TryGetCurrentTestApplicationFullPath()) ?? AppContext.BaseDirectory;
+
+    public string GetDisplayName()
+        => TryGetCurrentTestApplicationFullPath() ?? TryGetAssemblyName() ?? "<unknown-assembly>";
+
     public string GetProcessPath()
         => GetProcessPath(_environment, _process, throwOnNull: true)!;
 
-    public string[] GetCommandLineArgs()
-        => _environment.GetCommandLineArgs();
-
-    public string GetCommandLineArguments()
+    [UnconditionalSuppressMessage("SingleFile", "IL3000:Avoid accessing Assembly file path when publishing as a single file", Justification = "<Pending>")]
+    private static string? GetProcessPath(IEnvironment environment, IProcessHandler process, bool throwOnNull = false)
     {
-        string executableFileName = Path.GetFileNameWithoutExtension(GetCurrentTestApplicationFullPath());
-        if (IsAppHostOrSingleFileOrNativeAot)
+#if NETCOREAPP
+        string? processPath = environment.ProcessPath;
+#else
+        using IProcess currentProcess = process.GetCurrentProcess();
+        string? processPath = currentProcess.MainModule?.FileName;
+#endif
+
+        if (processPath is null)
         {
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            {
-                executableFileName += ".exe";
-            }
+            // Fallback for environments where ProcessPath is null (e.g., browser OS)
+            string[] commandLineArgs = environment.GetCommandLineArgs();
+            processPath = commandLineArgs.Length > 0
+                ? commandLineArgs[0]
+                : Assembly.GetEntryAssembly()?.Location is { } entryAssemblyLocation && !RoslynString.IsNullOrEmpty(entryAssemblyLocation)
+                    ? entryAssemblyLocation
+                    : AppContext.BaseDirectory;
         }
 
-        return _environment.CommandLine[_environment.CommandLine.IndexOf(executableFileName, StringComparison.InvariantCultureIgnoreCase)..];
-    }
-
-    private static string? GetProcessPath(IEnvironment environment, IProcessHandler process, bool throwOnNull = false)
-#if NETCOREAPP
-    {
-        string? processPath = environment.ProcessPath;
         ApplicationStateGuard.Ensure(processPath is not null || !throwOnNull);
-
         return processPath;
     }
-#else
-        => process.GetCurrentProcess().MainModule.FileName;
-#endif
 
     public ExecutableInfo GetCurrentExecutableInfo()
     {
-        string currentTestApplicationFullPath = GetCurrentTestApplicationFullPath();
         bool isDotnetMuxer = IsCurrentTestApplicationHostDotnetMuxer;
         bool isAppHost = IsAppHostOrSingleFileOrNativeAot;
-        string processPath = GetProcessPath();
-        string[] commandLineArguments = GetCommandLineArgs();
-        string fileName = processPath;
-        IEnumerable<string> arguments = isAppHost
-            ? commandLineArguments.Skip(1)
-            : isDotnetMuxer
-                ? MuxerExec.Concat(commandLineArguments)
-                : commandLineArguments;
 
-        return new(fileName, arguments, Path.GetDirectoryName(currentTestApplicationFullPath)!);
+        // Prefer the arguments that were passed to TestApplication.CreateBuilderAsync over
+        // Environment.GetCommandLineArgs(). This way a custom Main that mutates the args
+        // (e.g. injecting defaults) sees its modifications reflected when an extension such as
+        // the Retry extension needs to relaunch the test host with the same configuration.
+        // Environment.GetCommandLineArgs() is still consulted to recover the dll path for the
+        // dotnet/mono muxer cases since that information isn't part of the args passed to Main.
+        IEnumerable<string> arguments;
+        if (_commandLineArguments is { } passedArgs)
+        {
+            if (isAppHost)
+            {
+                arguments = passedArgs;
+            }
+            else if (isDotnetMuxer)
+            {
+                string[] envArgs = _environment.GetCommandLineArgs();
+                arguments = envArgs.Length > 0
+                    ? [.. MuxerExec, envArgs[0], .. passedArgs]
+                    : [.. MuxerExec, .. passedArgs];
+            }
+            else
+            {
+                // Mono muxer: prepend the dll path (envArgs[0]) before user-supplied args.
+                string[] envArgs = _environment.GetCommandLineArgs();
+                arguments = envArgs.Length > 0
+                    ? [envArgs[0], .. passedArgs]
+                    : passedArgs;
+            }
+        }
+        else
+        {
+            string[] commandLineArguments = _environment.GetCommandLineArgs();
+            arguments = (isAppHost, isDotnetMuxer) switch
+            {
+                // When executable
+                (true, _) => commandLineArguments.Skip(1),
+                // When dotnet
+                (_, true) => MuxerExec.Concat(commandLineArguments),
+                // Otherwise
+                _ => commandLineArguments,
+            };
+        }
+
+        return new ExecutableInfo(GetProcessPath(), arguments, GetCurrentTestApplicationDirectory());
     }
 }

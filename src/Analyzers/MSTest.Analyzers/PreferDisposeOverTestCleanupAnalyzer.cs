@@ -12,6 +12,9 @@ using MSTest.Analyzers.Helpers;
 
 namespace MSTest.Analyzers;
 
+/// <summary>
+/// MSTEST0021: <inheritdoc cref="Resources.PreferDisposeOverTestCleanupTitle"/>.
+/// </summary>
 [DiagnosticAnalyzer(LanguageNames.CSharp, LanguageNames.VisualBasic)]
 public sealed class PreferDisposeOverTestCleanupAnalyzer : DiagnosticAnalyzer
 {
@@ -25,11 +28,14 @@ public sealed class PreferDisposeOverTestCleanupAnalyzer : DiagnosticAnalyzer
         null,
         Category.Design,
         DiagnosticSeverity.Info,
-        isEnabledByDefault: false);
+        isEnabledByDefault: false,
+        disableInAllMode: true);
 
+    /// <inheritdoc />
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; }
         = ImmutableArray.Create(Rule);
 
+    /// <inheritdoc />
     public override void Initialize(AnalysisContext context)
     {
         context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
@@ -37,9 +43,9 @@ public sealed class PreferDisposeOverTestCleanupAnalyzer : DiagnosticAnalyzer
 
         context.RegisterCompilationStartAction(context =>
         {
-            if (context.Compilation.TryGetOrCreateTypeByMetadataName(WellKnownTypeNames.MicrosoftVisualStudioTestToolsUnitTestingTestCleanupAttribute, out var testCleanupAttributeSymbol))
+            if (context.Compilation.TryGetOrCreateTypeByMetadataName(WellKnownTypeNames.MicrosoftVisualStudioTestToolsUnitTestingTestCleanupAttribute, out INamedTypeSymbol? testCleanupAttributeSymbol))
             {
-                var iasyncDisposableSymbol = context.Compilation.GetOrCreateTypeByMetadataName(WellKnownTypeNames.SystemIAsyncDisposable);
+                INamedTypeSymbol? iasyncDisposableSymbol = context.Compilation.GetOrCreateTypeByMetadataName(WellKnownTypeNames.SystemIAsyncDisposable);
                 context.RegisterSymbolAction(context => AnalyzeSymbol(context, testCleanupAttributeSymbol, iasyncDisposableSymbol), SymbolKind.Method);
             }
         });
@@ -48,9 +54,9 @@ public sealed class PreferDisposeOverTestCleanupAnalyzer : DiagnosticAnalyzer
     private static void AnalyzeSymbol(SymbolAnalysisContext context, INamedTypeSymbol testCleanupAttributeSymbol,
         INamedTypeSymbol? iasyncDisposableSymbol)
     {
-        IMethodSymbol methodSymbol = (IMethodSymbol)context.Symbol;
+        var methodSymbol = (IMethodSymbol)context.Symbol;
 
-        if (methodSymbol.IsTestCleanupMethod(testCleanupAttributeSymbol))
+        if (methodSymbol.HasAttribute(testCleanupAttributeSymbol))
         {
             // We want to report only if the TestCleanup method returns void or if IAsyncDisposable is available.
             if (iasyncDisposableSymbol is not null

@@ -1,0 +1,180 @@
+﻿// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT license. See LICENSE file in the project root for full license information.
+
+using Microsoft.Testing.Platform.Acceptance.IntegrationTests;
+using Microsoft.Testing.Platform.Acceptance.IntegrationTests.Helpers;
+using Microsoft.Testing.Platform.Helpers;
+
+namespace MSTest.Acceptance.IntegrationTests;
+
+[TestClass]
+public class HelpInfoTests : AcceptanceTestBase<HelpInfoTests.TestAssetFixture>
+{
+    private const string AssetName = "HelpInfo";
+
+    [TestMethod]
+    [DynamicData(nameof(TargetFrameworks.AllForDynamicData), typeof(TargetFrameworks))]
+    public async Task Help_WhenMSTestExtensionRegistered_OutputHelpContentOfRegisteredExtension(string tfm)
+    {
+        var testHost = TestHost.LocateFrom(AssetFixture.TargetAssetPath, AssetName, tfm);
+        TestHostResult testHostResult = await testHost.ExecuteAsync("--help", cancellationToken: TestContext.CancellationToken);
+
+        testHostResult.AssertExitCodeIs(ExitCode.Success);
+
+        string wildcardMatchPattern = $"""
+MSTest v{MSTestVersion} (UTC *) [* - *]
+Usage {AssetName}* [option providers] [extension option providers]
+Execute a .NET Test Application.
+Options:
+    --ansi
+        Control whether ANSI escape characters are emitted.
+        Valid values are 'auto' (default), 'on' (also accepts 'true', 'enable', '1') or 'off' (also accepts 'false', 'disable', '0').
+        'on' forces ANSI escape codes (including cursor movement) even when stdout is redirected; pair it with --no-progress if you only want colors.
+        When both --ansi and --no-ansi are provided, --ansi wins.
+    --config-file
+        Specifies a testconfig.json file.
+    --debug
+        Allows to pause execution in order to attach to the process for debug purposes.
+    --diagnostic
+        Enable the diagnostic logging. The default log level is 'Trace'.
+        The file will be written in the output directory with the name log_[yyMMddHHmmssfff].diag
+    --diagnostic-file-prefix
+        Prefix for the log file name that will replace '[log]_.'
+    --diagnostic-output-directory
+        Output directory of the diagnostic logging.
+        If not specified the file will be generated inside the default 'TestResults' directory.
+    --diagnostic-synchronous-write
+        Force the built-in file logger to write the log synchronously.
+        Useful for scenario where you don't want to lose any log (i.e. in case of crash).
+        Note that this is slowing down the test execution.
+    --diagnostic-verbosity
+        Define the level of the verbosity for the --diagnostic.
+        The available values are 'Trace', 'Debug', 'Information', 'Warning', 'Error', and 'Critical'.
+    --exit-on-process-exit
+        Exit the test process if dependent process exits. PID must be provided.
+    --filter-uid
+        Provides a list of test node UIDs to filter by.
+    --help
+        Show the command line help.
+    --ignore-exit-code
+        Do not report non successful exit value for specific exit codes
+        (e.g. '--ignore-exit-code 8;9' ignore exit code 8 and 9 and will return 0 in these case)
+    --info
+        Display .NET test application information.
+    --list-tests
+        List available tests.
+        Optionally accepts 'text' (the default human-readable output) or 'json' to print the discovered tests as a JSON document on standard output.
+    --minimum-expected-tests
+        Specifies the minimum number of tests that are expected to run.
+    --no-ansi
+        Disable outputting ANSI escape characters to screen.
+    --no-progress
+        Disable reporting progress to screen.
+    --output
+        Output verbosity when reporting tests.
+        Valid values are 'Normal', 'Detailed'. Default is 'Normal'.
+    --results-directory
+        The directory where the test results are going to be placed.
+        If the specified directory doesn't exist, it's created.
+        The default is TestResults in the directory that contains the test application.
+    --show-stderr
+        Determines when to show captured error output of a test.
+        Valid values are 'All', 'Failed', 'None'. Default is 'All' (or 'Failed' when an LLM/AI agent environment is detected).
+    --show-stdout
+        Determines when to show captured standard output of a test.
+        Valid values are 'All', 'Failed', 'None'. Default is 'All' (or 'Failed' when an LLM/AI agent environment is detected).
+    --timeout
+        A global test execution timeout.
+        Takes one argument as a time value with an explicit unit suffix. Accepted suffixes are 'ms'/'mil(s)'/'millisecond(s)', 's'/'sec(s)'/'second(s)', 'm'/'min(s)'/'minute(s)', 'h'/'hour(s)', and 'd'/'day(s)', e.g. '500ms', '5400s', '90m', '1.5h', '1d'.
+Extension options:
+    --filter
+        Filters tests using the given expression. For more information, see the Filter option details section. For more information and examples on how to use selective unit test filtering, see https://learn.microsoft.com/dotnet/core/testing/selective-unit-tests.
+    --maximum-failed-tests
+        Specifies a maximum number of test failures that, when exceeded, will abort the test run.
+    --settings
+        The path, relative or absolute, to the .runsettings file. For more information and examples on how to configure test run, see https://learn.microsoft.com/visualstudio/test/configure-unit-tests-by-using-a-dot-runsettings-file#the-runsettings-file
+    --test-parameter
+        Specify or override a key-value pair parameter. For more information and examples, see https://learn.microsoft.com/visualstudio/test/configure-unit-tests-by-using-a-dot-runsettings-file#testrunparameters
+""";
+
+        testHostResult.AssertOutputMatchesLines(wildcardMatchPattern);
+    }
+
+    [TestMethod]
+    [DynamicData(nameof(TargetFrameworks.AllForDynamicData), typeof(TargetFrameworks))]
+    public async Task Info_WhenMSTestExtensionRegistered_OutputInfoContentOfRegisteredExtension(string tfm)
+    {
+        var testHost = TestHost.LocateFrom(AssetFixture.TargetAssetPath, AssetName, tfm);
+        TestHostResult testHostResult = await testHost.ExecuteAsync("--info", cancellationToken: TestContext.CancellationToken);
+
+        testHostResult.AssertExitCodeIs(ExitCode.Success);
+
+        string output = $"""
+  MSTestExtension
+    Name: MSTest
+    Version: {MSTestVersion}
+    Description: MSTest Framework for Microsoft Testing Platform
+    Options:
+      --settings
+        Arity: 1
+        Hidden: False
+        Description: The path, relative or absolute, to the .runsettings file. For more information and examples on how to configure test run, see https://learn.microsoft.com/visualstudio/test/configure-unit-tests-by-using-a-dot-runsettings-file#the-runsettings-file
+      --filter
+        Arity: 1
+        Hidden: False
+        Description: Filters tests using the given expression. For more information, see the Filter option details section. For more information and examples on how to use selective unit test filtering, see https://learn.microsoft.com/dotnet/core/testing/selective-unit-tests.
+      --test-parameter
+        Arity: 1..N
+        Hidden: False
+        Description: Specify or override a key-value pair parameter. For more information and examples, see https://learn.microsoft.com/visualstudio/test/configure-unit-tests-by-using-a-dot-runsettings-file#testrunparameters
+      --maximum-failed-tests
+        Arity: 1
+        Hidden: False
+        Description: Specifies a maximum number of test failures that, when exceeded, will abort the test run.
+""";
+
+        testHostResult.AssertOutputContains(output);
+    }
+
+    public sealed class TestAssetFixture() : TestAssetFixtureBase()
+    {
+        public string TargetAssetPath => GetAssetPath(AssetName);
+
+        public override (string ID, string Name, string Code) GetAssetsToGenerate() => (AssetName, AssetName,
+                SourceCode
+                .PatchTargetFrameworks(TargetFrameworks.All)
+                .PatchCodeWithReplace("$MSTestVersion$", MSTestVersion));
+
+        private const string SourceCode = """
+#file HelpInfo.csproj
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <EnableMSTestRunner>true</EnableMSTestRunner>
+    <TargetFrameworks>$TargetFrameworks$</TargetFrameworks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MSTest.TestAdapter" Version="$MSTestVersion$" />
+    <PackageReference Include="MSTest.TestFramework" Version="$MSTestVersion$" />
+  </ItemGroup>
+
+</Project>
+
+#file UnitTest1.cs
+
+using System;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+[TestClass]
+public class TestClass
+{
+    [TestMethod]
+    public void Test() {}
+}
+""";
+    }
+
+    public TestContext TestContext { get; set; }
+}

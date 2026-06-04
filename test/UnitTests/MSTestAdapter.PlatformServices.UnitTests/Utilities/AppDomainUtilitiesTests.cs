@@ -1,9 +1,8 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-#if NET462
-
-using System.Xml;
+#if NETFRAMEWORK
+using AwesomeAssertions;
 
 using Microsoft.VisualStudio.TestPlatform.MSTestAdapter.PlatformServices.Utilities;
 
@@ -33,7 +32,7 @@ public class AppDomainUtilitiesTests : TestContainer
     public void SetConfigurationFileShouldSetOMRedirectionIfConfigFileIsPresent()
     {
         AppDomainSetup setup = new();
-        var configFile = @"C:\temp\foo.dll.config";
+        string configFile = @"C:\temp\foo.dll.config";
 
         // Setup mocks.
         _testableXmlUtilities.ConfigXml = @"<?xml version=""1.0"" encoding=""utf-8"" ?>
@@ -43,15 +42,24 @@ public class AppDomainUtilitiesTests : TestContainer
         AppDomainUtilities.SetConfigurationFile(setup, configFile);
 
         // Assert Config file being set.
-        Verify(configFile == setup.ConfigurationFile);
+        setup.ConfigurationFile.Should().Be(configFile);
 
         // Assert Config Bytes.
-        var expectedRedir = "<dependentAssembly><assemblyIdentity name=\"Microsoft.VisualStudio.TestPlatform.ObjectModel\" publicKeyToken=\"b03f5f7f11d50a3a\" culture=\"neutral\" /><bindingRedirect oldVersion=\"11.0.0.0\" newVersion=\"15.0.0.0\" />";
+        string expectedRedir =
+            """
+            <dependentAssembly>
+            <assemblyIdentity name="Microsoft.VisualStudio.TestPlatform.ObjectModel" publicKeyToken="b03f5f7f11d50a3a" culture="neutral" />
+            <bindingRedirect oldVersion="11.0.0.0" newVersion="15.0.0.0" />
+            """;
 
-        var observedConfigBytes = setup.GetConfigurationBytes();
-        var observedXml = System.Text.Encoding.UTF8.GetString(observedConfigBytes);
+        byte[] observedConfigBytes = setup.GetConfigurationBytes();
+        string observedXml = Encoding.UTF8.GetString(observedConfigBytes);
 
-        Verify(observedXml.Replace("\r\n", string.Empty).Replace(" ", string.Empty).Contains(expectedRedir.Replace(" ", string.Empty)), "Config must have OM redirection");
+        SanitizeString(observedXml).Should().Contain(SanitizeString(expectedRedir), "Config must have OM redirection");
+
+        // Local functions
+        static string SanitizeString(string str)
+            => str.Replace("\r\n", string.Empty).Replace(" ", string.Empty);
     }
 
     public void SetConfigurationFileShouldSetToCurrentDomainsConfigFileIfSourceDoesNotHaveAConfig()
@@ -61,36 +69,36 @@ public class AppDomainUtilitiesTests : TestContainer
         AppDomainUtilities.SetConfigurationFile(setup, null);
 
         // Assert Config file being set.
-        Verify(AppDomain.CurrentDomain.SetupInformation.ConfigurationFile == setup.ConfigurationFile);
+        AppDomain.CurrentDomain.SetupInformation.ConfigurationFile.Should().Be(setup.ConfigurationFile);
 
-        Verify(setup.GetConfigurationBytes() is null);
+        setup.GetConfigurationBytes().Should().BeNull();
     }
 
     public void GetTargetFrameworkVersionFromVersionStringShouldReturnDefaultVersionIfVersionIsPortable()
     {
         var expected = new Version();
 
-        var version = AppDomainUtilities.GetTargetFrameworkVersionFromVersionString(".NETPortable,Version=v4.5,Profile=Profile259");
+        Version version = AppDomainUtilities.GetTargetFrameworkVersionFromVersionString(".NETPortable,Version=v4.5,Profile=Profile259");
 
-        Verify(expected.Major == version.Major);
-        Verify(expected.Minor == version.Minor);
+        version.Major.Should().Be(expected.Major);
+        version.Minor.Should().Be(expected.Minor);
     }
 
     public void GetTargetFrameworkVersionFromVersionStringShouldReturnCorrectVersion()
     {
         var expected = new Version("4.5");
 
-        var version = AppDomainUtilities.GetTargetFrameworkVersionFromVersionString(".NETFramework,Version=v4.5");
+        Version version = AppDomainUtilities.GetTargetFrameworkVersionFromVersionString(".NETFramework,Version=v4.5");
 
-        Verify(expected.Major == version.Major);
-        Verify(expected.Minor == version.Minor);
+        version.Major.Should().Be(expected.Major);
+        version.Minor.Should().Be(expected.Minor);
     }
 
     #region Testable Implementations
 
     internal class TestableXmlUtilities : XmlUtilities
     {
-        internal string ConfigXml { get; set; }
+        internal string ConfigXml { get; set; } = null!;
 
         internal override XmlDocument GetXmlDocument(string configFile)
         {

@@ -1,18 +1,14 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System.Globalization;
-
-using Microsoft.Testing.Internal.Framework;
 using Microsoft.Testing.Platform.Logging;
-using Microsoft.Testing.TestInfrastructure;
 
 using Moq;
 
 namespace Microsoft.Testing.Platform.UnitTests;
 
-[TestGroup]
-public class LoggerTests : TestBase
+[TestClass]
+public sealed class LoggerTests
 {
     private static readonly Func<string, Exception?, string> Formatter =
         (state, exception) =>
@@ -22,8 +18,7 @@ public class LoggerTests : TestBase
     private readonly Exception _exception = new("TestException");
     private readonly Mock<ILogger> _mockLogger = new();
 
-    public LoggerTests(ITestExecutionContext testExecutionContext)
-        : base(testExecutionContext)
+    public LoggerTests()
     {
         _mockLogger.Setup(x => x.Log(It.IsAny<LogLevel>(), It.IsAny<string>(), It.IsAny<Exception>(), Formatter));
         _mockLogger.Setup(x => x.LogAsync(It.IsAny<LogLevel>(), It.IsAny<string>(), It.IsAny<Exception>(), Formatter));
@@ -33,21 +28,23 @@ public class LoggerTests : TestBase
     {
         _mockLogger.Setup(x => x.IsEnabled(It.IsAny<LogLevel>())).Returns<LogLevel>(currentLogLevel => currentLogLevel >= logLevel);
 
-        Logger logger = new(new[] { _mockLogger.Object }, logLevel);
+        Logger logger = new([_mockLogger.Object], logLevel);
 
         Mock<ILoggerFactory> mockLoggerFactory = new();
         mockLoggerFactory.Setup(x => x.CreateLogger(It.IsAny<string>())).Returns(logger);
         return new Logger<string>(mockLoggerFactory.Object);
     }
 
-    [ArgumentsProvider(nameof(LogTestHelpers.GetLogLevelCombinations), typeof(LogTestHelpers))]
+    [DynamicData(nameof(LogTestHelpers.GetLogLevelCombinations), typeof(LogTestHelpers))]
+    [TestMethod]
     public void Logger_CheckEnabled(LogLevel defaultLogLevel, LogLevel currentLogLevel)
     {
         Logger<string> logger = CreateLogger(defaultLogLevel);
         Assert.AreEqual(logger.IsEnabled(currentLogLevel), LogTestHelpers.IsLogEnabled(defaultLogLevel, currentLogLevel));
     }
 
-    [ArgumentsProvider(nameof(LogTestHelpers.GetLogLevelCombinations), typeof(LogTestHelpers))]
+    [DynamicData(nameof(LogTestHelpers.GetLogLevelCombinations), typeof(LogTestHelpers))]
+    [TestMethod]
     public void Logger_Log_FormattedStringIsCorrect(LogLevel defaultLogLevel, LogLevel currentLogLevel)
     {
         Logger<string> logger = CreateLogger(defaultLogLevel);
@@ -58,7 +55,8 @@ public class LoggerTests : TestBase
             LogTestHelpers.GetExpectedLogCallTimes(defaultLogLevel, currentLogLevel));
     }
 
-    [ArgumentsProvider(nameof(LogTestHelpers.GetLogLevelCombinations), typeof(LogTestHelpers))]
+    [DynamicData(nameof(LogTestHelpers.GetLogLevelCombinations), typeof(LogTestHelpers))]
+    [TestMethod]
     public async ValueTask Logger_LogAsync_FormattedStringIsCorrect(LogLevel defaultLogLevel, LogLevel currentLogLevel)
     {
         Logger<string> logger = CreateLogger(defaultLogLevel);

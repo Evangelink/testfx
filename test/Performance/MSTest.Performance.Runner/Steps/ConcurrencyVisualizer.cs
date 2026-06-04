@@ -1,11 +1,7 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System.Diagnostics;
-using System.Globalization;
 using System.IO.Compression;
-using System.Runtime.InteropServices;
-using System.Text;
 
 namespace MSTest.Performance.Runner.Steps;
 
@@ -29,11 +25,11 @@ internal class ConcurrencyVisualizer : IStep<BuildArtifact, Files>
         if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
             Console.WriteLine("Skip run, not supported in Windows");
-            return new Files(Array.Empty<string>());
+            return new Files([]);
         }
 
         string vsProgramFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Microsoft Visual Studio");
-        string? cVCollectionCmd = Directory.GetFiles(vsProgramFile, "CVCollectionCmd.exe", SearchOption.AllDirectories).SingleOrDefault()
+        string cVCollectionCmd = Directory.GetFiles(vsProgramFile, "CVCollectionCmd.exe", SearchOption.AllDirectories).SingleOrDefault()
             ?? throw new InvalidOperationException("CVCollectionCmd.exe not found, https://learn.microsoft.com/visualstudio/profiling/concurrency-visualizer-command-line-utility-cvcollectioncmd");
 
         // https://learn.microsoft.com/visualstudio/profiling/concurrency-visualizer-command-line-utility-cvcollectioncmd for options and markers
@@ -99,14 +95,11 @@ internal class ConcurrencyVisualizer : IStep<BuildArtifact, Files>
         };
 
         Console.WriteLine($"CVCollectionCmd command: '{startCollection.FileName} {startCollection.Arguments}'");
-        Process process = Process.Start(startCollection)!;
-        process.EnableRaisingEvents = true;
-        process.BeginOutputReadLine();
-        process.OutputDataReceived += (sender, args) =>
-        {
-            Console.WriteLine(args.Data);
-        };
-        await process.WaitForExitAsync();
+        using Process startProcess = Process.Start(startCollection)!;
+        startProcess.EnableRaisingEvents = true;
+        startProcess.BeginOutputReadLine();
+        startProcess.OutputDataReceived += (sender, args) => Console.WriteLine(args.Data);
+        await startProcess.WaitForExitAsync();
 
         // Wait for process exit
         profiledProcessExited.Wait();
@@ -120,20 +113,17 @@ internal class ConcurrencyVisualizer : IStep<BuildArtifact, Files>
              RedirectStandardInput = true,
          };
         Console.WriteLine($"VSDiagnostics stop command: '{stopCollection.FileName} {stopCollection.Arguments}'");
-        process = Process.Start(stopCollection)!;
-        process.EnableRaisingEvents = true;
-        process.BeginOutputReadLine();
-        process.OutputDataReceived += (sender, args) =>
-        {
-            Console.WriteLine(args.Data);
-        };
-        await process.WaitForExitAsync();
+        using Process stopProcess = Process.Start(stopCollection)!;
+        stopProcess.EnableRaisingEvents = true;
+        stopProcess.BeginOutputReadLine();
+        stopProcess.OutputDataReceived += (sender, args) => Console.WriteLine(args.Data);
+        await stopProcess.WaitForExitAsync();
 
         string sample = Path.Combine(Path.GetTempPath(), _reportFileName);
         File.Delete(sample);
         Console.WriteLine($"Compressing to '{sample}'");
         ZipFile.CreateFromDirectory(payload.TestAsset.TargetAssetPath, sample, _compressionLevel, includeBaseDirectory: true);
 
-        return new Files(new[] { sample });
+        return new Files([sample]);
     }
 }

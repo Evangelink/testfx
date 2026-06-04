@@ -12,25 +12,46 @@ using MSTest.Analyzers.Helpers;
 
 namespace MSTest.Analyzers;
 
+/// <summary>
+/// MSTEST0001: <inheritdoc cref="Resources.UseParallelizeAttributeAnalyzerTitle"/>.
+/// MSTEST0059: <inheritdoc cref="Resources.DoNotUseParallelizeAndDoNotParallelizeTogetherTitle"/>.
+/// </summary>
 [DiagnosticAnalyzer(LanguageNames.CSharp, LanguageNames.VisualBasic)]
 public sealed class UseParallelizeAttributeAnalyzer : DiagnosticAnalyzer
 {
     private static readonly LocalizableResourceString Title = new(nameof(Resources.UseParallelizeAttributeAnalyzerTitle), Resources.ResourceManager, typeof(Resources));
     private static readonly LocalizableResourceString MessageFormat = new(nameof(Resources.UseParallelizeAttributeAnalyzerMessageFormat), Resources.ResourceManager, typeof(Resources));
     private static readonly LocalizableResourceString Description = new(nameof(Resources.UseParallelizeAttributeAnalyzerDescription), Resources.ResourceManager, typeof(Resources));
-    internal static readonly DiagnosticDescriptor Rule = DiagnosticDescriptorHelper.Create(
+
+    private static readonly LocalizableResourceString BothAttributesTitle = new(nameof(Resources.DoNotUseParallelizeAndDoNotParallelizeTogetherTitle), Resources.ResourceManager, typeof(Resources));
+    private static readonly LocalizableResourceString BothAttributesMessageFormat = new(nameof(Resources.DoNotUseParallelizeAndDoNotParallelizeTogetherMessageFormat), Resources.ResourceManager, typeof(Resources));
+    private static readonly LocalizableResourceString BothAttributesDescription = new(nameof(Resources.DoNotUseParallelizeAndDoNotParallelizeTogetherDescription), Resources.ResourceManager, typeof(Resources));
+
+    /// <inheritdoc cref="Resources.UseParallelizeAttributeAnalyzerTitle" />
+    public static readonly DiagnosticDescriptor Rule = DiagnosticDescriptorHelper.Create(
         DiagnosticIds.UseParallelizedAttributeRuleId,
         Title,
         MessageFormat,
         Description,
         Category.Performance,
         DiagnosticSeverity.Info,
-        isEnabledByDefault: true,
-        isReportedAtCompilationEnd: true);
+        isEnabledByDefault: true);
 
+    /// <inheritdoc cref="Resources.DoNotUseParallelizeAndDoNotParallelizeTogetherTitle" />
+    public static readonly DiagnosticDescriptor DoNotUseBothAttributesRule = DiagnosticDescriptorHelper.Create(
+        DiagnosticIds.DoNotUseParallelizeAndDoNotParallelizeTogetherRuleId,
+        BothAttributesTitle,
+        BothAttributesMessageFormat,
+        BothAttributesDescription,
+        Category.Usage,
+        DiagnosticSeverity.Warning,
+        isEnabledByDefault: true);
+
+    /// <inheritdoc />
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; }
-        = ImmutableArray.Create(Rule);
+        = ImmutableArray.Create(Rule, DoNotUseBothAttributesRule);
 
+    /// <inheritdoc />
     public override void Initialize(AnalysisContext context)
     {
         context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
@@ -41,25 +62,52 @@ public sealed class UseParallelizeAttributeAnalyzer : DiagnosticAnalyzer
 
     private static void AnalyzeCompilation(CompilationAnalysisContext context)
     {
-        var parallelizeAttributeSymbol = context.Compilation.GetOrCreateTypeByMetadataName(WellKnownTypeNames.MicrosoftVisualStudioTestToolsUnitTestingParallelizeAttribute);
-        var doNotParallelizeAttributeSymbol = context.Compilation.GetOrCreateTypeByMetadataName(WellKnownTypeNames.MicrosoftVisualStudioTestToolsUnitTestingDoNotParallelizeAttribute);
+        INamedTypeSymbol? parallelizeAttributeSymbol = context.Compilation.GetOrCreateTypeByMetadataName(WellKnownTypeNames.MicrosoftVisualStudioTestToolsUnitTestingParallelizeAttribute);
+        INamedTypeSymbol? doNotParallelizeAttributeSymbol = context.Compilation.GetOrCreateTypeByMetadataName(WellKnownTypeNames.MicrosoftVisualStudioTestToolsUnitTestingDoNotParallelizeAttribute);
 
-        bool hasParallelizeAttribute = false;
-        bool hasDoNotParallelizeAttribute = false;
-        foreach (var attribute in context.Compilation.Assembly.GetAttributes())
+        AttributeData? parallelizeAttribute = null;
+        AttributeData? doNotParallelizeAttribute = null;
+        foreach (AttributeData attribute in context.Compilation.Assembly.GetAttributes())
         {
             if (SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, parallelizeAttributeSymbol))
             {
-                hasParallelizeAttribute = true;
+                parallelizeAttribute = attribute;
             }
 
             if (SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, doNotParallelizeAttributeSymbol))
             {
-                hasDoNotParallelizeAttribute = true;
+                doNotParallelizeAttribute = attribute;
             }
         }
 
-        if (!hasParallelizeAttribute && !hasDoNotParallelizeAttribute)
+        if (parallelizeAttribute is not null && doNotParallelizeAttribute is not null)
+        {
+            // Both attributes are present - this is an error
+            // Report on both attribute locations
+            if (parallelizeAttribute.ApplicationSyntaxReference is not null)
+            {
+                context.ReportDiagnostic(parallelizeAttribute.ApplicationSyntaxReference.CreateDiagnostic(DoNotUseBothAttributesRule, context.CancellationToken));
+            }
+
+            if (doNotParallelizeAttribute.ApplicationSyntaxReference is not null)
+            {
+                context.ReportDiagnostic(doNotParallelizeAttribute.ApplicationSyntaxReference.CreateDiagnostic(DoNotUseBothAttributesRule, context.CancellationToken));
+            }
+
+            return;
+        }
+
+        bool hasTestAdapter = context.Options.AnalyzerConfigOptionsProvider.GlobalOptions.TryGetValue("build_property.IsMSTestTestAdapterReferenced", out string? isAdapterReferenced) &&
+            bool.TryParse(isAdapterReferenced, out bool isAdapterReferencedValue) &&
+            isAdapterReferencedValue;
+
+        if (!hasTestAdapter)
+        {
+            // We shouldn't produce a diagnostic if only the test framework is referenced, but not the adapter.
+            return;
+        }
+
+        if (parallelizeAttribute is null && doNotParallelizeAttribute is null)
         {
             // We cannot provide any good location for assembly level missing attributes
             context.ReportNoLocationDiagnostic(Rule);

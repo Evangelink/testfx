@@ -1,0 +1,262 @@
+﻿// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT license. See LICENSE file in the project root for full license information.
+
+namespace Microsoft.Testing.Platform.OutputDevice.Terminal;
+
+/// <summary>
+/// Terminal that updates the progress in place when progress reporting is enabled.
+/// </summary>
+[UnsupportedOSPlatform("browser")]
+internal sealed partial class TestProgressStateAwareTerminal : IDisposable
+{
+    /// <summary>
+    /// Protects access to state shared between the logger callbacks and the rendering thread.
+    /// </summary>
+#if NET9_0_OR_GREATER
+    private readonly Lock _lock = new();
+#else
+    private readonly object _lock = new();
+#endif
+
+    private readonly ITerminal _terminal;
+    private readonly Func<bool?> _showProgress;
+
+    /// <summary>
+    /// A cancellation token to signal the rendering thread that it should exit.
+    /// </summary>
+    private CancellationTokenSource? _cts;
+    private TestProgressState?[] _progressItems = [];
+    private bool? _showProgressCached;
+    private int _progressErased;
+
+    /// <summary>
+    /// The thread that performs periodic refresh of the console output.
+    /// </summary>
+    private Thread? _refresher;
+    private long _counter;
+    private int _stopped;
+    private int _disposed;
+
+    public event EventHandler? OnProgressStartUpdate;
+
+    public event EventHandler? OnProgressStopUpdate;
+
+    /// <summary>
+    /// The <see cref="_refresher"/> thread proc.
+    /// </summary>
+    private void ThreadProc(CancellationTokenSource cancellationTokenSource)
+    {
+        try
+        {
+            // When writing to ANSI, we update the progress in place and it should look responsive so we
+            // update every half second, because we only show seconds on the screen, so it is good enough.
+            // When writing to non-ANSI, we never show progress as the output can get long and messy.
+            const int AnsiUpdateCadenceInMs = 500;
+            while (!cancellationTokenSource.Token.WaitHandle.WaitOne(AnsiUpdateCadenceInMs))
+            {
+                // Note: OnProgressStartUpdate is invoked outside the lock to avoid a deadlock where
+                // a test subscriber blocks the event handler (e.g. with WaitOne) while the lock is held,
+                // preventing other callers (e.g. WriteToTerminal) from acquiring the lock.
+                OnProgressStartUpdate?.Invoke(this, EventArgs.Empty);
+                lock (_lock)
+                {
+                    _terminal.StartUpdate();
+                    try
+                    {
+                        _terminal.RenderProgress(_progressItems);
+                    }
+                    finally
+                    {
+                        _terminal.StopUpdate();
+                        OnProgressStopUpdate?.Invoke(this, EventArgs.Empty);
+                    }
+                }
+            }
+        }
+        catch (ObjectDisposedException)
+        {
+            // When we dispose the cancellation token source too early this will throw.
+        }
+        catch (Exception)
+        {
+            // Swallow so that the unconditional EraseProgress() below still runs.
+            // There is no other thread to surface this to; the test run itself should
+            // still be allowed to complete.
+        }
+
+        try
+        {
+            _terminal.EraseProgress();
+            Interlocked.Exchange(ref _progressErased, 1);
+        }
+        catch (Exception)
+        {
+            // Best-effort cleanup; we are already in teardown.
+        }
+    }
+
+    public TestProgressStateAwareTerminal(ITerminal terminal, Func<bool?> showProgress)
+    {
+        _terminal = terminal;
+        _showProgress = showProgress;
+    }
+
+    public int AddWorker(TestProgressState testWorker)
+    {
+        if (GetShowProgress())
+        {
+            for (int i = 0; i < _progressItems.Length; i++)
+            {
+                if (_progressItems[i] == null)
+                {
+                    _progressItems[i] = testWorker;
+                    return i;
+                }
+            }
+
+            throw new InvalidOperationException("No empty slot found");
+        }
+
+        return 0;
+    }
+
+    public void StartShowingProgress(int workerCount)
+    {
+        if (!GetShowProgress())
+        {
+            return;
+        }
+
+        _progressItems = new TestProgressState[workerCount];
+        Interlocked.Exchange(ref _progressErased, 0);
+        Interlocked.Exchange(ref _stopped, 0);
+
+        var cancellationTokenSource = new CancellationTokenSource();
+        _cts = cancellationTokenSource;
+
+        _terminal.StartBusyIndicator();
+        // If we crash unexpectedly without completing this thread we don't want it to keep the process running.
+        _refresher = new Thread(() => ThreadProc(cancellationTokenSource)) { IsBackground = true };
+        _refresher.Start();
+    }
+
+    internal void StopShowingProgress()
+    {
+        if (Interlocked.CompareExchange(ref _stopped, 1, 0) != 0 || !GetShowProgress())
+        {
+            return;
+        }
+
+        CancellationTokenSource? cancellationTokenSource = _cts;
+        Thread? refresher = _refresher;
+        _cts = null;
+        _refresher = null;
+
+        cancellationTokenSource?.Cancel();
+        refresher?.Join();
+        cancellationTokenSource?.Dispose();
+
+        try
+        {
+            if (Interlocked.CompareExchange(ref _progressErased, 1, 0) == 0)
+            {
+                _terminal.EraseProgress();
+            }
+
+            _terminal.StopBusyIndicator();
+        }
+        catch (Exception ex) when (ex is ObjectDisposedException or InvalidOperationException or System.IO.IOException)
+        {
+            // Best-effort cleanup; we are already in teardown.
+        }
+    }
+
+    public void Dispose()
+    {
+        if (Interlocked.CompareExchange(ref _disposed, 1, 0) != 0)
+        {
+            return;
+        }
+
+        // Ensure that even when callers forget to call StopShowingProgress (e.g. because the process
+        // is being torn down by an unhandled exception), we still bring the refresher thread down,
+        // erase any in-flight progress, restore the busy-indicator and show the cursor again so the
+        // user's terminal is left in a sane state.
+        StopShowingProgress();
+    }
+
+    internal void WriteToTerminal(Action<ITerminal> write)
+    {
+        if (GetShowProgress())
+        {
+            lock (_lock)
+            {
+                try
+                {
+                    _terminal.StartUpdate();
+                    _terminal.EraseProgress();
+                    write(_terminal);
+                    _terminal.RenderProgress(_progressItems);
+                }
+                finally
+                {
+                    _terminal.StopUpdate();
+                }
+            }
+        }
+        else
+        {
+            lock (_lock)
+            {
+                try
+                {
+                    _terminal.StartUpdate();
+                    write(_terminal);
+                }
+                finally
+                {
+                    _terminal.StopUpdate();
+                }
+            }
+        }
+    }
+
+    internal void RemoveWorker(int slotIndex)
+    {
+        if (GetShowProgress())
+        {
+            _progressItems[slotIndex] = null;
+        }
+    }
+
+    internal void UpdateWorker(int slotIndex)
+    {
+        if (GetShowProgress())
+        {
+            // We increase the counter to say that this version of data is newer than what we had before and
+            // it should be completely re-rendered. Another approach would be to use timestamps, or to replace the
+            // instance and compare that, but that means more objects floating around.
+            _counter++;
+
+            TestProgressState? progress = _progressItems[slotIndex];
+            progress?.Version = _counter;
+        }
+    }
+
+    private bool GetShowProgress()
+    {
+        if (_showProgressCached != null)
+        {
+            return _showProgressCached.Value;
+        }
+
+        // Get the value from the func until we get the first non-null value.
+        bool? showProgress = _showProgress();
+        if (showProgress != null)
+        {
+            _showProgressCached = showProgress;
+        }
+
+        return showProgress == true;
+    }
+}

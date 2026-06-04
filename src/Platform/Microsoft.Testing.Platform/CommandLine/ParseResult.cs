@@ -1,28 +1,71 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System.Diagnostics.CodeAnalysis;
-
 namespace Microsoft.Testing.Platform.CommandLine;
 
-internal sealed class CommandLineParseResult(string? toolName, OptionRecord[] options, string[] errors, string[] originalArguments) : IEquatable<CommandLineParseResult>
+/// <summary>
+/// Represents the result of parsing a command line.
+/// </summary>
+[Experimental("TPEXP", UrlFormat = "https://aka.ms/testingplatform/diagnostics#{0}")]
+public sealed class CommandLineParseResult : IEquatable<CommandLineParseResult>
 {
+    /// <summary>
+    /// The prefix for options.
+    /// </summary>
     public const char OptionPrefix = '-';
 
-    public static CommandLineParseResult Empty => new(null, [], [], []);
+    /// <summary>
+    /// Gets an empty <see cref="CommandLineParseResult"/>.
+    /// </summary>
+    public static CommandLineParseResult Empty => new(null, [], []);
 
-    public string? ToolName { get; set; } = toolName;
+    /// <summary>
+    /// Initializes a new instance of the <see cref="CommandLineParseResult"/> class.
+    /// </summary>
+    /// <param name="toolName">The name of the tool.</param>
+    /// <param name="options">The collection of parsed options.</param>
+    /// <param name="errors">The collection of errors associated to the parsing.</param>
+    public CommandLineParseResult(string? toolName, IReadOnlyList<CommandLineParseOption> options, IReadOnlyList<string> errors)
+        : this(toolName, options, errors, [])
+    {
+    }
 
-    public OptionRecord[] Options { get; } = options;
+    internal CommandLineParseResult(string? toolName, IReadOnlyList<CommandLineParseOption> options, IReadOnlyList<string> errors, IReadOnlyList<string> arguments)
+    {
+        ToolName = toolName;
+        Options = options;
+        Errors = errors;
+        CommandLine = string.Join(" ", arguments);
+    }
 
-    public string[] Errors { get; } = errors;
+    /// <summary>
+    /// Gets the name of the tool.
+    /// </summary>
+    public string? ToolName { get; }
 
-    public string[] OriginalArguments { get; } = originalArguments;
+    /// <summary>
+    /// Gets the collection of parsed options.
+    /// </summary>
+    public IReadOnlyList<CommandLineParseOption> Options { get; }
 
-    public bool HasError => Errors.Length > 0;
+    /// <summary>
+    /// Gets the collection of errors associated to the parsing.
+    /// </summary>
+    public IReadOnlyList<string> Errors { get; }
 
+    internal string CommandLine { get; }
+
+    /// <summary>
+    /// Gets a value indicating whether the parsing has errors.
+    /// </summary>
+    public bool HasError => Errors.Count > 0;
+
+    /// <summary>
+    /// Gets a value indicating whether the parsing has a tool.
+    /// </summary>
     public bool HasTool => ToolName is not null;
 
+    /// <inheritdoc />
     public bool Equals(CommandLineParseResult? other)
     {
         if (other is null)
@@ -40,12 +83,12 @@ internal sealed class CommandLineParseResult(string? toolName, OptionRecord[] op
             return false;
         }
 
-        if (Errors.Length != other.Errors.Length)
+        if (Errors.Count != other.Errors.Count)
         {
             return false;
         }
 
-        for (int i = 0; i < Errors.Length; i++)
+        for (int i = 0; i < Errors.Count; i++)
         {
             if (Errors[i] != other.Errors[i])
             {
@@ -53,16 +96,16 @@ internal sealed class CommandLineParseResult(string? toolName, OptionRecord[] op
             }
         }
 
-        if (Options.Length != other.Options.Length)
+        if (Options.Count != other.Options.Count)
         {
             return false;
         }
 
-        OptionRecord[] thisOptions = Options;
-        OptionRecord[] otherOptions = other.Options;
-        for (int i = 0; i < thisOptions.Length; i++)
+        IReadOnlyList<CommandLineParseOption> thisOptions = Options;
+        IReadOnlyList<CommandLineParseOption> otherOptions = other.Options;
+        for (int i = 0; i < thisOptions.Count; i++)
         {
-            if (thisOptions[i].Option != otherOptions[i].Option)
+            if (thisOptions[i].Name != otherOptions[i].Name)
             {
                 return false;
             }
@@ -84,31 +127,45 @@ internal sealed class CommandLineParseResult(string? toolName, OptionRecord[] op
         return true;
     }
 
+    /// <summary>
+    /// Determines if the specified option is set.
+    /// </summary>
+    /// <param name="optionName">The name of the option.</param>
+    /// <returns>Returns <c>true</c> if the option is set; <c>false</c> otherwise.</returns>
     public bool IsOptionSet(string optionName)
-        => Options.Any(o => o.Option.Equals(optionName.Trim(OptionPrefix), StringComparison.OrdinalIgnoreCase));
+        => Options.Any(o => o.Name.Equals(optionName.Trim(OptionPrefix), StringComparison.OrdinalIgnoreCase));
 
+    /// <summary>
+    /// Gets the argument list for the specified option.
+    /// </summary>
+    /// <param name="optionName">The name of the option.</param>
+    /// <param name="arguments">The arguments associated with the option.</param>
+    /// <returns>Returns <c>true</c> if there are some arguments; <c>false</c> otherwise.</returns>
     public bool TryGetOptionArgumentList(string optionName, [NotNullWhen(true)] out string[]? arguments)
     {
-        arguments = null;
-
-        IEnumerable<OptionRecord>? result = Options.Where(x => x.Option == optionName.Trim(OptionPrefix));
-        if (result?.Any() == true)
+        optionName = optionName.Trim(OptionPrefix);
+        IEnumerable<CommandLineParseOption> result = Options.Where(x => x.Name == optionName);
+        if (result.Any())
         {
-            arguments = result.SelectMany(x => x.Arguments).ToArray();
+            arguments = [.. result.SelectMany(x => x.Arguments)];
             return true;
         }
 
+        arguments = null;
         return false;
     }
 
-    public override bool Equals(object? obj) => Equals(obj as CommandLineParseResult);
+    /// <inheritdoc />
+    public override bool Equals(object? obj)
+        => Equals(obj as CommandLineParseResult);
 
+    /// <inheritdoc />
     public override int GetHashCode()
     {
         HashCode hashCode = default;
-        foreach (OptionRecord option in Options)
+        foreach (CommandLineParseOption option in Options)
         {
-            hashCode.Add(option.Option);
+            hashCode.Add(option.Name);
             foreach (string value in option.Arguments)
             {
                 hashCode.Add(value);
@@ -121,5 +178,44 @@ internal sealed class CommandLineParseResult(string? toolName, OptionRecord[] op
         }
 
         return hashCode.ToHashCode();
+    }
+
+    /// <inheritdoc />
+    public override string ToString()
+    {
+        var builder = new StringBuilder();
+        builder.AppendLine(CultureInfo.InvariantCulture, $"ToolName: {ToolName}");
+
+        builder.AppendLine("Errors:");
+        if (Errors.Count == 0)
+        {
+            builder.AppendLine("    None");
+        }
+        else
+        {
+            foreach (string error in Errors)
+            {
+                builder.AppendLine(CultureInfo.InvariantCulture, $"    {error}");
+            }
+        }
+
+        builder.AppendLine("Options:");
+        if (Options.Count == 0)
+        {
+            builder.AppendLine("    None");
+        }
+        else
+        {
+            foreach (CommandLineParseOption option in Options)
+            {
+                builder.AppendLine(CultureInfo.InvariantCulture, $"   {option.Name}");
+                foreach (string arg in option.Arguments)
+                {
+                    builder.AppendLine(CultureInfo.InvariantCulture, $"        {arg}");
+                }
+            }
+        }
+
+        return builder.ToString();
     }
 }

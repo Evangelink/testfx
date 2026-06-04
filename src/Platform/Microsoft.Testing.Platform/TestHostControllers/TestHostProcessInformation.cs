@@ -6,32 +6,25 @@ using Microsoft.Testing.Platform.Resources;
 
 namespace Microsoft.Testing.Platform.TestHostControllers;
 
-internal class TestHostProcessInformation : ITestHostProcessInformation
+internal sealed class TestHostProcessInformation : ITestHostProcessInformation
 {
     private readonly int? _exitCode;
-    private readonly bool? _hasExitedGracefully;
+    private readonly bool? _testHostCompletedReceived;
 
-    public TestHostProcessInformation(int pid)
-    {
-        PID = pid;
-    }
+    public TestHostProcessInformation(int pid) => PID = pid;
 
-    public TestHostProcessInformation(int pid, int exitCode, bool hasExitedGracefully)
+    public TestHostProcessInformation(int pid, int exitCode, bool testHostCompletedReceived)
     {
         PID = pid;
         _exitCode = exitCode;
-        _hasExitedGracefully = hasExitedGracefully;
+        _testHostCompletedReceived = testHostCompletedReceived;
     }
 
     public int PID { get; }
 
     public int ExitCode
-        => _exitCode is null
-            ? throw new InvalidOperationException(PlatformResources.ProcessHasNotYetExitedErrorMessage)
-            : _exitCode.Value;
+        => _exitCode ?? throw new InvalidOperationException(PlatformResources.ProcessHasNotYetExitedErrorMessage);
 
     public bool HasExitedGracefully
-        => _hasExitedGracefully is null
-            ? throw new InvalidOperationException(PlatformResources.ProcessHasNotYetExitedErrorMessage)
-            : _hasExitedGracefully.Value;
+        => _testHostCompletedReceived ?? throw new InvalidOperationException(PlatformResources.ProcessHasNotYetExitedErrorMessage);
 }

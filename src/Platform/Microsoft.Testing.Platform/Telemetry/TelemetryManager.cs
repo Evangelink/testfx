@@ -15,96 +15,49 @@ namespace Microsoft.Testing.Platform.Telemetry;
 internal sealed class TelemetryManager : ITelemetryManager, IOutputDeviceDataProducer
 {
     private Func<IServiceProvider, ITelemetryCollector>? _telemetryFactory;
+    private Func<IServiceProvider, IOpenTelemetryProvider>? _openTelemetryProviderFactory;
 
     public string Uid => nameof(TelemetryManager);
 
-    public string Version => AppVersion.DefaultSemVer;
+    public string Version => PlatformVersion.Version;
 
     public string DisplayName => string.Empty;
 
     public string Description => string.Empty;
 
     public void AddTelemetryCollectorProvider(Func<IServiceProvider, ITelemetryCollector> telemetryFactory)
-    {
-        ArgumentGuard.IsNotNull(telemetryFactory);
-        _telemetryFactory = telemetryFactory;
-    }
+        => _telemetryFactory = telemetryFactory ?? throw new ArgumentNullException(nameof(telemetryFactory));
 
-    public async Task<ITelemetryCollector> BuildAsync(ServiceProvider serviceProvider, ILoggerFactory loggerFactory, TestApplicationOptions testApplicationOptions)
+    public void AddOpenTelemetryProvider(Func<IServiceProvider, IOpenTelemetryProvider> openTelemetryProviderFactory)
+        => _openTelemetryProviderFactory = openTelemetryProviderFactory ?? throw new ArgumentNullException(nameof(openTelemetryProviderFactory));
+
+    public IOpenTelemetryProvider? BuildOTelProvider(ServiceProvider serviceProvider)
+        => _openTelemetryProviderFactory is null
+            ? null
+            : _openTelemetryProviderFactory(serviceProvider);
+
+    public async Task<ITelemetryCollector> BuildTelemetryAsync(ServiceProvider serviceProvider, ILoggerFactory loggerFactory, TestApplicationOptions testApplicationOptions)
     {
         bool isTelemetryOptedOut = !testApplicationOptions.EnableTelemetry;
 
         ILogger<TelemetryManager> logger = loggerFactory.CreateLogger<TelemetryManager>();
-        await logger.LogInformationAsync($"TestApplicationOptions.EnableTelemetry: {testApplicationOptions.EnableTelemetry}");
+        await logger.LogDebugAsync($"TestApplicationOptions.EnableTelemetry: {testApplicationOptions.EnableTelemetry}").ConfigureAwait(false);
 
         // If the environment variable is not set or is set to 0, telemetry is opted in.
         IEnvironment environment = serviceProvider.GetEnvironment();
         string? telemetryOptOut = environment.GetEnvironmentVariable(EnvironmentVariableConstants.TESTINGPLATFORM_TELEMETRY_OPTOUT);
-        await logger.LogInformationAsync($"{EnvironmentVariableConstants.TESTINGPLATFORM_TELEMETRY_OPTOUT} environment variable: '{telemetryOptOut}'");
-        isTelemetryOptedOut = (telemetryOptOut is not null and ("1" or "true")) || isTelemetryOptedOut;
+        await logger.LogDebugAsync($"{EnvironmentVariableConstants.TESTINGPLATFORM_TELEMETRY_OPTOUT} environment variable: '{telemetryOptOut}'").ConfigureAwait(false);
+        isTelemetryOptedOut = (telemetryOptOut is "1" or "true") || isTelemetryOptedOut;
 
         string? cli_telemetryOptOut = environment.GetEnvironmentVariable(EnvironmentVariableConstants.DOTNET_CLI_TELEMETRY_OPTOUT);
-        await logger.LogInformationAsync($"{EnvironmentVariableConstants.DOTNET_CLI_TELEMETRY_OPTOUT} environment variable: '{cli_telemetryOptOut}'");
-        isTelemetryOptedOut = (cli_telemetryOptOut is not null and ("1" or "true")) || isTelemetryOptedOut;
+        await logger.LogDebugAsync($"{EnvironmentVariableConstants.DOTNET_CLI_TELEMETRY_OPTOUT} environment variable: '{cli_telemetryOptOut}'").ConfigureAwait(false);
+        isTelemetryOptedOut = (cli_telemetryOptOut is "1" or "true") || isTelemetryOptedOut;
 
-        // NO_LOGO
+        await logger.LogDebugAsync($"Telemetry is '{(!isTelemetryOptedOut ? "ENABLED" : "DISABLED")}'").ConfigureAwait(false);
 
-        // If the environment variable is not set or is set to 0, telemetry is opted in.
-        ICommandLineOptions commandLineOptions = serviceProvider.GetCommandLineOptions();
-        bool doNotShowLogo = commandLineOptions.IsOptionSet(PlatformCommandLineProvider.NoBannerOptionKey);
-
-        string? noBannerEnvVar = environment.GetEnvironmentVariable(EnvironmentVariableConstants.TESTINGPLATFORM_NOBANNER);
-        await logger.LogInformationAsync($"{EnvironmentVariableConstants.TESTINGPLATFORM_NOBANNER} environment variable: '{noBannerEnvVar}'");
-        doNotShowLogo = (noBannerEnvVar is not null and ("1" or "true")) || doNotShowLogo;
-
-        string? dotnetNoLogoEnvVar = environment.GetEnvironmentVariable(EnvironmentVariableConstants.DOTNET_NOLOGO);
-        await logger.LogInformationAsync($"{EnvironmentVariableConstants.DOTNET_NOLOGO} environment variable: '{dotnetNoLogoEnvVar}'");
-        doNotShowLogo = (dotnetNoLogoEnvVar is not null and ("1" or "true")) || doNotShowLogo;
-
-        await logger.LogInformationAsync($"Telemetry is '{(!isTelemetryOptedOut ? "ENABLED" : "DISABLED")}'");
-
-        if (!isTelemetryOptedOut && !doNotShowLogo)
+        if (!isTelemetryOptedOut && _telemetryFactory is not null)
         {
-            ITestApplicationModuleInfo testApplicationModuleInfo = serviceProvider.GetTestApplicationModuleInfo();
-#pragma warning disable RS0030 // Do not use banned APIs - There is no easy way to disable it for all members
-            string? directory = environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData, Environment.SpecialFolderOption.Create);
-#pragma warning restore RS0030 // Do not use banned APIs
-            if (directory is not null)
-            {
-                directory = Path.Combine(directory, "Microsoft", "TestingPlatform");
-            }
-
-            IFileSystem fileSystem = serviceProvider.GetFileSystem();
-            string fileName = Path.ChangeExtension(Path.GetFileName(testApplicationModuleInfo.GetCurrentTestApplicationFullPath()), "testingPlatformFirstTimeUseSentinel");
-            bool sentinelIsNotPresent =
-                RoslynString.IsNullOrWhiteSpace(directory)
-                || !fileSystem.Exists(Path.Combine(directory, fileName));
-
-            if (!doNotShowLogo && sentinelIsNotPresent)
-            {
-                IOutputDevice outputDevice = serviceProvider.GetOutputDevice();
-                await outputDevice.DisplayAsync(this, new TextOutputDeviceData(PlatformResources.TelemetryNotice));
-
-                string? path = null;
-                try
-                {
-                    // See if we should write the file, and write it.
-                    if (!RoslynString.IsNullOrWhiteSpace(directory))
-                    {
-                        Directory.CreateDirectory(directory);
-
-                        // Write empty file.
-                        path = Path.Combine(directory, fileName);
-                        using (fileSystem.NewFileStream(path, FileMode.Create, FileAccess.Write))
-                        {
-                        }
-                    }
-                }
-                catch (Exception exception) when (exception is IOException or SystemException)
-                {
-                    await logger.LogErrorAsync($"Could not write sentinel file for telemetry to path,'{path ?? "<unknown>"}'.", exception);
-                }
-            }
+            await ShowTelemetryBannerFirstNoticeAsync(serviceProvider, logger, environment).ConfigureAwait(false);
         }
 
         serviceProvider.TryAddService(new TelemetryInformation(!isTelemetryOptedOut, TelemetryProperties.VersionValue));
@@ -115,10 +68,77 @@ internal sealed class TelemetryManager : ITelemetryManager, IOutputDeviceDataPro
 
         if (!isTelemetryOptedOut)
         {
-            await logger.LogInformationAsync($"Telemetry collector provider: '{telemetryCollector.GetType()}'");
+            await logger.LogDebugAsync($"Telemetry collector provider: '{telemetryCollector.GetType()}'").ConfigureAwait(false);
         }
 
         return telemetryCollector;
+    }
+
+    private async Task ShowTelemetryBannerFirstNoticeAsync(ServiceProvider serviceProvider, ILogger<TelemetryManager> logger, IEnvironment environment)
+    {
+        // If the environment variable is not set or is set to 0, telemetry is opted in.
+        ICommandLineOptions commandLineOptions = serviceProvider.GetCommandLineOptions();
+        bool doNotShowLogo = commandLineOptions.IsOptionSet(PlatformCommandLineProvider.NoBannerOptionKey);
+
+        string? noBannerEnvVar = environment.GetEnvironmentVariable(EnvironmentVariableConstants.TESTINGPLATFORM_NOBANNER);
+        await logger.LogDebugAsync($"{EnvironmentVariableConstants.TESTINGPLATFORM_NOBANNER} environment variable: '{noBannerEnvVar}'").ConfigureAwait(false);
+        doNotShowLogo = (noBannerEnvVar is "1" or "true") || doNotShowLogo;
+
+        string? dotnetNoLogoEnvVar = environment.GetEnvironmentVariable(EnvironmentVariableConstants.DOTNET_NOLOGO);
+        await logger.LogDebugAsync($"{EnvironmentVariableConstants.DOTNET_NOLOGO} environment variable: '{dotnetNoLogoEnvVar}'").ConfigureAwait(false);
+        doNotShowLogo = (dotnetNoLogoEnvVar is "1" or "true") || doNotShowLogo;
+
+        if (doNotShowLogo)
+        {
+            return;
+        }
+
+        ITestApplicationModuleInfo testApplicationModuleInfo = serviceProvider.GetTestApplicationModuleInfo();
+#pragma warning disable RS0030 // Do not use banned APIs - There is no easy way to disable it for all members
+        string? directory = environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData, Environment.SpecialFolderOption.Create);
+#pragma warning restore RS0030 // Do not use banned APIs
+        if (directory is not null)
+        {
+            directory = Path.Combine(directory, "Microsoft", "TestingPlatform");
+        }
+
+        IFileSystem fileSystem = serviceProvider.GetFileSystem();
+        string fileName = testApplicationModuleInfo.TryGetCurrentTestApplicationFullPath() is { } testApplicationFullPath
+            ? Path.ChangeExtension(Path.GetFileName(testApplicationFullPath), "testingPlatformFirstTimeUseSentinel")
+            : "testingPlatformFirstTimeUseSentinel";
+
+        bool sentinelIsNotPresent =
+            RoslynString.IsNullOrWhiteSpace(directory)
+            || !fileSystem.ExistFile(Path.Combine(directory, fileName));
+
+        if (!sentinelIsNotPresent)
+        {
+            return;
+        }
+
+        IOutputDevice outputDevice = serviceProvider.GetOutputDevice();
+        CancellationToken cancellationToken = serviceProvider.GetTestApplicationCancellationTokenSource().CancellationToken;
+        await outputDevice.DisplayAsync(this, new TextOutputDeviceData(PlatformResources.TelemetryNotice), cancellationToken).ConfigureAwait(false);
+
+        string? path = null;
+        try
+        {
+            // See if we should write the file, and write it.
+            if (!RoslynString.IsNullOrWhiteSpace(directory))
+            {
+                Directory.CreateDirectory(directory);
+
+                // Write empty file.
+                path = Path.Combine(directory, fileName);
+                using (fileSystem.NewFileStream(path, FileMode.Create, FileAccess.Write))
+                {
+                }
+            }
+        }
+        catch (Exception exception) when (exception is IOException or SystemException)
+        {
+            await logger.LogErrorAsync($"Could not write sentinel file for telemetry to path,'{path ?? "<unknown>"}'.", exception).ConfigureAwait(false);
+        }
     }
 
     public Task<bool> IsEnabledAsync() => throw new NotImplementedException();

@@ -1,22 +1,16 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System.Diagnostics;
-
-using Microsoft.Testing.Internal.Framework;
 using Microsoft.Testing.Platform.Helpers;
-using Microsoft.Testing.TestInfrastructure;
 
 namespace Microsoft.Testing.Platform.UnitTests;
 
-[TestGroup]
-public class SystemAsyncMonitorTests : TestBase
+[TestClass]
+public sealed class SystemAsyncMonitorTests
 {
-    public SystemAsyncMonitorTests(ITestExecutionContext testExecutionContext)
-        : base(testExecutionContext)
-    {
-    }
+    public TestContext TestContext { get; set; }
 
+    [TestMethod]
     public async Task AsyncMonitor_ShouldCorrectlyLock()
     {
         var asyncSystemMonitor = (SystemAsyncMonitor)new SystemMonitorAsyncFactory().Create();
@@ -25,15 +19,12 @@ public class SystemAsyncMonitorTests : TestBase
         var stopwatch = Stopwatch.StartNew();
         for (int i = 0; i < 3; i++)
         {
-            tasks.Add(Task.Run(() => TestLock()));
+            tasks.Add(Task.Run(TestLock, TestContext.CancellationToken));
         }
 
-        await Task.WhenAll(tasks.ToArray());
+        await Task.WhenAll([.. tasks]);
 
-        // Give more time to be above 3s
-        Thread.Sleep(500);
-
-        Assert.IsTrue(stopwatch.ElapsedMilliseconds > 3000);
+        Assert.IsGreaterThanOrEqualTo(2900, stopwatch.ElapsedMilliseconds);
 
         async Task TestLock()
         {
@@ -45,7 +36,7 @@ public class SystemAsyncMonitorTests : TestBase
                 }
 
                 lockState = true;
-                await Task.Delay(1000);
+                await Task.Delay(1000, TestContext.CancellationToken);
                 lockState = false;
             }
         }

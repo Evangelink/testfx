@@ -1,18 +1,34 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using Microsoft.Testing.Internal.Framework;
-using Microsoft.Testing.TestInfrastructure;
-
 using VerifyCS = MSTest.Analyzers.Test.CSharpCodeFixVerifier<
     MSTest.Analyzers.PreferTestCleanupOverDisposeAnalyzer,
-    Microsoft.CodeAnalysis.Testing.EmptyCodeFixProvider>;
+    MSTest.Analyzers.PreferTestCleanupOverDisposeFixer>;
 
 namespace MSTest.Analyzers.Test;
 
-[TestGroup]
-public sealed class PreferTestCleanupOverDisposeAnalyzerTests(ITestExecutionContext testExecutionContext) : TestBase(testExecutionContext)
+[TestClass]
+public sealed class PreferTestCleanupOverDisposeAnalyzerTests
 {
+    [TestMethod]
+    public async Task WhenNonTestClassHasDispose_NoDiagnostic()
+    {
+        string code = """
+            using System;
+            using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+            public class MyNonTestClass : IDisposable
+            {
+                public void Dispose()
+                {
+                }
+            }
+            """;
+
+        await VerifyCS.VerifyCodeFixAsync(code, code);
+    }
+
+    [TestMethod]
     public async Task WhenTestClassHasDispose_Diagnostic()
     {
         string code = """
@@ -20,17 +36,40 @@ public sealed class PreferTestCleanupOverDisposeAnalyzerTests(ITestExecutionCont
             using Microsoft.VisualStudio.TestTools.UnitTesting;
 
             [TestClass]
-            public class MyTestClass : IDisposable
+            public class MyTestClass : IDisposable, IMyInterface
             {
                 public void [|Dispose|]()
                 {
                 }
+
+                [TestMethod]
+                public void Test() {}
             }
+            public interface IMyInterface { }
+            """;
+        string fixedCode = """
+            using System;
+            using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+            [TestClass]
+            public class MyTestClass : IMyInterface
+            {
+                [TestCleanup]
+                public void TestCleanup()
+                {
+                }
+
+                [TestMethod]
+                public void Test() {}
+            }
+            public interface IMyInterface { }
             """;
 
-        await VerifyCS.VerifyAnalyzerAsync(code);
+        await VerifyCS.VerifyCodeFixAsync(code, fixedCode);
     }
 
+#if NET
+    [TestMethod]
     public async Task WhenTestClassHasDisposeAsync_Diagnostic()
     {
         string code = """
@@ -47,10 +86,26 @@ public sealed class PreferTestCleanupOverDisposeAnalyzerTests(ITestExecutionCont
                 }
             }
             """;
+        string fixedCode = """
+            using System;
+            using System.Threading.Tasks;
+            using Microsoft.VisualStudio.TestTools.UnitTesting;
 
-        await VerifyCS.VerifyAnalyzerAsync(code);
+            [TestClass]
+            public class MyTestClass
+            {
+                [TestCleanup]
+                public ValueTask TestCleanup()
+                {
+                    return ValueTask.CompletedTask;
+                }
+            }
+            """;
+
+        await VerifyCS.VerifyCodeFixAsync(code, fixedCode);
     }
 
+    [TestMethod]
     public async Task WhenTestClassHasTestCleanup_NoDiagnostic()
     {
         string code = """
@@ -87,6 +142,51 @@ public sealed class PreferTestCleanupOverDisposeAnalyzerTests(ITestExecutionCont
             }
             """;
 
-        await VerifyCS.VerifyAnalyzerAsync(code);
+        await VerifyCS.VerifyCodeFixAsync(code, code);
+    }
+#endif
+
+    [TestMethod]
+    public async Task WhenTestClassHasDisposeWithMultiLineBody_PreservesIndentation()
+    {
+        string code = """
+            using System;
+            using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+            [TestClass]
+            public class MyTestClass : IDisposable
+            {
+                public void [|Dispose|]()
+                {
+                    Cleanup(
+                        1,
+                        2,
+                        3);
+                }
+
+                private void Cleanup(int a, int b, int c) { }
+            }
+            """;
+        string fixedCode = """
+            using System;
+            using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+            [TestClass]
+            public class MyTestClass
+            {
+                [TestCleanup]
+                public void TestCleanup()
+                {
+                    Cleanup(
+                        1,
+                        2,
+                        3);
+                }
+
+                private void Cleanup(int a, int b, int c) { }
+            }
+            """;
+
+        await VerifyCS.VerifyCodeFixAsync(code, fixedCode);
     }
 }

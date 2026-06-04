@@ -7,19 +7,25 @@ using Analyzer.Utilities.Extensions;
 
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
+using Microsoft.CodeAnalysis.Operations;
 
 using MSTest.Analyzers.Helpers;
 
 namespace MSTest.Analyzers;
 
+/// <summary>
+/// MSTEST0005: <inheritdoc cref="Resources.TestContextShouldBeValidTitle"/>.
+/// </summary>
 [DiagnosticAnalyzer(LanguageNames.CSharp, LanguageNames.VisualBasic)]
 public sealed class TestContextShouldBeValidAnalyzer : DiagnosticAnalyzer
 {
     private static readonly LocalizableResourceString Title = new(nameof(Resources.TestContextShouldBeValidTitle), Resources.ResourceManager, typeof(Resources));
     private static readonly LocalizableResourceString Description = new(nameof(Resources.TestContextShouldBeValidDescription), Resources.ResourceManager, typeof(Resources));
-    private static readonly LocalizableResourceString MessageFormat = new(nameof(Resources.TestContextShouldBeValidMessageFormat_Public), Resources.ResourceManager, typeof(Resources));
+    private static readonly LocalizableResourceString MessageFormat = new(nameof(Resources.TestContextShouldBeValidMessageFormat), Resources.ResourceManager, typeof(Resources));
 
-    internal static readonly DiagnosticDescriptor PublicRule = DiagnosticDescriptorHelper.Create(
+    internal const string TestContextPropertyName = "TestContext";
+
+    internal static readonly DiagnosticDescriptor TestContextShouldBeValidRule = DiagnosticDescriptorHelper.Create(
         DiagnosticIds.TestContextShouldBeValidRuleId,
         Title,
         MessageFormat,
@@ -28,14 +34,137 @@ public sealed class TestContextShouldBeValidAnalyzer : DiagnosticAnalyzer
         DiagnosticSeverity.Warning,
         isEnabledByDefault: true);
 
-    internal static readonly DiagnosticDescriptor PublicOrInternalRule = PublicRule.WithMessage(new(nameof(Resources.TestContextShouldBeValidMessageFormat_PublicOrInternal), Resources.ResourceManager, typeof(Resources)));
-    internal static readonly DiagnosticDescriptor NotStaticRule = PublicRule.WithMessage(new(nameof(Resources.TestContextShouldBeValidMessageFormat_NotStatic), Resources.ResourceManager, typeof(Resources)));
-    internal static readonly DiagnosticDescriptor NotReadonlyRule = PublicRule.WithMessage(new(nameof(Resources.TestContextShouldBeValidMessageFormat_NotReadonly), Resources.ResourceManager, typeof(Resources)));
-    internal static readonly DiagnosticDescriptor NotFieldRule = PublicRule.WithMessage(new(nameof(Resources.TestContextShouldBeValidMessageFormat_NotField), Resources.ResourceManager, typeof(Resources)));
-
+    /// <inheritdoc />
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; }
-        = ImmutableArray.Create(PublicRule);
+        = ImmutableArray.Create(TestContextShouldBeValidRule);
 
+    private static IFieldSymbol? TryGetReturnedField(ImmutableArray<IOperation> operations)
+    {
+        foreach (IOperation operation in operations)
+        {
+            if (TryGetReturnedField(operation) is { } returnedMember)
+            {
+                return returnedMember;
+            }
+        }
+
+        return null;
+    }
+
+    private static IFieldSymbol? TryGetReturnedField(IOperation operation)
+    {
+        if (operation is IBlockOperation blockOperation)
+        {
+            return TryGetReturnedField(blockOperation.Operations);
+        }
+
+        if (operation is IReturnOperation { ReturnedValue: IFieldReferenceOperation { Field: { } returnedField } })
+        {
+            return returnedField;
+        }
+
+        // We can't figure out exactly the field returned by this property.
+        return null;
+    }
+
+    private static bool AssignsParameterToMember(IParameterSymbol parameter, ISymbol member, ImmutableArray<IOperation> operations)
+    {
+        foreach (IOperation operation in operations)
+        {
+            if (AssignsParameterToMember(parameter, member, operation))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool AssignsParameterToMember(IParameterSymbol parameter, ISymbol member, IOperation operation)
+    {
+        if (operation is IBlockOperation blockOperation)
+        {
+            return AssignsParameterToMember(parameter, member, blockOperation.Operations);
+        }
+
+        if (operation is IExpressionStatementOperation expressionStatementOperation)
+        {
+            operation = expressionStatementOperation.Operation;
+        }
+
+        if (operation is ISimpleAssignmentOperation assignmentOperation &&
+            assignmentOperation.Target is IMemberReferenceOperation targetMemberReference &&
+            SymbolEqualityComparer.Default.Equals(targetMemberReference.Member, member))
+        {
+            // Extract parameter reference from the value, unwrapping from coalesce operation if necessary
+            IOperation effectiveValue = assignmentOperation.Value;
+            if (effectiveValue is ICoalesceOperation coalesceOperation)
+            {
+                effectiveValue = coalesceOperation.Value;
+            }
+
+            // Check if the effective value is a parameter reference to our target parameter
+            if (effectiveValue is IParameterReferenceOperation parameterReference &&
+                SymbolEqualityComparer.Default.Equals(parameterReference.Parameter, parameter))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static void CollectTestContextFieldsAssignedInConstructor(
+        IParameterSymbol testContextParameter,
+        ImmutableArray<IOperation> operations,
+        ConcurrentBag<IFieldSymbol> fieldsAssignedInConstructor)
+    {
+        foreach (IOperation operation in operations)
+        {
+            CollectTestContextFieldsAssignedInConstructor(testContextParameter, operation, fieldsAssignedInConstructor);
+        }
+    }
+
+    private static void CollectTestContextFieldsAssignedInConstructor(
+        IParameterSymbol testContextParameter,
+        IOperation operation,
+        ConcurrentBag<IFieldSymbol> fieldsAssignedInConstructor)
+    {
+        if (operation is IBlockOperation blockOperation)
+        {
+            CollectTestContextFieldsAssignedInConstructor(testContextParameter, blockOperation.Operations, fieldsAssignedInConstructor);
+        }
+        else if (operation is IExpressionStatementOperation expressionStatementOperation)
+        {
+            operation = expressionStatementOperation.Operation;
+        }
+
+        if (operation is ISimpleAssignmentOperation assignmentOperation &&
+            assignmentOperation.Target is IMemberReferenceOperation { Member: IFieldSymbol { } candidateField })
+        {
+            // Extract parameter reference from the value, unwrapping from coalesce operation if necessary
+            IOperation effectiveValue = assignmentOperation.Value;
+            if (effectiveValue is ICoalesceOperation coalesceOperation)
+            {
+                effectiveValue = coalesceOperation.Value;
+            }
+
+            // Check if the effective value is a parameter reference to our target parameter
+            if (effectiveValue is IParameterReferenceOperation parameterReference &&
+                SymbolEqualityComparer.Default.Equals(parameterReference.Parameter, testContextParameter))
+            {
+                fieldsAssignedInConstructor.Add(candidateField);
+            }
+        }
+    }
+
+    private static IParameterSymbol? TryGetTestContextParameterIfValidConstructor(ISymbol candidate, INamedTypeSymbol testContextSymbol)
+        => candidate is IMethodSymbol { MethodKind: MethodKind.Constructor, Parameters: [{ } parameter] } &&
+            SymbolEqualityComparer.Default.Equals(parameter.Type, testContextSymbol)
+            ? parameter
+            : null;
+
+    /// <inheritdoc />
     public override void Initialize(AnalysisContext context)
     {
         context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
@@ -43,78 +172,106 @@ public sealed class TestContextShouldBeValidAnalyzer : DiagnosticAnalyzer
 
         context.RegisterCompilationStartAction(context =>
         {
-            if (context.Compilation.TryGetOrCreateTypeByMetadataName(WellKnownTypeNames.MicrosoftVisualStudioTestToolsUnitTestingTestContext, out var testContextSymbol)
-                && context.Compilation.TryGetOrCreateTypeByMetadataName(WellKnownTypeNames.MicrosoftVisualStudioTestToolsUnitTestingTestClassAttribute, out var testClassAttributeSymbol))
+            if (context.Compilation.TryGetOrCreateTypeByMetadataName(WellKnownTypeNames.MicrosoftVisualStudioTestToolsUnitTestingTestContext, out INamedTypeSymbol? testContextSymbol)
+                && context.Compilation.TryGetOrCreateTypeByMetadataName(WellKnownTypeNames.MicrosoftVisualStudioTestToolsUnitTestingTestClassAttribute, out INamedTypeSymbol? testClassAttributeSymbol))
             {
-                bool canDiscoverInternals = context.Compilation.CanDiscoverInternals();
-                context.RegisterSymbolAction(
-                    context => AnalyzeSymbol(context, testContextSymbol, testClassAttributeSymbol, canDiscoverInternals),
-                    SymbolKind.Field, SymbolKind.Property);
+                context.RegisterSymbolStartAction(
+                    context =>
+                    {
+                        if (!context.Symbol.GetAttributes().Any(attr => attr.AttributeClass.Inherits(testClassAttributeSymbol)))
+                        {
+                            return;
+                        }
+
+                        var namedType = (INamedTypeSymbol)context.Symbol;
+                        foreach (ISymbol member in namedType.GetMembers())
+                        {
+                            if (member is not IPropertySymbol propertySymbol)
+                            {
+                                continue;
+                            }
+
+                            if (!SymbolEqualityComparer.Default.Equals(propertySymbol.Type, testContextSymbol) ||
+                                !propertySymbol.Name.Equals(TestContextPropertyName, StringComparison.OrdinalIgnoreCase))
+                            {
+                                continue;
+                            }
+
+                            if (propertySymbol.IsStatic)
+                            {
+                                context.RegisterSymbolEndAction(
+                                    context => context.ReportDiagnostic(propertySymbol.CreateDiagnostic(TestContextShouldBeValidRule)));
+                                continue;
+                            }
+
+                            if (IsTestContextPropertyAutomaticallyAssigned(propertySymbol, testContextSymbol))
+                            {
+                                return;
+                            }
+
+                            IFieldSymbol? fieldReturnedByProperty = null;
+                            ConcurrentBag<IFieldSymbol> fieldsAssignedInConstructor = [];
+
+                            context.RegisterOperationBlockAction(context =>
+                            {
+                                if (context.OwningSymbol.Equals(propertySymbol.GetMethod, SymbolEqualityComparer.Default))
+                                {
+                                    fieldReturnedByProperty = TryGetReturnedField(context.OperationBlocks);
+                                }
+                                else if (TryGetTestContextParameterIfValidConstructor(context.OwningSymbol, testContextSymbol) is { } parameter)
+                                {
+                                    CollectTestContextFieldsAssignedInConstructor(parameter, context.OperationBlocks, fieldsAssignedInConstructor);
+                                }
+                            });
+
+                            // Initially, we consider the property as not assigned in the constructor.
+                            // Then, we look for a constructor with a single TestContext parameter and look for assignment
+                            // in the constructor. We simply iterate over the operation blocks (no DFA involved for now).
+                            bool isAssigned = false;
+
+                            context.RegisterOperationBlockAction(
+                                context =>
+                                {
+                                    if (TryGetTestContextParameterIfValidConstructor(context.OwningSymbol, testContextSymbol) is not { } parameter)
+                                    {
+                                        return;
+                                    }
+
+                                    if (AssignsParameterToMember(parameter, propertySymbol, context.OperationBlocks))
+                                    {
+                                        isAssigned = true;
+                                    }
+                                });
+
+                            context.RegisterSymbolEndAction(
+                                context =>
+                                {
+                                    if (!isAssigned)
+                                    {
+                                        isAssigned = fieldReturnedByProperty is not null &&
+                                            fieldsAssignedInConstructor.Contains(fieldReturnedByProperty, SymbolEqualityComparer.Default);
+                                    }
+
+                                    if (!isAssigned)
+                                    {
+                                        context.ReportDiagnostic(propertySymbol.CreateDiagnostic(TestContextShouldBeValidRule));
+                                    }
+                                });
+                        }
+                    }, SymbolKind.NamedType);
             }
         });
     }
 
-    private static void AnalyzeSymbol(SymbolAnalysisContext context, INamedTypeSymbol testContextSymbol, INamedTypeSymbol testClassAttributeSymbol,
-        bool canDiscoverInternals)
-    {
-        if (!context.Symbol.ContainingType.GetAttributes().Any(attr => attr.AttributeClass.Inherits(testClassAttributeSymbol)))
-        {
-            return;
-        }
+    private static bool IsTestContextPropertyAutomaticallyAssigned(IPropertySymbol property, INamedTypeSymbol testContextSymbol) =>
+        // See TypeCache.ResolveTestContext
 
-        if (context.Symbol is IFieldSymbol fieldSymbol)
-        {
-            AnalyzeFieldSymbol(context, fieldSymbol, testContextSymbol);
-            return;
-        }
-
-        if (context.Symbol is IPropertySymbol propertySymbol)
-        {
-            AnalyzePropertySymbol(context, testContextSymbol, canDiscoverInternals, propertySymbol);
-            return;
-        }
-
-        throw ApplicationStateGuard.Unreachable();
-    }
-
-    private static void AnalyzePropertySymbol(SymbolAnalysisContext context, INamedTypeSymbol testContextSymbol, bool canDiscoverInternals, IPropertySymbol propertySymbol)
-    {
-        if (propertySymbol.GetMethod is null
-            || !string.Equals(propertySymbol.Name, "TestContext", StringComparison.OrdinalIgnoreCase)
-            || !SymbolEqualityComparer.Default.Equals(testContextSymbol, propertySymbol.GetMethod.ReturnType))
-        {
-            return;
-        }
-
-        if (propertySymbol.GetResultantVisibility() is { } resultantVisibility)
-        {
-            if (!canDiscoverInternals && resultantVisibility != SymbolVisibility.Public)
-            {
-                context.ReportDiagnostic(propertySymbol.CreateDiagnostic(PublicRule));
-            }
-            else if (canDiscoverInternals && resultantVisibility == SymbolVisibility.Private)
-            {
-                context.ReportDiagnostic(propertySymbol.CreateDiagnostic(PublicOrInternalRule));
-            }
-        }
-
-        if (propertySymbol.IsStatic)
-        {
-            context.ReportDiagnostic(propertySymbol.CreateDiagnostic(NotStaticRule));
-        }
-
-        if (propertySymbol.SetMethod is null)
-        {
-            context.ReportDiagnostic(propertySymbol.CreateDiagnostic(NotReadonlyRule));
-        }
-    }
-
-    private static void AnalyzeFieldSymbol(SymbolAnalysisContext context, IFieldSymbol fieldSymbol, INamedTypeSymbol testContextSymbol)
-    {
-        if (string.Equals(fieldSymbol.Name, "TestContext", StringComparison.OrdinalIgnoreCase)
-            && SymbolEqualityComparer.Default.Equals(testContextSymbol, fieldSymbol.Type))
-        {
-            context.ReportDiagnostic(fieldSymbol.CreateDiagnostic(NotFieldRule));
-        }
-    }
+        // For the property to be auto assigned, the name must be exactly TestContext (case sensitive)
+        property.Name.Equals(TestContextPropertyName, StringComparison.Ordinal) &&
+            // The TestContext property must be public regardless of the presence of DiscoverInternals attribute.
+            property.DeclaredAccessibility == Accessibility.Public &&
+            // A setter must exist, even if private.
+            property.SetMethod is not null &&
+            // The TestContext property type must be TestContext
+            SymbolEqualityComparer.Default.Equals(property.Type, testContextSymbol);
 }

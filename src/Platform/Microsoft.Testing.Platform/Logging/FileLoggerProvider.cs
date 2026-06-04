@@ -47,17 +47,16 @@ internal sealed class FileLoggerProvider(
         // If custom directory is provided for the log file, we don't WANT to move the log file
         // We won't betray the users expectations.
         if (_customDirectory
-            || testResultDirectory == Path.GetDirectoryName(FileLogger.FileName)
-            || FileLogger is null)
+            || testResultDirectory == Path.GetDirectoryName(FileLogger.FileName))
         {
             return;
         }
 
         string fileName = Path.GetFileName(FileLogger.FileName);
-        await DisposeHelper.DisposeAsync(FileLogger);
+        await DisposeHelper.DisposeAsync(FileLogger).ConfigureAwait(false);
 
         // Move the log file to the new directory
-        _fileSystem.Move(FileLogger.FileName, Path.Combine(testResultDirectory, fileName));
+        _fileSystem.MoveFile(FileLogger.FileName, Path.Combine(testResultDirectory, fileName));
 
         FileLogger = new FileLogger(
             new FileLoggerOptions(testResultDirectory, _options.LogPrefixName, fileName, _options.SyncFlush),
@@ -73,15 +72,10 @@ internal sealed class FileLoggerProvider(
         => new FileLoggerCategory(FileLogger, categoryName);
 
     public void Dispose()
-        => FileLogger?.Dispose();
+        => FileLogger.Dispose();
 
 #if NETCOREAPP
     public async ValueTask DisposeAsync()
-    {
-        if (FileLogger is not null)
-        {
-            await FileLogger.DisposeAsync();
-        }
-    }
+        => await FileLogger.DisposeAsync().ConfigureAwait(false);
 #endif
 }

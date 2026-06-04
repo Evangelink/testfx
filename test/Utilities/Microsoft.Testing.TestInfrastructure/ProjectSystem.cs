@@ -1,10 +1,6 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System.Globalization;
-using System.Text;
-using System.Xml.Linq;
-
 namespace Microsoft.Testing.TestInfrastructure;
 
 public class VSSolution : Folder
@@ -19,19 +15,19 @@ MinimumVisualStudioVersion = 10.0.40219.1
 
     private const string SlnGlobalSectionTemplate = @"
 Global
-	GlobalSection(SolutionConfigurationPlatforms) = preSolution
-		Debug|Any CPU = Debug|Any CPU
-		Release|Any CPU = Release|Any CPU
-	EndGlobalSection
-	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{0}
-	EndGlobalSection
-	GlobalSection(SolutionProperties) = preSolution
-		HideSolutionNode = FALSE
-	EndGlobalSection
-	GlobalSection(ExtensibilityGlobals) = postSolution
-		SolutionGuid = {{C0047A98-3108-4928-8D43-FB6F8A49E3AB}}
-	EndGlobalSection
+    GlobalSection(SolutionConfigurationPlatforms) = preSolution
+        Debug|Any CPU = Debug|Any CPU
+        Release|Any CPU = Release|Any CPU
+    EndGlobalSection
+    GlobalSection(ProjectConfigurationPlatforms) = postSolution
+        {0}
+    EndGlobalSection
+    GlobalSection(SolutionProperties) = preSolution
+        HideSolutionNode = FALSE
+    EndGlobalSection
+    GlobalSection(ExtensibilityGlobals) = postSolution
+        SolutionGuid = {{C0047A98-3108-4928-8D43-FB6F8A49E3AB}}
+    EndGlobalSection
 EndGlobal
 ";
 
@@ -42,28 +38,21 @@ EndGlobal
     public VSSolution(string? solutionFolder, string? solutionName)
         : base(solutionFolder)
     {
-        if (string.IsNullOrEmpty(solutionFolder))
-        {
-            throw new ArgumentNullException(nameof(solutionFolder));
-        }
-
-        if (string.IsNullOrEmpty(solutionName))
-        {
-            throw new ArgumentNullException(nameof(solutionName));
-        }
+        Ensure.NotNullOrWhiteSpace(solutionFolder);
+        Ensure.NotNullOrWhiteSpace(solutionName);
 
         _solutionFileName = $"{solutionName}.sln";
         SolutionFile = Path.Combine(FolderPath, _solutionFileName);
         AddOrUpdateFileContent(_solutionFileName, MergeSolutionContent());
     }
 
-    public ICollection<Project> Projects { get; private set; } = new List<Project>();
+    public ICollection<Project> Projects { get; } = [];
 
     public string SolutionFile { get; private set; }
 
     public CSharpProject CreateCSharpProject(string projectName, params string[] tfm)
     {
-        var newProject = new CSharpProject(FolderPath, projectName, tfm);
+        CSharpProject newProject = new(FolderPath, projectName, tfm);
         Projects.Add(newProject);
 
         var projectGuid = Guid.NewGuid();
@@ -73,10 +62,10 @@ EndGlobal
 EndProject{4}", projectGuid, projectName, newProject.ProjectFile, configGuid, Environment.NewLine);
 
         _globals.AppendFormat(CultureInfo.InvariantCulture, @"{{{0}}}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{{{0}}}.Debug|Any CPU.Build.0 = Debug|Any CPU{1}", configGuid, Environment.NewLine);
+        {{{0}}}.Debug|Any CPU.Build.0 = Debug|Any CPU{1}", configGuid, Environment.NewLine);
 
         _globals.AppendFormat(CultureInfo.InvariantCulture, @"{{{0}}}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{{{0}}}.Release|Any CPU.Build.0 = Release|Any CPU{1}", configGuid, Environment.NewLine);
+        {{{0}}}.Release|Any CPU.Build.0 = Release|Any CPU{1}", configGuid, Environment.NewLine);
 
         AddOrUpdateFileContent(_solutionFileName, MergeSolutionContent());
         return newProject;
@@ -90,22 +79,15 @@ public class CSharpProject : Project
     private readonly string _projectFileName;
     private XElement _projectContent = new("Project", new XAttribute("Sdk", "Microsoft.NET.Sdk"), new XElement("PropertyGroup"), new XElement("ItemGroup"));
 
-    public CSharpProject(string solutionFolder, string projectName, params string[]? tfms)
+    public CSharpProject(string solutionFolder, string projectName, params string[] tfms)
        : base(Path.Combine(solutionFolder, projectName))
     {
-        if (string.IsNullOrEmpty(solutionFolder))
-        {
-            throw new ArgumentNullException(nameof(solutionFolder));
-        }
-
-        if (string.IsNullOrEmpty(projectName))
-        {
-            throw new ArgumentNullException(nameof(projectName));
-        }
+        Ensure.NotNullOrWhiteSpace(solutionFolder);
+        Ensure.NotNullOrWhiteSpace(projectName);
 
         if (tfms is null || tfms.Length == 0)
         {
-            throw new ArgumentException("Invalid tfm", nameof(tfms));
+            throw new InvalidOperationException("tfms must have at least one element.");
         }
 
         _projectFileName = $"{projectName}.csproj";
@@ -123,7 +105,7 @@ public class CSharpProject : Project
         AddOrUpdateFileContent(_projectFileName, _projectContent.ToString());
     }
 
-    public string ProjectFile { get; private set; }
+    public string ProjectFile { get; }
 
     public void AddPackageReference(string name, string version)
     {
@@ -141,7 +123,7 @@ public class CSharpProject : Project
 
 public abstract class Project : Folder
 {
-    public Project(string projectFolder)
+    protected Project(string projectFolder)
         : base(projectFolder)
     {
     }
@@ -149,7 +131,7 @@ public abstract class Project : Folder
 
 public abstract class Folder
 {
-    public Folder(string? folderPath)
+    protected Folder(string? folderPath)
     {
         if (string.IsNullOrEmpty(folderPath))
         {
@@ -159,12 +141,12 @@ public abstract class Folder
         FolderPath = Path.GetFullPath(folderPath);
     }
 
-    public string FolderPath { get; private set; }
+    public string FolderPath { get; }
 
     public string AddOrUpdateFileContent(string relativePath, string fileContent)
     {
         string finalPath = Path.Combine(FolderPath, relativePath);
-        string? finalPathDirectory = Path.GetDirectoryName(finalPath) ?? throw new InvalidOperationException("Unexpected null 'finalPathDirectory'");
+        string finalPathDirectory = Path.GetDirectoryName(finalPath) ?? throw new InvalidOperationException("Unexpected null 'finalPathDirectory'");
         Directory.CreateDirectory(finalPathDirectory);
         File.WriteAllText(finalPath, fileContent);
         return finalPath;

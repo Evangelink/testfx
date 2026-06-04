@@ -1,18 +1,17 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using Microsoft.Testing.Internal.Framework;
-using Microsoft.Testing.TestInfrastructure;
-
 using VerifyCS = MSTest.Analyzers.Test.CSharpCodeFixVerifier<
     MSTest.Analyzers.DoNotStoreStaticTestContextAnalyzer,
     Microsoft.CodeAnalysis.Testing.EmptyCodeFixProvider>;
 
 namespace MSTest.Analyzers.Test;
 
-[TestGroup]
-public sealed class DoNotStoreStaticTestContextAnalyzerTests(ITestExecutionContext testExecutionContext) : TestBase(testExecutionContext)
+[TestClass]
+public sealed class DoNotStoreStaticTestContextAnalyzerTests
 {
+#if NET
+    [TestMethod]
     public async Task WhenAssemblyInitializeOrClassInitialize_Diagnostic()
     {
         string code = """
@@ -89,7 +88,9 @@ public sealed class DoNotStoreStaticTestContextAnalyzerTests(ITestExecutionConte
 
         await VerifyCS.VerifyAnalyzerAsync(code);
     }
+#endif
 
+    [TestMethod]
     public async Task WhenOtherTestContext_NoDiagnostic()
     {
         string code = """

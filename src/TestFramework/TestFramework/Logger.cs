@@ -1,9 +1,5 @@
-// Copyright (c) Microsoft Corporation. All rights reserved.
+﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
-
-using System.Diagnostics.CodeAnalysis;
-using System.Globalization;
-using System.Reflection;
 
 namespace Microsoft.VisualStudio.TestTools.UnitTesting.Logging;
 
@@ -37,26 +33,20 @@ public class Logger
             return;
         }
 
-        if (format == null)
-        {
-            throw new ArgumentNullException(nameof(format));
-        }
-
-        if (args is null)
-        {
-            throw new ArgumentNullException(nameof(args));
-        }
+        _ = format ?? throw new ArgumentNullException(nameof(format));
+        _ = args ?? throw new ArgumentNullException(nameof(args));
 
         string message = args.Length == 0
             ? format
             : string.Format(CultureInfo.InvariantCulture, format, args);
 
+        object?[] parameters = [message];
         // Making sure all event handlers are called in sync on same thread.
-        foreach (var invoker in OnLogMessage.GetInvocationList())
+        foreach (Delegate invoker in OnLogMessage.GetInvocationList())
         {
             try
             {
-                invoker!.GetMethodInfo()!.Invoke(invoker.Target, new[] { message });
+                invoker.GetMethodInfo().Invoke(invoker.Target, parameters);
             }
             catch (Exception)
             {

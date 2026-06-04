@@ -7,16 +7,13 @@ namespace Microsoft.VisualStudio.TestTools.UnitTesting;
 /// WorkItem attribute; used to specify a work item associated with this test.
 /// </summary>
 [AttributeUsage(AttributeTargets.Method, AllowMultiple = true)]
-public sealed class WorkItemAttribute : Attribute
+public class WorkItemAttribute : Attribute
 {
     /// <summary>
     /// Initializes a new instance of the <see cref="WorkItemAttribute"/> class for the WorkItem Attribute.
     /// </summary>
     /// <param name="id">The Id to a work item.</param>
-    public WorkItemAttribute(int id)
-    {
-        Id = id;
-    }
+    public WorkItemAttribute(int id) => Id = id;
 
     /// <summary>
     /// Gets the Id to a work item associated.

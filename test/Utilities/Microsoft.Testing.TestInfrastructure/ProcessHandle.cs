@@ -1,8 +1,6 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System.Diagnostics;
-
 namespace Microsoft.Testing.TestInfrastructure;
 
 public sealed class ProcessHandle : IProcessHandle, IDisposable
@@ -28,21 +26,18 @@ public sealed class ProcessHandle : IProcessHandle, IDisposable
 
     public int ExitCode => _process.ExitCode;
 
-    public async Task<int> WaitForExitAsync()
+    public async Task<int> WaitForExitAsync(CancellationToken cancellationToken = default)
     {
         if (_disposed)
         {
             return _exitCode;
         }
-#if NETCOREAPP
-        await _process.WaitForExitAsync();
-#else
-        _process.WaitForExit();
-#endif
-        return await Task.FromResult(_process.ExitCode);
+
+        await _process.WaitForExitAsync(cancellationToken);
+        return _process.ExitCode;
     }
 
-    public async Task<int> StopAsync()
+    public async Task<int> StopAsync(CancellationToken cancellationToken = default)
     {
         if (_disposed)
         {
@@ -50,7 +45,7 @@ public sealed class ProcessHandle : IProcessHandle, IDisposable
         }
 
         KillSafe(_process);
-        return await WaitForExitAsync();
+        return await WaitForExitAsync(cancellationToken);
     }
 
     public void Kill()
@@ -96,11 +91,7 @@ public sealed class ProcessHandle : IProcessHandle, IDisposable
     {
         try
         {
-#if NETCOREAPP
             process.Kill(true);
-#else
-            process.Kill();
-#endif
         }
         catch (InvalidOperationException)
         {

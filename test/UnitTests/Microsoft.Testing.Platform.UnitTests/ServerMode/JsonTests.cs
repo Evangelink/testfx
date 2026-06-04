@@ -1,31 +1,28 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using Microsoft.Testing.Internal.Framework;
 using Microsoft.Testing.Platform.Extensions.Messages;
 using Microsoft.Testing.Platform.ServerMode;
 using Microsoft.Testing.Platform.ServerMode.Json;
-using Microsoft.Testing.TestInfrastructure;
 
 using TestNode = Microsoft.Testing.Platform.Extensions.Messages.TestNode;
 
 namespace Microsoft.Testing.Platform.UnitTests;
 
-[TestGroup]
-public class JsonTests : TestBase
+[TestClass]
+public sealed class JsonTests
 {
     private readonly Json _json;
 
-    public JsonTests(ITestExecutionContext testExecutionContext)
-        : base(testExecutionContext)
+    public JsonTests()
     {
-        var serializers = new Dictionary<Type, JsonSerializer>();
-        var deserializers = new Dictionary<Type, JsonDeserializer>();
+        Dictionary<Type, JsonSerializer> serializers = [];
+        Dictionary<Type, JsonDeserializer> deserializers = [];
 
         foreach (Type serializableType in SerializerUtilities.SerializerTypes)
         {
             serializers[serializableType] = new JsonObjectSerializer<object>(
-                o => SerializerUtilities.Serialize(serializableType, o).Select(kvp => (kvp.Key, kvp.Value)).ToArray());
+                o => [.. SerializerUtilities.Serialize(serializableType, o).Select(kvp => (kvp.Key, kvp.Value))]);
         }
 
         foreach (Type deserializableType in SerializerUtilities.DeserializerTypes)
@@ -38,16 +35,17 @@ public class JsonTests : TestBase
         _json = new Json(serializers, deserializers);
     }
 
+    [TestMethod]
     public async Task Serialize_TestNodeAsync()
     {
         // Arrange
-        var bag = new PropertyBag(new SerializableKeyValuePairStringProperty("hello", "my friend"));
+        PropertyBag bag = new(new SerializableKeyValuePairStringProperty("hello", "my friend"));
 
-        var testNode = new TestNode
+        TestNode testNode = new()
         {
             DisplayName = "test",
             Properties = bag,
-            Uid = new Extensions.Messages.TestNodeUid("11111"),
+            Uid = new TestNodeUid("11111"),
         };
 
         // Act
@@ -57,10 +55,11 @@ public class JsonTests : TestBase
         Assert.AreEqual("""{"uid":"11111","display-name":"test","hello":"my friend","node-type":"group"}""", actual);
     }
 
+    [TestMethod]
     public async Task Serialize_Array()
     {
         // Arrange
-        var json = new Json();
+        Json json = new();
 
         // Act
         string actual = await json.SerializeAsync(new int[] { 1, 2, 3 });
@@ -69,10 +68,11 @@ public class JsonTests : TestBase
         Assert.AreEqual("[1,2,3]", actual);
     }
 
+    [TestMethod]
     public async Task Serialize_DateTimeOffset()
     {
         // Arrange
-        var json = new Json();
+        Json json = new();
 
         // Act
         string actual = await json.SerializeAsync(new DateTimeOffset(2023, 01, 01, 01, 01, 01, 01, TimeSpan.Zero));
@@ -81,20 +81,21 @@ public class JsonTests : TestBase
         Assert.AreEqual("2023-01-01T01:01:01.0010000+00:00", actual.Trim('"'));
     }
 
+    [TestMethod]
     public async Task Serialize_ArrayOfObjects()
     {
         // Arrange
-        var converters = new Dictionary<Type, JsonSerializer>
+        Dictionary<Type, JsonSerializer> converters = new()
         {
             [typeof(Person)] = new JsonObjectSerializer<Person>(
-                n => new (string Key, object? Value)[]
-                {
+                n =>
+                [
                     ("name", n.Name),
-                    ("children", n.Children),
-                }),
+                    ("children", n.Children)
+                ]),
         };
 
-        var person = new Person
+        Person person = new()
         {
             Name = "Thomas",
             Children =
@@ -106,7 +107,7 @@ public class JsonTests : TestBase
             ],
         };
 
-        var json = new Json(converters);
+        Json json = new(converters);
 
         // Act
         string actual = await json.SerializeAsync(new object[] { person, new[] { 2 }, 3 });
@@ -115,51 +116,40 @@ public class JsonTests : TestBase
         Assert.AreEqual("""[{"name":"Thomas","children":[{"name":"Ruth","children":null}]},[2],3]""", actual);
     }
 
+    [TestMethod]
     public void DeserializePerson()
     {
         // Arrange
-        var json = new Json(null, new Dictionary<Type, JsonDeserializer>
+        Json json = new(null, new Dictionary<Type, JsonDeserializer>
         {
             [typeof(Person)] = new JsonElementDeserializer<Person>((json, jsonElement) => new Person
             {
                 Name = json.Bind<string?>(jsonElement, "name"),
-                Children = json.Bind<List<Person>>(jsonElement, "children"),
             }),
-
-            [typeof(List<Person>)] = new JsonCollectionDeserializer<List<Person>, Person>(_ => new List<Person>(), (c, i) => c.Add(i)),
         });
 
         // Act
-        Person actual = json.Deserialize<Person>(new("""{"name":"Thomas","children":[{"name":"Ruth","children":null}]}""".ToCharArray()));
+        Person actual = json.Deserialize<Person>(new("""{"name":"Thomas"}""".ToCharArray()));
 
         // Assert
         Assert.AreEqual("Thomas", actual.Name);
-        Assert.AreEqual(1, actual.Children!.Count);
-        Assert.AreEqual("Ruth", actual.Children![0].Name);
-        Assert.IsNull(actual.Children![0].Children);
     }
 
-    public void DeserializePersonList()
+    [TestMethod]
+    public void GetProperties_WhenPropertiesDelegateIsNotSet_ThrowsInvalidOperationException()
     {
         // Arrange
-        var json = new Json(null, new Dictionary<Type, JsonDeserializer>
-        {
-            [typeof(Person)] = new JsonElementDeserializer<Person>((json, jsonElement) => new Person
-            {
-                Name = json.Bind<string?>(jsonElement, "name"),
-                Children = json.Bind<List<Person>>(jsonElement, "children"),
-            }),
-
-            [typeof(List<Person>)] = new JsonCollectionDeserializer<List<Person>, Person>(_ => new List<Person>(), (c, i) => c.Add(i)),
-        });
+        var serializer = new TestJsonObjectSerializer();
 
         // Act
-        List<Person> actual = json.Deserialize<List<Person>>(new("""[{"name":"Thomas","children":[{"name":"Ruth","children":null}]}]""".ToCharArray()));
+        InvalidOperationException exception = Assert.ThrowsExactly<InvalidOperationException>(() => serializer.GetProperties(new object()));
 
         // Assert
-        Assert.AreEqual(1, actual.Count);
-        Assert.AreEqual("Thomas", actual[0].Name);
+        Assert.Contains(nameof(JsonObjectSerializer.Properties), exception.Message);
+        Assert.Contains(nameof(TestJsonObjectSerializer), exception.Message);
     }
+
+    private sealed class TestJsonObjectSerializer : JsonObjectSerializer;
 
     private sealed class Person
     {

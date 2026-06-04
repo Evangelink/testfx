@@ -1,8 +1,5 @@
-// Copyright (c) Microsoft Corporation. All rights reserved.
+﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
-
-using System.Diagnostics.CodeAnalysis;
-using System.Globalization;
 
 namespace Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -11,6 +8,7 @@ namespace Microsoft.VisualStudio.TestTools.UnitTesting;
 /// unit tests. If the condition being tested is not met, an exception
 /// is thrown.
 /// </summary>
+[StackTraceHidden]
 public sealed partial class Assert
 {
     private Assert()
@@ -26,28 +24,10 @@ public sealed partial class Assert
     /// Users could then use a syntax similar to the default assertions which in this case is "Assert.That.IsOfType&lt;Dog&gt;(animal);"
     /// More documentation is at "https://github.com/Microsoft/testfx/docs/README.md".
     /// </remarks>
-    public static Assert That { get; } = new Assert();
+    public static Assert That { get; } = new();
 
     /// <summary>
-    /// Replaces null characters ('\0') with "\\0".
-    /// </summary>
-    /// <param name="input">
-    /// The string to search.
-    /// </param>
-    /// <returns>
-    /// The converted string with null characters replaced by "\\0".
-    /// </returns>
-    /// <remarks>
-    /// This is only public and still present to preserve compatibility with the V1 framework.
-    /// </remarks>
-    [return: NotNullIfNotNull(nameof(input))]
-    public static string? ReplaceNullChars(string? input)
-        => StringEx.IsNullOrEmpty(input)
-            ? input
-            : input.Replace("\0", "\\0");
-
-    /// <summary>
-    /// Helper function that creates and throws an AssertionFailedException.
+    /// Reports an assertion failure and always throws, even within an <see cref="AssertScope"/>.
     /// </summary>
     /// <param name="assertionName">
     /// name of the assertion throwing an exception.
@@ -56,9 +36,228 @@ public sealed partial class Assert
     /// The assertion failure message.
     /// </param>
     [DoesNotReturn]
+    [StackTraceHidden]
     internal static void ThrowAssertFailed(string assertionName, string? message)
-        => throw new AssertFailedException(
-            string.Format(CultureInfo.CurrentCulture, FrameworkMessages.AssertionFailed, assertionName, ReplaceNulls(message)));
+    {
+        LaunchDebuggerIfNeeded();
+        throw CreateAssertFailedException(assertionName, message);
+    }
+
+    /// <summary>
+    /// Reports an assertion failure. Within an <see cref="AssertScope"/>, the failure is collected
+    /// and execution continues. Outside a scope, the failure is thrown immediately.
+    /// </summary>
+    /// <param name="assertionName">
+    /// name of the assertion throwing an exception.
+    /// </param>
+    /// <param name="message">
+    /// The assertion failure message.
+    /// </param>
+#pragma warning disable CS8763 // A method marked [DoesNotReturn] should not return - Deliberately keeping [DoesNotReturn] annotation while using soft assertions. Within an AssertScope, the postcondition is not enforced (same as all other assertion postconditions in scoped mode).
+    [DoesNotReturn]
+    [StackTraceHidden]
+    internal static void ReportAssertFailed(string assertionName, string? message)
+    {
+        LaunchDebuggerIfNeeded();
+        AssertFailedException assertionFailedException = CreateAssertFailedException(assertionName, message);
+        if (AssertScope.Current is { } scope)
+        {
+            // Throw and catch to capture the stack trace at the point of failure,
+            // so the exception has a meaningful stack trace when reported from the scope.
+            try
+            {
+                throw assertionFailedException;
+            }
+            catch (AssertFailedException ex)
+            {
+                assertionFailedException = ex;
+            }
+
+            scope.AddError(assertionFailedException);
+            return;
+        }
+
+        throw assertionFailedException;
+    }
+#pragma warning restore CS8763 // A method marked [DoesNotReturn] should not return
+
+    private static void LaunchDebuggerIfNeeded()
+    {
+        if (ShouldLaunchDebugger())
+        {
+            if (Debugger.IsAttached)
+            {
+                Debugger.Break();
+            }
+            else
+            {
+                Debugger.Launch();
+            }
+        }
+
+        // Local functions
+        static bool ShouldLaunchDebugger()
+            => AssertionFailureSettings.LaunchDebuggerOnAssertionFailure switch
+            {
+                DebuggerLaunchMode.Enabled => true,
+                DebuggerLaunchMode.EnabledExcludingCI => !CIEnvironmentDetector.Instance.IsCIEnvironment(),
+                _ => false,
+            };
+    }
+
+    private static AssertFailedException CreateAssertFailedException(string assertionName, string? message)
+        => new(FormatAssertionFailed(assertionName, message));
+
+    private static AssertFailedException CreateAssertFailedException(StructuredAssertionMessage structuredMessage)
+    {
+        AssertFailedException exception = new(structuredMessage.Format())
+        {
+            ExpectedText = structuredMessage.ExpectedText,
+            ActualText = structuredMessage.ActualText,
+        };
+
+        if (structuredMessage.ExpectedText is not null)
+        {
+            exception.Data["assert.expected"] = structuredMessage.ExpectedText;
+        }
+
+        if (structuredMessage.ActualText is not null)
+        {
+            exception.Data["assert.actual"] = structuredMessage.ActualText;
+        }
+
+        return exception;
+    }
+
+    /// <summary>
+    /// Reports an assertion failure using a structured message. Within an <see cref="AssertScope"/>,
+    /// the failure is collected and execution continues. Outside a scope, the failure is thrown immediately.
+    /// </summary>
+    /// <param name="structuredMessage">
+    /// The structured assertion failure message.
+    /// </param>
+#pragma warning disable CS8763 // A method marked [DoesNotReturn] should not return - Deliberately keeping [DoesNotReturn] annotation while using soft assertions. Within an AssertScope, the postcondition is not enforced (same as all other assertion postconditions in scoped mode).
+    [DoesNotReturn]
+    [StackTraceHidden]
+    internal static void ReportAssertFailed(StructuredAssertionMessage structuredMessage)
+    {
+        LaunchDebuggerIfNeeded();
+        AssertFailedException assertionFailedException = CreateAssertFailedException(structuredMessage);
+        if (AssertScope.Current is { } scope)
+        {
+            try
+            {
+                throw assertionFailedException;
+            }
+            catch (AssertFailedException ex)
+            {
+                assertionFailedException = ex;
+            }
+
+            scope.AddError(assertionFailedException);
+            return;
+        }
+
+        throw assertionFailedException;
+    }
+#pragma warning restore CS8763 // A method marked [DoesNotReturn] should not return
+
+    /// <summary>
+    /// Reports an assertion failure using a structured message and always throws,
+    /// even within an <see cref="AssertScope"/>.
+    /// </summary>
+    /// <param name="structuredMessage">
+    /// The structured assertion failure message.
+    /// </param>
+    [DoesNotReturn]
+    [StackTraceHidden]
+    internal static void ThrowAssertFailed(StructuredAssertionMessage structuredMessage)
+    {
+        LaunchDebuggerIfNeeded();
+        throw CreateAssertFailedException(structuredMessage);
+    }
+
+    /// <summary>
+    /// Formats a call-site expression for display at the bottom of a structured assertion message.
+    /// When the expression is empty, the call-site is omitted. When the expression contains newlines,
+    /// it is replaced with the supplied placeholder (either a full <c>&lt;placeholder&gt;</c> or a raw parameter name).
+    /// </summary>
+    internal static string? FormatCallSiteExpression(string assertionMethodName, string expression, string placeholderOrParamName = "<value>")
+    {
+        if (string.IsNullOrWhiteSpace(expression))
+        {
+            return null;
+        }
+
+        string arg = IsMultiline(expression) ? NormalizeCallSitePlaceholder(placeholderOrParamName) : expression;
+        return $"{assertionMethodName}({arg})";
+    }
+
+    /// <summary>
+    /// Formats a call-site expression for display at the bottom of a structured assertion message,
+    /// using two captured expressions. Multiline expressions are replaced with the supplied placeholders.
+    /// When only one expression is empty/whitespace, its placeholder is used so the partial call site is still shown;
+    /// only when both expressions are empty/whitespace is the entire call-site line suppressed.
+    /// </summary>
+    internal static string? FormatCallSiteExpression(string assertionMethodName, string expression1, string expression2, string placeholder1 = "<arg1>", string placeholder2 = "<arg2>")
+    {
+        bool empty1 = string.IsNullOrWhiteSpace(expression1);
+        bool empty2 = string.IsNullOrWhiteSpace(expression2);
+        if (empty1 && empty2)
+        {
+            return null;
+        }
+
+        string arg1 = empty1 || IsMultiline(expression1) ? NormalizeCallSitePlaceholder(placeholder1) : expression1;
+        string arg2 = empty2 || IsMultiline(expression2) ? NormalizeCallSitePlaceholder(placeholder2) : expression2;
+
+        return $"{assertionMethodName}({arg1}, {arg2})";
+    }
+
+    /// <summary>
+    /// Formats a call-site expression for display at the bottom of a structured assertion message,
+    /// using three captured expressions. Multiline (or empty/whitespace) expressions are replaced with the
+    /// supplied placeholders. Only when all three expressions are empty/whitespace is the entire call-site
+    /// line suppressed.
+    /// </summary>
+    internal static string? FormatCallSiteExpression(string assertionMethodName, string expression1, string expression2, string expression3, string placeholder1 = "<arg1>", string placeholder2 = "<arg2>", string placeholder3 = "<arg3>")
+    {
+        bool empty1 = string.IsNullOrWhiteSpace(expression1);
+        bool empty2 = string.IsNullOrWhiteSpace(expression2);
+        bool empty3 = string.IsNullOrWhiteSpace(expression3);
+        if (empty1 && empty2 && empty3)
+        {
+            return null;
+        }
+
+        string arg1 = empty1 || IsMultiline(expression1) ? NormalizeCallSitePlaceholder(placeholder1) : expression1;
+        string arg2 = empty2 || IsMultiline(expression2) ? NormalizeCallSitePlaceholder(placeholder2) : expression2;
+        string arg3 = empty3 || IsMultiline(expression3) ? NormalizeCallSitePlaceholder(placeholder3) : expression3;
+
+        return $"{assertionMethodName}({arg1}, {arg2}, {arg3})";
+    }
+
+    // string.Contains(char) is not available on netstandard2.0 / net462, so use IndexOf to check for newline characters.
+    private static bool IsMultiline(string expression)
+        => expression.IndexOf('\n') >= 0 || expression.IndexOf('\r') >= 0;
+
+    private static string NormalizeCallSitePlaceholder(string placeholderOrParamName)
+        => placeholderOrParamName.Length > 1 && placeholderOrParamName[0] == '<' && placeholderOrParamName[placeholderOrParamName.Length - 1] == '>'
+            ? placeholderOrParamName
+            : $"<{placeholderOrParamName}>";
+
+    private static string FormatAssertionFailed(string assertionName, string? message)
+    {
+        string failedMessage = string.Format(CultureInfo.CurrentCulture, FrameworkMessages.AssertionFailed, assertionName);
+        return FormatPrefixAndMessage(failedMessage, message);
+    }
+
+    private static string FormatPrefixAndMessage(string prefix, string? message)
+        => string.IsNullOrWhiteSpace(message)
+            ? prefix
+            : message![0] is '\n' or '\r'
+                ? string.Concat(prefix, message)
+                : $"{prefix} {message}";
 
     /// <summary>
     /// Builds the formatted message using the given user format message and parameters.
@@ -66,20 +265,11 @@ public sealed partial class Assert
     /// <param name="format">
     /// A composite format string.
     /// </param>
-    /// <param name="parameters">
-    /// An object array that contains zero or more objects to format.
-    /// </param>
     /// <returns>
     /// The formatted string based on format and parameters.
     /// </returns>
-    internal static string BuildUserMessage(string? format, params object?[]? parameters)
-        => format is null
-            ? ReplaceNulls(format)
-            : format.Length == 0
-                ? string.Empty
-                : parameters == null || parameters.Length == 0
-                    ? ReplaceNulls(format)
-                    : string.Format(CultureInfo.CurrentCulture, ReplaceNulls(format), parameters);
+    internal static string BuildUserMessage(string? format)
+        => format ?? string.Empty;
 
     /// <summary>
     /// Checks the parameter for valid conditions.
@@ -93,73 +283,98 @@ public sealed partial class Assert
     /// <param name="parameterName">
     /// parameter name.
     /// </param>
-    /// <param name="message">
-    /// message for the invalid parameter exception.
-    /// </param>
-    /// <param name="parameters">
-    /// The parameters.
-    /// </param>
-    internal static void CheckParameterNotNull([NotNull] object? param, string assertionName, string parameterName,
-        string? message, params object?[]? parameters)
+    internal static void CheckParameterNotNull([NotNull] object? param, string assertionName, string parameterName)
     {
-        if (param == null)
+        if (param is null)
         {
-            string userMessage = BuildUserMessage(message, parameters);
-            string finalMessage = string.Format(CultureInfo.CurrentCulture, FrameworkMessages.NullParameterToAssert, parameterName, userMessage);
-            ThrowAssertFailed(assertionName, finalMessage);
+            string finalMessage = string.Format(CultureInfo.CurrentCulture, FrameworkMessages.NullParameterToAssert, parameterName);
+            throw CreateAssertFailedException(assertionName, finalMessage);
         }
     }
 
-    /// <summary>
-    /// Safely converts an object to a string, handling null values and null characters.
-    /// Null values are converted to "(null)". Null characters are converted to "\\0".
-    /// </summary>
-    /// <param name="input">
-    /// The object to convert to a string.
-    /// </param>
-    /// <returns>
-    /// The converted string.
-    /// </returns>
-    [SuppressMessage("ReSharper", "RedundantToStringCall", Justification = "We are ensuring ToString() isn't overloaded in a way to misbehave")]
-    [return: NotNull]
     internal static string ReplaceNulls(object? input)
-    {
-        // Use the localized "(null)" string for null values.
-        if (input == null)
-        {
-            return FrameworkMessages.Common_NullInMessages.ToString();
-        }
+        => input?.ToString() ?? string.Empty;
 
-        // Convert it to a string.
-        string? inputString = input.ToString();
-
-        // Make sure the class didn't override ToString and return null.
-        return inputString == null ? FrameworkMessages.Common_ObjectString.ToString() : ReplaceNullChars(inputString);
-    }
-
-    private static int CompareInternal(string? expected, string? actual, bool ignoreCase, CultureInfo? culture)
+    private static int CompareInternal(string? expected, string? actual, bool ignoreCase, CultureInfo culture)
 #pragma warning disable CA1309 // Use ordinal string comparison
         => string.Compare(expected, actual, ignoreCase, culture);
 #pragma warning restore CA1309 // Use ordinal string comparison
 
-    #region EqualsAssertion
+    #region DoNotUse
 
     /// <summary>
     /// Static equals overloads are used for comparing instances of two types for reference
     /// equality. This method should <b>not</b> be used for comparison of two instances for
-    /// equality. This object will <b>always</b> throw with Assert.Fail. Please use
-    /// Assert.AreEqual and associated overloads in your unit tests.
+    /// equality. Please use Assert.AreEqual and associated overloads in your unit tests.
     /// </summary>
     /// <param name="objA"> Object A. </param>
     /// <param name="objB"> Object B. </param>
-    /// <returns> False, always. </returns>
+    /// <returns> Never returns. </returns>
     [SuppressMessage("Microsoft.Naming", "CA1720:IdentifiersShouldNotContainTypeNames", MessageId = "obj", Justification = "We want to compare 'object A' with 'object B', so it makes sense to have 'obj' in the parameter name")]
-#pragma warning disable IDE0060 // Remove unused parameter
+#if DEBUG && NET8_0_OR_GREATER
+    [Obsolete(
+        FrameworkConstants.DoNotUseAssertEquals,
+        error: false,
+        DiagnosticId = "MSTEST0100",
+        UrlFormat = "https://aka.ms/mstest/diagnostics#{0}")]
+#elif DEBUG
+    [Obsolete(
+        FrameworkConstants.DoNotUseAssertEquals,
+        error: false)]
+#elif NET8_0_OR_GREATER
+    [Obsolete(
+        FrameworkConstants.DoNotUseAssertEquals,
+        error: true,
+        DiagnosticId = "MSTEST0100",
+        UrlFormat = "https://aka.ms/mstest/diagnostics#{0}")]
+#else
+    [Obsolete(
+        FrameworkConstants.DoNotUseAssertEquals,
+        error: true)]
+#endif
+    [DoesNotReturn]
     public static new bool Equals(object? objA, object? objB)
-#pragma warning restore IDE0060 // Remove unused parameter
     {
         Fail(FrameworkMessages.DoNotUseAssertEquals);
         return false;
     }
+
+    /// <summary>
+    /// Static ReferenceEquals overloads are used for comparing instances of two types for reference
+    /// equality. This method should <b>not</b> be used for comparison of two instances for
+    /// reference equality. Please use Assert.AreSame and associated overloads in your unit tests.
+    /// </summary>
+    /// <param name="objA"> Object A. </param>
+    /// <param name="objB"> Object B. </param>
+    /// <returns> Never returns. </returns>
+    [SuppressMessage("Microsoft.Naming", "CA1720:IdentifiersShouldNotContainTypeNames", MessageId = "obj", Justification = "We want to compare 'object A' with 'object B', so it makes sense to have 'obj' in the parameter name")]
+#if DEBUG && NET8_0_OR_GREATER
+    [Obsolete(
+        FrameworkConstants.DoNotUseAssertReferenceEquals,
+        error: false,
+        DiagnosticId = "MSTEST0101",
+        UrlFormat = "https://aka.ms/mstest/diagnostics#{0}")]
+#elif DEBUG
+    [Obsolete(
+        FrameworkConstants.DoNotUseAssertReferenceEquals,
+        error: false)]
+#elif NET8_0_OR_GREATER
+    [Obsolete(
+        FrameworkConstants.DoNotUseAssertReferenceEquals,
+        error: true,
+        DiagnosticId = "MSTEST0101",
+        UrlFormat = "https://aka.ms/mstest/diagnostics#{0}")]
+#else
+    [Obsolete(
+        FrameworkConstants.DoNotUseAssertReferenceEquals,
+        error: true)]
+#endif
+    [DoesNotReturn]
+    public static new bool ReferenceEquals(object? objA, object? objB)
+    {
+        Fail(FrameworkMessages.DoNotUseAssertReferenceEquals);
+        return false;
+    }
+
     #endregion
 }

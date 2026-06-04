@@ -1,33 +1,26 @@
-// Copyright (c) Microsoft Corporation. All rights reserved.
+﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System.Diagnostics.CodeAnalysis;
-using System.Reflection;
+#if !WINDOWS_UWP && !WIN_UI
 
-#if !WINDOWS_UWP
+using Microsoft.VisualStudio.TestPlatform.MSTest.TestAdapter;
 using Microsoft.VisualStudio.TestPlatform.MSTestAdapter.PlatformServices.Deployment;
-#endif
 using Microsoft.VisualStudio.TestPlatform.MSTestAdapter.PlatformServices.Interface;
-#if !WINDOWS_UWP
 using Microsoft.VisualStudio.TestPlatform.MSTestAdapter.PlatformServices.Utilities;
-#endif
 using Microsoft.VisualStudio.TestPlatform.ObjectModel;
 using Microsoft.VisualStudio.TestPlatform.ObjectModel.Adapter;
 #if NETFRAMEWORK
 using Microsoft.VisualStudio.TestPlatform.ObjectModel.Utilities;
 #endif
-#if !WINDOWS_UWP
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-#endif
 
 namespace Microsoft.VisualStudio.TestPlatform.MSTestAdapter.PlatformServices;
 
 /// <summary>
 /// The test deployment.
 /// </summary>
-public class TestDeployment : ITestDeployment
+internal sealed class TestDeployment : ITestDeployment
 {
-#if !WINDOWS_UWP
     #region Service Utility Variables
 
     private readonly DeploymentItemUtility _deploymentItemUtility;
@@ -41,7 +34,7 @@ public class TestDeployment : ITestDeployment
     /// Initializes a new instance of the <see cref="TestDeployment"/> class.
     /// </summary>
     public TestDeployment()
-        : this(new DeploymentItemUtility(new ReflectionUtility()), new DeploymentUtility(), new FileUtility())
+        : this(new DeploymentItemUtility(PlatformServiceProvider.Instance.ReflectionOperations), new DeploymentUtility(), new FileUtility())
     {
     }
 
@@ -68,7 +61,6 @@ public class TestDeployment : ITestDeployment
     /// Leaving this as a static variable since the testContext needs to be filled in with this information.
     /// </remarks>
     internal static TestRunDirectories? RunDirectories { get; private set; }
-#endif
 
     /// <summary>
     /// The get deployment items.
@@ -77,60 +69,48 @@ public class TestDeployment : ITestDeployment
     /// <param name="type"> The type. </param>
     /// <param name="warnings"> The warnings. </param>
     /// <returns> A string of deployment items. </returns>
-    public KeyValuePair<string, string>[]? GetDeploymentItems(MethodInfo method, Type type, ICollection<string> warnings)
-    {
-#if WINDOWS_UWP
-        return null;
-#else
-        return _deploymentItemUtility.GetDeploymentItems(method, _deploymentItemUtility.GetClassLevelDeploymentItems(type, warnings), warnings);
-#endif
-    }
+    public KeyValuePair<string, string>[]? GetDeploymentItems(MethodInfo method, Type type, ICollection<string> warnings) =>
+        _deploymentItemUtility.GetDeploymentItems(method, _deploymentItemUtility.GetClassLevelDeploymentItems(type, warnings), warnings);
 
     /// <summary>
     /// Cleanup deployment item directories.
     /// </summary>
     public void Cleanup()
     {
-#if !WINDOWS_UWP
         // Delete the deployment directory
         if (RunDirectories != null && _adapterSettings?.DeleteDeploymentDirectoryAfterTestRunIsComplete == true)
         {
-            EqtTrace.InfoIf(EqtTrace.IsInfoEnabled, "Deleting deployment directory {0}", RunDirectories.RootDeploymentDirectory);
+            if (PlatformServiceProvider.Instance.AdapterTraceLogger.IsInfoEnabled)
+            {
+                PlatformServiceProvider.Instance.AdapterTraceLogger.Info("Deleting deployment directory {0}", RunDirectories.RootDeploymentDirectory);
+            }
 
             _fileUtility.DeleteDirectories(RunDirectories.RootDeploymentDirectory);
 
-            EqtTrace.InfoIf(EqtTrace.IsInfoEnabled, "Deleted deployment directory {0}", RunDirectories.RootDeploymentDirectory);
+            if (PlatformServiceProvider.Instance.AdapterTraceLogger.IsInfoEnabled)
+            {
+                PlatformServiceProvider.Instance.AdapterTraceLogger.Info("Deleted deployment directory {0}", RunDirectories.RootDeploymentDirectory);
+            }
         }
-#endif
     }
 
     /// <summary>
     /// Gets the deployment output directory where the source file along with all its dependencies is dropped.
     /// </summary>
     /// <returns> The deployment output directory. </returns>
-    public string? GetDeploymentDirectory()
-    {
-#if WINDOWS_UWP
-        return null;
-#else
-        return RunDirectories?.OutDirectory;
-#endif
-    }
+    public string? GetDeploymentDirectory() =>
+        RunDirectories?.OutDirectory;
 
     /// <summary>
     /// Deploy files related to the list of tests specified.
     /// </summary>
-    /// <param name="tests"> The tests. </param>
+    /// <param name="testCases"> The tests. </param>
     /// <param name="runContext"> The run context. </param>
     /// <param name="frameworkHandle"> The framework handle. </param>
     /// <returns> Return true if deployment is done. </returns>
-    [SuppressMessage("Naming", "CA1725:Parameter names should match base declaration", Justification = "Part of the public API")]
-    public bool Deploy(IEnumerable<TestCase> tests, IRunContext? runContext, IFrameworkHandle frameworkHandle)
+    public bool Deploy(IEnumerable<TestCase> testCases, IRunContext? runContext, IFrameworkHandle frameworkHandle)
     {
-#if WINDOWS_UWP
-        return false;
-#else
-        DebugEx.Assert(tests != null, "tests");
+        DebugEx.Assert(testCases != null, "tests");
 
         // Reset runDirectories before doing deployment, so that older values of runDirectories is not picked
         // even if test host is kept alive.
@@ -138,7 +118,7 @@ public class TestDeployment : ITestDeployment
 
         _adapterSettings = MSTestSettingsProvider.Settings;
         bool canDeploy = CanDeploy();
-        var hasDeploymentItems = tests.Any(test => DeploymentItemUtility.HasDeploymentItems(test));
+        bool hasDeploymentItems = testCases.Any(DeploymentItemUtility.HasDeploymentItems);
 
         // deployment directories should not be created in this case,simply return
         if (!canDeploy && hasDeploymentItems)
@@ -146,7 +126,9 @@ public class TestDeployment : ITestDeployment
             return false;
         }
 
-        RunDirectories = _deploymentUtility.CreateDeploymentDirectories(runContext);
+#if NETFRAMEWORK
+        string? firstTestSource = testCases.FirstOrDefault()?.Source;
+        RunDirectories = _deploymentUtility.CreateDeploymentDirectories(runContext, firstTestSource);
 
         // Deployment directories are created but deployment will not happen.
         // This is added just to keep consistency with MSTest v1 behavior.
@@ -154,6 +136,16 @@ public class TestDeployment : ITestDeployment
         {
             return false;
         }
+#else
+        // On .NET Core, avoid creating empty deployment folders when no deployment items are used.
+        if (!hasDeploymentItems)
+        {
+            return false;
+        }
+
+        string? firstTestSource = testCases.FirstOrDefault()?.Source;
+        RunDirectories = _deploymentUtility.CreateDeploymentDirectories(runContext, firstTestSource);
+#endif
 
         // Object model currently does not have support for SuspendCodeCoverage. We can remove this once support is added
 #if NETFRAMEWORK
@@ -161,11 +153,11 @@ public class TestDeployment : ITestDeployment
 #endif
         {
             // Group the tests by source
-            var testsBySource = from test in tests
+            var testsBySource = from test in testCases
                                 group test by test.Source into testGroup
                                 select new { Source = testGroup.Key, Tests = testGroup };
 
-            var runDirectories = RunDirectories;
+            TestRunDirectories runDirectories = RunDirectories;
             foreach (var group in testsBySource)
             {
                 // do the deployment
@@ -177,13 +169,11 @@ public class TestDeployment : ITestDeployment
         }
 
         return true;
-#endif
     }
 
-#if !WINDOWS_UWP
-    internal static IDictionary<string, object> GetDeploymentInformation(string source)
+    internal static IDictionary<string, object> GetDeploymentInformation(string? source)
     {
-        var properties = new Dictionary<string, object>();
+        var properties = new Dictionary<string, object>(capacity: 8);
 
         string applicationBaseDirectory = string.Empty;
 
@@ -199,22 +189,13 @@ public class TestDeployment : ITestDeployment
         properties[TestContext.ResultsDirectoryLabel] = RunDirectories?.InDirectory ?? applicationBaseDirectory;
         properties[TestContext.TestRunResultsDirectoryLabel] = RunDirectories?.InMachineNameDirectory ?? applicationBaseDirectory;
         properties[TestContext.TestResultsDirectoryLabel] = RunDirectories?.InDirectory ?? applicationBaseDirectory;
-#pragma warning disable CS0618 // Type or member is obsolete
-        properties[TestContext.TestDirLabel] = RunDirectories?.RootDeploymentDirectory ?? applicationBaseDirectory;
-        properties[TestContext.TestDeploymentDirLabel] = RunDirectories?.OutDirectory ?? applicationBaseDirectory;
-        properties[TestContext.TestLogsDirLabel] = RunDirectories?.InMachineNameDirectory ?? applicationBaseDirectory;
-#pragma warning restore CS0618 // Type or member is obsolete
-
         return properties;
     }
 
     /// <summary>
     /// Reset the static variable to default values. Used only for testing purposes.
     /// </summary>
-    internal static void Reset()
-    {
-        RunDirectories = null;
-    }
+    internal static void Reset() => RunDirectories = null;
 
     /// <summary>
     /// Returns whether deployment can happen or not.
@@ -225,11 +206,15 @@ public class TestDeployment : ITestDeployment
         DebugEx.Assert(_adapterSettings is not null, "Adapter settings should not be null.");
         if (!_adapterSettings.DeploymentEnabled)
         {
-            EqtTrace.InfoIf(EqtTrace.IsInfoEnabled, "MSTestExecutor: CanDeploy is false.");
+            if (PlatformServiceProvider.Instance.AdapterTraceLogger.IsInfoEnabled)
+            {
+                PlatformServiceProvider.Instance.AdapterTraceLogger.Info("MSTestExecutor: CanDeploy is false.");
+            }
+
             return false;
         }
 
         return true;
     }
-#endif
 }
+#endif

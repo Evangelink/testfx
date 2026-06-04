@@ -1,20 +1,19 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System.Collections.Concurrent;
-using System.Diagnostics.CodeAnalysis;
 using System.Net.Sockets;
 
 using Microsoft.Testing.Internal.Framework;
 using Microsoft.Testing.Platform.Capabilities.TestFramework;
 using Microsoft.Testing.Platform.Extensions.Messages;
+using Microsoft.Testing.Platform.Extensions.OutputDevice;
 using Microsoft.Testing.Platform.Extensions.TestFramework;
-using Microsoft.Testing.Platform.Extensions.TestHost;
 using Microsoft.Testing.Platform.Helpers;
 using Microsoft.Testing.Platform.Logging;
 using Microsoft.Testing.Platform.Messages;
 using Microsoft.Testing.Platform.OutputDevice;
 using Microsoft.Testing.Platform.Requests;
+using Microsoft.Testing.Platform.Resources;
 using Microsoft.Testing.Platform.ServerMode;
 using Microsoft.Testing.Platform.Services;
 using Microsoft.Testing.Platform.Telemetry;
@@ -22,28 +21,14 @@ using Microsoft.Testing.Platform.TestHost;
 
 namespace Microsoft.Testing.Platform.Hosts;
 
-internal sealed partial class ServerTestHost : CommonTestHost, IServerTestHost, IDisposable
+internal sealed partial class ServerTestHost : CommonHost, IServerTestHost, IDisposable, IOutputDeviceDataProducer
 {
-    private const string ProtocolVersion = "1.0.0";
-    private readonly Func<
-        ServiceProvider,
-        ITestExecutionRequestFactory,
-        ITestFrameworkInvoker,
-        ITestExecutionFilterFactory,
-        IPlatformOutputDevice,
-        IEnumerable<IDataConsumer>,
-        TestFrameworkManager,
-        TestHostManager,
-        MessageBusProxy,
-        bool,
-        Task<ITestFramework>>
-        _buildTestFrameworkAsync;
+    public const string ProtocolVersion = PlatformVersion.Version;
+    private readonly Func<TestFrameworkBuilderData, Task<ITestFramework>> _buildTestFrameworkAsync;
 
     private readonly IMessageHandlerFactory _messageHandlerFactory;
     private readonly TestFrameworkManager _testFrameworkManager;
-    private readonly ITestApplicationCancellationTokenSource _testApplicationCancellationTokenSource;
     private readonly TestHostManager _testSessionManager;
-    private readonly ServerTelemetry _telemetryService;
     private readonly IAsyncMonitor _messageMonitor;
     private readonly IEnvironment _environment;
     private readonly ILogger<ServerTestHost> _logger;
@@ -64,23 +49,13 @@ internal sealed partial class ServerTestHost : CommonTestHost, IServerTestHost, 
     // Whenever a client responds with a result or an error, the requests
     // get completed.
     private ConcurrentDictionary<int, RpcInvocationState> _serverToClientRequests;
-    private int _serverToClientRequestId;
     private IMessageHandler? _messageHandler;
     private TestHost.ClientInfo? _client;
+    private IClientInfo? _clientInfoService;
 
     public ServerTestHost(
         ServiceProvider serviceProvider,
-        Func<ServiceProvider,
-            ITestExecutionRequestFactory,
-            ITestFrameworkInvoker,
-            ITestExecutionFilterFactory,
-            IPlatformOutputDevice,
-            IEnumerable<IDataConsumer>,
-            TestFrameworkManager,
-            TestHostManager,
-            MessageBusProxy,
-            bool,
-            Task<ITestFramework>> buildTestFrameworkAsync,
+        Func<TestFrameworkBuilderData, Task<ITestFramework>> buildTestFrameworkAsync,
         IMessageHandlerFactory messageHandlerFactory,
         TestFrameworkManager testFrameworkManager,
         TestHostManager testSessionManager)
@@ -89,9 +64,7 @@ internal sealed partial class ServerTestHost : CommonTestHost, IServerTestHost, 
         _buildTestFrameworkAsync = buildTestFrameworkAsync;
         _messageHandlerFactory = messageHandlerFactory;
         _testFrameworkManager = testFrameworkManager;
-        _testApplicationCancellationTokenSource = serviceProvider.GetTestApplicationCancellationTokenSource();
         _testSessionManager = testSessionManager;
-        _telemetryService = new ServerTelemetry(this);
         _clientToServerRequests = new();
         _serverToClientRequests = new();
 
@@ -102,7 +75,7 @@ internal sealed partial class ServerTestHost : CommonTestHost, IServerTestHost, 
         _clock = ServiceProvider.GetClock();
 
         _logger = ServiceProvider.GetLoggerFactory().CreateLogger<ServerTestHost>();
-        _messageHandlerStopPlusGlobalTokenSource = CancellationTokenSource.CreateLinkedTokenSource(_testApplicationCancellationTokenSource.CancellationToken, _stopMessageHandler.Token);
+        _messageHandlerStopPlusGlobalTokenSource = CancellationTokenSource.CreateLinkedTokenSource(serviceProvider.GetTestApplicationCancellationTokenSource().CancellationToken, _stopMessageHandler.Token);
 
         // If we don't want to crash on unhandled exceptions, handle them differently
         if (!ServiceProvider.GetUnhandledExceptionsPolicy().FastFailOnFailure)
@@ -114,15 +87,48 @@ internal sealed partial class ServerTestHost : CommonTestHost, IServerTestHost, 
 
     public bool IsInitialized => _messageHandler is not null;
 
-    protected override bool RunTestApplicationLifecycleCallbacks => true;
+    protected override bool RunTestApplicationLifeCycleCallbacks => true;
+
+    public string Uid => nameof(ServerTestHost);
+
+    public string Version => PlatformVersion.Version;
+
+    public string DisplayName => PlatformResources.ServerTestHostDisplayName;
+
+    public string Description => PlatformResources.ServerTestHostDescription;
 
     private void OnCurrentDomainUnhandledException(object sender, UnhandledExceptionEventArgs e)
-        => _logger.LogError($"[ServerTestHost.OnCurrentDomainUnhandledException] {e.ExceptionObject}{_environment.NewLine}IsTerminating: {e.IsTerminating}");
+    {
+        const string Prefix = "[ServerTestHost.OnCurrentDomainUnhandledException]";
+        var exception = e.ExceptionObject as Exception;
+
+        // Log the exception via the structured exception parameter so sinks can capture it
+        // independently of the message text. Output device still gets the human-readable form.
+        if (exception is not null)
+        {
+            _logger.Log(LogLevel.Warning, $"{Prefix} IsTerminating: {e.IsTerminating}", exception, LoggingExtensions.Formatter);
+        }
+        else
+        {
+            _logger.LogWarning($"{Prefix} {e.ExceptionObject}{_environment.NewLine}IsTerminating: {e.IsTerminating}");
+        }
+
+        // Looks like nothing in this message to really be localized?
+        // All are class names, method names, property names, and placeholders. So none is localizable?
+        ServiceProvider.GetOutputDevice().DisplayAsync(
+            this,
+            new WarningMessageOutputDeviceData(
+                $"{Prefix} {e.ExceptionObject}{_environment.NewLine}IsTerminating: {e.IsTerminating}"), CancellationToken.None)
+            .GetAwaiter().GetResult();
+    }
 
     private void OnTaskSchedulerUnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs e)
     {
         e.SetObserved();
-        _logger.LogError($"[UnhandledExceptionHandler.OnTaskSchedulerUnobservedTaskException] Unhandled exception: {e.Exception}");
+        _logger.Log(LogLevel.Warning, "[ServerTestHost.OnTaskSchedulerUnobservedTaskException] Unhandled task exception", e.Exception, LoggingExtensions.Formatter);
+
+        ServiceProvider.GetOutputDevice().DisplayAsync(this, new WarningMessageOutputDeviceData(string.Format(CultureInfo.InvariantCulture, PlatformResources.UnobservedTaskExceptionWarningMessage, e.Exception.ToString())), CancellationToken.None)
+            .GetAwaiter().GetResult();
     }
 
     [MemberNotNull(nameof(_messageHandler))]
@@ -134,50 +140,55 @@ internal sealed partial class ServerTestHost : CommonTestHost, IServerTestHost, 
         }
     }
 
-    protected override async Task<int> InternalRunAsync()
+    protected override async Task<int> InternalRunAsync(CancellationToken cancellationToken)
     {
+        using IPlatformActivity? activity = ServiceProvider.GetPlatformOTelService()?.StartActivity("ServerTestHost");
+
+        await _logger.LogDebugAsync("Starting server mode").ConfigureAwait(false);
+
         try
         {
-            await _logger.LogInformationAsync("Starting server mode");
-            _messageHandler = await _messageHandlerFactory.CreateMessageHandlerAsync(_testApplicationCancellationTokenSource.CancellationToken);
+            _messageHandler = await _messageHandlerFactory.CreateMessageHandlerAsync(cancellationToken).ConfigureAwait(false);
 
-            // Initialize the ServerLoggerForwarderProvider, it can be null if diagnostic is disabled.
-            var serviceLoggerForwarder = ServiceProvider.GetService<ServerLoggerForwarderProvider>();
-            if (serviceLoggerForwarder is not null)
-            {
-                await serviceLoggerForwarder.InitializeAsync(this);
-            }
-
-            await HandleMessagesAsync();
-
-            (_messageHandler as IDisposable)?.Dispose();
+            await HandleMessagesAsync(cancellationToken).ConfigureAwait(false);
         }
-        catch (OperationCanceledException ex) when (ex.CancellationToken == _testApplicationCancellationTokenSource.CancellationToken)
-        {
-        }
-        catch (SocketException ex) when (ex.SocketErrorCode == SocketError.OperationAborted && _testApplicationCancellationTokenSource.CancellationToken.IsCancellationRequested)
-        {
-        }
-        catch (ObjectDisposedException) when (_testApplicationCancellationTokenSource.CancellationToken.IsCancellationRequested)
+        catch (Exception ex) when
+            // When the cancellation token fires during TCP connect or message handling, several
+            // exception types can surface depending on the exact timing:
+            (cancellationToken.IsCancellationRequested
+            // the standard cancellation path.
+            && (ex is OperationCanceledException
+                // the TcpClient/stream was disposed while an async operation was in flight.
+                or ObjectDisposedException
+                // TOCTOU race in the runtime: ConnectAsync completed successfully at the OS level,
+                // but the cancellation callback (registered via CancellationToken.UnsafeRegister
+                // in SocketAsyncEventArgs.ProcessIOCPResult) called CancelIoEx, tearing down
+                // the socket's connected state before GetStream() could read it.
+                or InvalidOperationException
+                // the pending overlapped I/O was cancelled by CancelIoEx (Windows) from the
+                // cancellation callback, completing with SocketError.OperationAborted.
+                or SocketException { SocketErrorCode: SocketError.OperationAborted }))
         {
         }
         finally
         {
+            (_messageHandler as IDisposable)?.Dispose();
+
             // Cleanup all services but special one because in the per-call mode we needed to keep them alive for reuse
-            await DisposeServiceProviderAsync(ServiceProvider);
+            await DisposeServiceProviderAsync(ServiceProvider).ConfigureAwait(false);
         }
 
         // If the global cancellation is called together with the server closing one the server exited gracefully.
-        return !_testApplicationCancellationTokenSource.CancellationToken.IsCancellationRequested && _serverClosingTokenSource.IsCancellationRequested
-            ? ExitCodes.Success
-            : ExitCodes.TestSessionAborted;
+        return !cancellationToken.IsCancellationRequested && _serverClosingTokenSource.IsCancellationRequested
+            ? (int)ExitCode.Success
+            : (int)ExitCode.TestSessionAborted;
     }
 
     /// <summary>
     /// The main server loop.
     /// It receives messages from the client and then runs a corresponding handler.
     /// </summary>
-    private async Task HandleMessagesAsync()
+    private async Task HandleMessagesAsync(CancellationToken cancellationToken)
     {
         AssertInitialized();
 
@@ -186,7 +197,7 @@ internal sealed partial class ServerTestHost : CommonTestHost, IServerTestHost, 
         {
             try
             {
-                RpcMessage? message = await _messageHandler.ReadAsync(messageHandlerStopPlusGlobalToken);
+                RpcMessage? message = await _messageHandler.ReadAsync(messageHandlerStopPlusGlobalToken).ConfigureAwait(false);
 
                 // In case of issue on underneath handler we expect a null rpc message to signal that we should close
                 // because we're no more able to process things.
@@ -203,12 +214,10 @@ internal sealed partial class ServerTestHost : CommonTestHost, IServerTestHost, 
                     // Signal only one time
                     if (!_serverClosingTokenSource.IsCancellationRequested)
                     {
-                        await _logger.LogInformationAsync("Server requested to shutdown");
-#if NET8_0_OR_GREATER
-                        await _serverClosingTokenSource.CancelAsync();
-#else
+                        await _logger.LogDebugAsync("Server requested to shutdown").ConfigureAwait(false);
+#pragma warning disable VSTHRD103 // Call async methods when in an async method
                         _serverClosingTokenSource.Cancel();
-#endif
+#pragma warning restore VSTHRD103 // Call async methods when in an async method
                     }
 
                     // Signal the exit call
@@ -217,11 +226,9 @@ internal sealed partial class ServerTestHost : CommonTestHost, IServerTestHost, 
                     // If there're no in-flight request we can close the server
                     if (_clientToServerRequests.IsEmpty)
                     {
-#if NET8_0_OR_GREATER
-                        await _stopMessageHandler.CancelAsync();
-#else
+#pragma warning disable VSTHRD103 // Call async methods when in an async method
                         _stopMessageHandler.Cancel();
-#endif
+#pragma warning restore VSTHRD103 // Call async methods when in an async method
                     }
 
                     continue;
@@ -235,7 +242,7 @@ internal sealed partial class ServerTestHost : CommonTestHost, IServerTestHost, 
                 {
                     case RequestMessage request:
                         // This task is recorded inside the _clientToServerRequests
-                        _ = HandleRequestAsync(request, _serverClosingTokenSource.Token);
+                        _ = HandleRequestAsync(request, _serverClosingTokenSource.Token, cancellationToken);
                         break;
 
                     case NotificationMessage notification:
@@ -247,7 +254,7 @@ internal sealed partial class ServerTestHost : CommonTestHost, IServerTestHost, 
                         break;
 
                     case ErrorMessage error:
-                        var exception = new RemoteInvocationException();
+                        RemoteInvocationException exception = new();
                         CompleteRequest(ref _serverToClientRequests, error.Id, completion => completion.TrySetException(exception));
                         break;
                     default:
@@ -257,7 +264,6 @@ internal sealed partial class ServerTestHost : CommonTestHost, IServerTestHost, 
             catch (OperationCanceledException ex) when (ex.CancellationToken == messageHandlerStopPlusGlobalToken)
             {
                 // We're shutting down the reader
-                continue;
             }
         }
 
@@ -265,7 +271,7 @@ internal sealed partial class ServerTestHost : CommonTestHost, IServerTestHost, 
         _requestCounter.Signal();
 
         // Wait to drain all in-flight requests HandleRequestCoreAsync/CompleteRequest
-        await _requestCounter.WaitAsync(TimeoutHelper.DefaultHangTimeSpanTimeout, CancellationToken.None);
+        await _requestCounter.WaitAsync(TimeoutHelper.DefaultHangTimeSpanTimeout, CancellationToken.None).ConfigureAwait(false);
     }
 
     private async Task HandleNotificationAsync(NotificationMessage message, CancellationToken serverClosing)
@@ -299,7 +305,14 @@ internal sealed partial class ServerTestHost : CommonTestHost, IServerTestHost, 
                         Exception? cancellationException = rpcState.CancelRequest();
                         if (cancellationException is null)
                         {
-                            await _logger.LogWarningAsync($"Exception during the cancellation of request id '{args.CancelRequestId}'");
+                            // This is intentionally not using PlatformResources.ExceptionDuringCancellationWarningMessage
+                            // It's meant for troubleshooting and shouldn't be localized.
+                            // The localized message that is user-facing will be displayed in the DisplayAsync call next line.
+                            await _logger.LogWarningAsync($"Exception during the cancellation of request id '{args.CancelRequestId}'").ConfigureAwait(false);
+
+                            await ServiceProvider.GetOutputDevice().DisplayAsync(
+                                this,
+                                new WarningMessageOutputDeviceData(string.Format(CultureInfo.InvariantCulture, PlatformResources.ExceptionDuringCancellationWarningMessage, args.CancelRequestId)), serverClosing).ConfigureAwait(false);
                         }
                     }
 
@@ -313,14 +326,14 @@ internal sealed partial class ServerTestHost : CommonTestHost, IServerTestHost, 
         }
     }
 
-    private async Task HandleRequestAsync(RequestMessage request, CancellationToken serverClosing)
+    private async Task HandleRequestAsync(RequestMessage request, CancellationToken serverClosing, CancellationToken cancellationToken)
     {
         // We're closing so we don't handle anymore any requests
         if (serverClosing.IsCancellationRequested)
         {
             try
             {
-                await SendErrorAsync(reqId: request.Id, errorCode: ErrorCodes.InvalidRequest, message: "Server is closing", data: null, _testApplicationCancellationTokenSource.CancellationToken);
+                await SendErrorAsync(reqId: request.Id, errorCode: ErrorCodes.InvalidRequest, message: "Server is closing", data: null, cancellationToken).ConfigureAwait(false);
             }
             finally
             {
@@ -332,7 +345,7 @@ internal sealed partial class ServerTestHost : CommonTestHost, IServerTestHost, 
         {
             // We enqueue the request before to "unlink" the current thread so we're sure that we
             // correctly handle the completion also after the "exit"
-            var rpcState = new RpcInvocationState();
+            RpcInvocationState rpcState = new();
             _clientToServerRequests.TryAdd(request.Id, rpcState);
 
             // Note: Yield, so that the main message reading loop can continue.
@@ -340,24 +353,29 @@ internal sealed partial class ServerTestHost : CommonTestHost, IServerTestHost, 
 
             try
             {
-                object response = await HandleRequestCoreAsync(request, rpcState);
-                await SendResponseAsync(reqId: request.Id, result: response, _testApplicationCancellationTokenSource.CancellationToken);
+                object response = await HandleRequestCoreAsync(request, rpcState, cancellationToken).ConfigureAwait(false);
+                await SendResponseAsync(reqId: request.Id, result: response, cancellationToken).ConfigureAwait(false);
                 CompleteRequest(ref _clientToServerRequests, request.Id, completion => completion.TrySetResult(response));
             }
             catch (OperationCanceledException e)
             {
-                // We don't return the stack of the exception if we're cancelling the single request because it's expected and it's not an exception.
+                // We don't return the stack of the exception if we're canceling the single request because it's expected and it's not an exception.
                 (string errorMessage, int errorCode) =
                     rpcState.CancellationToken.IsCancellationRequested
-                    ? (string.Empty, ErrorCodes.RequestCancelled)
-                    : (e.ToString(), ErrorCodes.RequestCancelled);
+                    ? (string.Empty, ErrorCodes.RequestCanceled)
+                    : (e.ToString(), ErrorCodes.RequestCanceled);
 
-                await SendErrorAsync(reqId: request.Id, errorCode: errorCode, message: errorMessage, data: null, _testApplicationCancellationTokenSource.CancellationToken);
+                await SendErrorAsync(reqId: request.Id, errorCode: errorCode, message: errorMessage, data: null, cancellationToken).ConfigureAwait(false);
                 CompleteRequest(ref _clientToServerRequests, request.Id, completion => completion.TrySetCanceled());
+            }
+            catch (JsonRpcException e)
+            {
+                await SendErrorAsync(reqId: request.Id, errorCode: e.ErrorCode, message: e.Message, data: null, cancellationToken).ConfigureAwait(false);
+                CompleteRequest(ref _clientToServerRequests, request.Id, completion => completion.TrySetException(e));
             }
             catch (Exception e)
             {
-                await SendErrorAsync(reqId: request.Id, errorCode: 0, message: e.ToString(), data: null, _testApplicationCancellationTokenSource.CancellationToken);
+                await SendErrorAsync(reqId: request.Id, errorCode: 0, message: e.ToString(), data: null, cancellationToken).ConfigureAwait(false);
                 CompleteRequest(ref _clientToServerRequests, request.Id, completion => completion.SetException(e));
             }
         }
@@ -390,55 +408,56 @@ internal sealed partial class ServerTestHost : CommonTestHost, IServerTestHost, 
         }
     }
 
-    private async Task<object> HandleRequestCoreAsync(RequestMessage message, RpcInvocationState rpcInvocationState)
+    private async Task<object> HandleRequestCoreAsync(RequestMessage message, RpcInvocationState rpcInvocationState, CancellationToken cancellationToken)
     {
         var perRequestServiceProvider = (ServiceProvider)ServiceProvider.Clone();
 
         // Add custom linked ITestApplicationCooperativeLifetimeService cancellation token source
         perRequestServiceProvider.AddService(new PerRequestTestSessionContext(
             rpcInvocationState.CancellationToken,
-            _testApplicationCancellationTokenSource.CancellationToken));
+            cancellationToken));
 
         perRequestServiceProvider.AddService(new TestHostTestFrameworkInvoker(perRequestServiceProvider));
 
         AssertInitialized();
 
-        await _logger.LogInformationAsync($"Received {message.Method} request");
+        await _logger.LogDebugAsync($"Received {message.Method} request").ConfigureAwait(false);
 
         switch (message.Method, message.Params)
         {
+            case (_, InvalidRequestParamsArgs invalidParams):
+                {
+                    throw new JsonRpcException(invalidParams.ErrorCode, invalidParams.ErrorMessage);
+                }
+
             case (JsonRpcMethods.Initialize, InitializeRequestArgs args):
                 {
                     _client = new(args.ClientInfo.Name, args.ClientInfo.Version);
-                    await _logger.LogInformationAsync($"Connection established with '{_client.Id}', protocol version {_client.Version}");
+                    _clientInfoService = new ClientInfoService(args.ClientInfo.Name, args.ClientInfo.Version);
+                    await _logger.LogDebugAsync($"Connection established with '{_client.Id}', protocol version {_client.Version}").ConfigureAwait(false);
 
-                    // Get the capabilities of the test framework
-                    ITestFrameworkCapabilities capabilities = _testFrameworkManager.TestFrameworkCapabilitiesFactory(ServiceProvider);
-                    try
-                    {
-                        INamedFeatureCapability? namedFeatureCapability = capabilities.GetCapability<INamedFeatureCapability>();
-                        return new InitializeResponseArgs(
-                            ServerInfo: new ServerInfo("test-anywhere", Version: ProtocolVersion),
-                            Capabilities: new ServerCapabilities(
-                                new ServerTestingCapabilities(
-                                    SupportsDiscovery: true,
-                                    MultiRequestSupport: namedFeatureCapability?.IsSupported(JsonRpcStrings.MultiRequestSupport) == true,
-                                    VSTestProviderSupport: namedFeatureCapability?.IsSupported(JsonRpcStrings.VSTestProviderSupport) == true)));
-                    }
-                    finally
-                    {
-                        await DisposeHelper.DisposeAsync(capabilities);
-                    }
+                    INamedFeatureCapability? namedFeatureCapability = ServiceProvider.GetTestFrameworkCapabilities().GetCapability<INamedFeatureCapability>();
+                    return new InitializeResponseArgs(
+                        ProcessId: ServiceProvider.GetEnvironment().ProcessId,
+                        ServerInfo: new ServerInfo("test-anywhere", Version: ProtocolVersion),
+                        Capabilities: new ServerCapabilities(
+                            new ServerTestingCapabilities(
+                                SupportsDiscovery: true,
+                                // Current implementation of testing platform and VS doesn't allow multi-request.
+                                MultiRequestSupport: false,
+                                VSTestProviderSupport: namedFeatureCapability?.IsSupported(JsonRpcStrings.VSTestProviderSupport) == true,
+                                SupportsAttachments: true,
+                                MultiConnectionProvider: false)));
                 }
 
             case (JsonRpcMethods.TestingDiscoverTests, DiscoverRequestArgs args):
                 {
-                    return await ExecuteRequestAsync(args, JsonRpcMethods.TestingDiscoverTests, perRequestServiceProvider);
+                    return await ExecuteRequestAsync(args, JsonRpcMethods.TestingDiscoverTests, perRequestServiceProvider, cancellationToken).ConfigureAwait(false);
                 }
 
             case (JsonRpcMethods.TestingRunTests, RunRequestArgs args):
                 {
-                    return await ExecuteRequestAsync(args, JsonRpcMethods.TestingRunTests, perRequestServiceProvider);
+                    return await ExecuteRequestAsync(args, JsonRpcMethods.TestingRunTests, perRequestServiceProvider, cancellationToken).ConfigureAwait(false);
                 }
 
             default:
@@ -446,18 +465,18 @@ internal sealed partial class ServerTestHost : CommonTestHost, IServerTestHost, 
         }
     }
 
-    private async Task<ResponseArgsBase> ExecuteRequestAsync(RequestArgsBase args, string method, ServiceProvider perRequestServiceProvider)
+    private async Task<ResponseArgsBase> ExecuteRequestAsync(RequestArgsBase args, string method, ServiceProvider perRequestServiceProvider, CancellationToken cancellationToken)
     {
         DateTimeOffset requestStart = _clock.UtcNow;
         ITestSessionContext perRequestTestSessionContext = perRequestServiceProvider.GetTestSessionContext();
 
         // Verify request cancellation, above the chain the exception will be
         // catch and propagated as correct json rpc error
-        perRequestTestSessionContext.CancellationToken.ThrowIfCancellationRequested();
+        cancellationToken.ThrowIfCancellationRequested();
 
         // Note: Currently the request generation and filtering isn't extensible
         // in server mode, we create NoOp services, so that they're always available.
-        var requestFactory = new ServerTestExecutionRequestFactory(session =>
+        ServerTestExecutionRequestFactory requestFactory = new(session =>
         {
             ICollection<TestNode>? testNodes = args.TestNodes;
             string? filter = args.GraphFilter;
@@ -475,24 +494,32 @@ internal sealed partial class ServerTestHost : CommonTestHost, IServerTestHost, 
         });
 
         // Build the per request objects
-        var filterFactory = new ServerTestExecutionFilterFactory();
-        var invoker = new TestHostTestFrameworkInvoker(perRequestServiceProvider);
-        var testNodeUpdateProcessor = new PerRequestServerDataConsumer(perRequestServiceProvider, this, args.RunId, perRequestServiceProvider.GetTask());
+        ServerTestExecutionFilterFactory filterFactory = new();
+        TestHostTestFrameworkInvoker invoker = new(perRequestServiceProvider);
+        PerRequestServerDataConsumer testNodeUpdateProcessor = new(perRequestServiceProvider, this, args.RunId, perRequestServiceProvider.GetTask());
+
+        // Add the client info service to the per request service provider
+        RoslynDebug.Assert(_clientInfoService is not null, "Request should only have been called after initialization");
+        perRequestServiceProvider.TryAddService(_clientInfoService);
 
         DateTimeOffset adapterLoadStart = _clock.UtcNow;
 
+        ProxyOutputDevice outputDevice = ServiceProvider.GetRequiredService<ProxyOutputDevice>();
+        await outputDevice.InitializeAsync(this).ConfigureAwait(false);
+
         // Build the per request adapter
-        ITestFramework perRequestTestFramework = await _buildTestFrameworkAsync(
-          perRequestServiceProvider,
-          requestFactory,
-          invoker,
-          filterFactory,
-          new ServerModePerCallOutputDevice(),
-          new IDataConsumer[] { testNodeUpdateProcessor },
-          _testFrameworkManager,
-          _testSessionManager,
-          new MessageBusProxy(),
-          method == JsonRpcMethods.TestingDiscoverTests);
+        ITestFramework perRequestTestFramework = await _buildTestFrameworkAsync(new TestFrameworkBuilderData(
+            perRequestServiceProvider,
+            requestFactory,
+            invoker,
+            filterFactory,
+            outputDevice.OriginalOutputDevice,
+            [testNodeUpdateProcessor],
+            _testFrameworkManager,
+            _testSessionManager,
+            new MessageBusProxy(),
+            method == JsonRpcMethods.TestingDiscoverTests,
+            true)).ConfigureAwait(false);
 
         DateTimeOffset adapterLoadStop = _clock.UtcNow;
 
@@ -505,12 +532,12 @@ internal sealed partial class ServerTestHost : CommonTestHost, IServerTestHost, 
 
             // Execute the request
             await ExecuteRequestAsync(
-                perRequestServiceProvider.GetPlatformOutputDevice(),
+                outputDevice,
                 perRequestServiceProvider.GetTestSessionContext(),
                 perRequestServiceProvider,
                 perRequestServiceProvider.GetBaseMessageBus(),
                 perRequestTestFramework,
-                _client);
+                _client).ConfigureAwait(false);
 
             // Check if there was a test adapter testSession failure
             ITestApplicationProcessExitCode testApplicationResult = perRequestServiceProvider.GetTestApplicationProcessExitCode();
@@ -522,19 +549,17 @@ internal sealed partial class ServerTestHost : CommonTestHost, IServerTestHost, 
             // Verify request cancellation, above the chain the exception will be
             // catch and propagated as correct json rpc error
             perRequestTestSessionContext.CancellationToken.ThrowIfCancellationRequested();
-            await SendTestUpdateCompleteAsync(args.RunId);
+
+            await SendTestUpdateCompleteAsync(args.RunId, cancellationToken).ConfigureAwait(false);
             requestExecuteStop = _clock.UtcNow;
         }
         finally
         {
-            if (requestExecuteStop == null)
-            {
-                requestExecuteStop = _clock.UtcNow;
-            }
+            requestExecuteStop ??= _clock.UtcNow;
 
             // Cleanup all services
             // We skip all services that are "cloned" per call because are reused and will be disposed on shutdown.
-            await DisposeServiceProviderAsync(perRequestServiceProvider, obj => !ServiceProvider.Services.Contains(obj));
+            await DisposeServiceProviderAsync(perRequestServiceProvider, obj => !ServiceProvider.Services.Contains(obj)).ConfigureAwait(false);
 
             // We need to dispose this service manually because the shared DisposeServiceProviderAsync skip some special service like the ITestApplicationCooperativeLifetimeService
             // that needs to be disposed at process exits.
@@ -545,30 +570,32 @@ internal sealed partial class ServerTestHost : CommonTestHost, IServerTestHost, 
         DateTimeOffset requestStop = _clock.UtcNow;
 
         RoslynDebug.Assert(requestExecuteStop != null);
+        bool isRunRequest = method switch
+        {
+            JsonRpcMethods.TestingRunTests => true,
+            JsonRpcMethods.TestingDiscoverTests => false,
+            _ => throw new NotImplementedException($"Request not implemented '{method}'"),
+        };
 
-        Dictionary<string, object> metadata = method == JsonRpcMethods.TestingRunTests
+        Dictionary<string, object> metadata = isRunRequest
             ? GetRunMetrics(
                 (RunRequestArgs)args,
                 requestStart, requestStop,
                 adapterLoadStart, adapterLoadStop,
-                requestExecuteStart, (DateTimeOffset)requestExecuteStop!,
+                requestExecuteStart, (DateTimeOffset)requestExecuteStop,
                 testNodeUpdateProcessor.GetTestNodeStatistics())
-            : method == JsonRpcMethods.TestingDiscoverTests
-                ? GetDiscoveryMetrics(
+            : GetDiscoveryMetrics(
                     (DiscoverRequestArgs)args,
                     requestStart, requestStop,
                     adapterLoadStart, adapterLoadStop,
-                    requestExecuteStart, (DateTimeOffset)requestExecuteStop!,
-                    testNodeUpdateProcessor.GetTestNodeStatistics().TotalDiscoveredTests)
-                : throw new NotImplementedException($"Request not implemented '{method}'");
+                    requestExecuteStart, (DateTimeOffset)requestExecuteStop,
+                    testNodeUpdateProcessor.GetTestNodeStatistics().TotalDiscoveredTests);
 
-        await _telemetryService.LogEventAsync(TelemetryEvents.TestsRunEventName, metadata);
+        await ServiceProvider.GetTelemetryCollector().LogEventAsync(isRunRequest ? TelemetryEvents.TestsRunEventName : TelemetryEvents.TestsDiscoveryEventName, metadata, cancellationToken).ConfigureAwait(false);
 
-        return method == JsonRpcMethods.TestingRunTests
-            ? new RunResponseArgs(testNodeUpdateProcessor.Artifacts.ToArray())
-            : method == JsonRpcMethods.TestingDiscoverTests
-                ? (ResponseArgsBase)new DiscoverResponseArgs()
-                : throw new NotImplementedException($"Request not implemented '{method}'");
+        return isRunRequest
+            ? new RunResponseArgs([.. testNodeUpdateProcessor.Artifacts])
+            : new DiscoverResponseArgs();
     }
 
     internal static Dictionary<string, object> GetDiscoveryMetrics(
@@ -585,7 +612,7 @@ internal sealed partial class ServerTestHost : CommonTestHost, IServerTestHost, 
             { TelemetryProperties.RequestProperties.AdapterLoadStop, adapterLoadStop },
             { TelemetryProperties.RequestProperties.RequestExecuteStart, requestExecuteStart },
             { TelemetryProperties.RequestProperties.RequestExecuteStop, requestExecuteStop },
-            { TelemetryProperties.RequestProperties.IsFilterEnabledPropertyName, (args?.TestNodes is not null || args?.GraphFilter is not null).AsTelemetryBool() },
+            { TelemetryProperties.RequestProperties.IsFilterEnabledPropertyName, (args.TestNodes is not null || args.GraphFilter is not null).AsTelemetryBool() },
         };
 
     internal static Dictionary<string, object> GetRunMetrics(
@@ -605,28 +632,28 @@ internal sealed partial class ServerTestHost : CommonTestHost, IServerTestHost, 
             { TelemetryProperties.RequestProperties.AdapterLoadStop, adapterLoadStop },
             { TelemetryProperties.RequestProperties.RequestExecuteStart, requestExecuteStart },
             { TelemetryProperties.RequestProperties.RequestExecuteStop, requestExecuteStop },
-            { TelemetryProperties.RequestProperties.IsFilterEnabledPropertyName, (args?.TestNodes is not null || args?.GraphFilter is not null).AsTelemetryBool() },
+            { TelemetryProperties.RequestProperties.IsFilterEnabledPropertyName, (args.TestNodes is not null || args.GraphFilter is not null).AsTelemetryBool() },
         };
 
     private async Task SendErrorAsync(int reqId, int errorCode, string message, object? data, CancellationToken cancellationToken)
     {
         AssertInitialized();
-        var error = new ErrorMessage(reqId, errorCode, message, data);
+        ErrorMessage error = new(reqId, errorCode, message, data);
 
-        using (await _messageMonitor.LockAsync(cancellationToken))
+        using (await _messageMonitor.LockAsync(cancellationToken).ConfigureAwait(false))
         {
-            await _messageHandler!.WriteRequestAsync(error, cancellationToken);
+            await _messageHandler.WriteRequestAsync(error, cancellationToken).ConfigureAwait(false);
         }
     }
 
     private async Task SendResponseAsync(int reqId, object result, CancellationToken cancellationToken)
     {
         AssertInitialized();
-        var response = new ResponseMessage(reqId, result);
+        ResponseMessage response = new(reqId, result);
 
-        using (await _messageMonitor.LockAsync(cancellationToken))
+        using (await _messageMonitor.LockAsync(cancellationToken).ConfigureAwait(false))
         {
-            await _messageHandler!.WriteRequestAsync(response, cancellationToken);
+            await _messageHandler.WriteRequestAsync(response, cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -640,12 +667,12 @@ internal sealed partial class ServerTestHost : CommonTestHost, IServerTestHost, 
         _requestCounter.AddCount();
         try
         {
-            var notification = new NotificationMessage(method, @params);
+            NotificationMessage notification = new(method, @params);
 
-            using (await _messageMonitor.LockAsync(cancellationToken))
+            using (await _messageMonitor.LockAsync(cancellationToken).ConfigureAwait(false))
             {
                 AssertInitialized();
-                await _messageHandler.WriteRequestAsync(notification, cancellationToken);
+                await _messageHandler.WriteRequestAsync(notification, cancellationToken).ConfigureAwait(false);
             }
         }
         catch
@@ -665,58 +692,29 @@ internal sealed partial class ServerTestHost : CommonTestHost, IServerTestHost, 
     {
         // Note: The lifetime of the _reader/_writer should be currently handled by the RunAsync()
         // We could consider creating a stateful engine that has the lifetime == server connection UP.
-    }
-
-    internal Task SendTestUpdateCompleteAsync(Guid runId)
-        => SendTestUpdateAsync(new TestNodeStateChangedEventArgs(runId, Changes: null));
-
-    public async Task SendTestUpdateAsync(TestNodeStateChangedEventArgs update)
-        => await SendMessageAsync(
-            method: JsonRpcMethods.TestingTestUpdatesTests,
-            @params: update,
-            _testApplicationCancellationTokenSource.CancellationToken);
-
-    public async Task SendTelemetryEventUpdateAsync(TelemetryEventArgs args)
-        => await SendMessageAsync(
-            method: JsonRpcMethods.TelemetryUpdate,
-            @params: args,
-            _testApplicationCancellationTokenSource.CancellationToken);
-
-    public async Task SendClientLaunchDebuggerAsync(ProcessInfoArgs args)
-       => await SendRequestAsync(
-           method: JsonRpcMethods.ClientLaunchDebugger,
-           @params: args,
-           _testApplicationCancellationTokenSource.CancellationToken);
-
-    public async Task SendClientAttachDebuggerAsync(AttachDebuggerInfoArgs args)
-       => await SendRequestAsync(
-           method: JsonRpcMethods.ClientAttachDebugger,
-           @params: args,
-           _testApplicationCancellationTokenSource.CancellationToken);
-
-    private async Task SendRequestAsync(string method, object @params, CancellationToken cancellationToken)
-    {
-        AssertInitialized();
-        int requestId = Interlocked.Increment(ref _serverToClientRequestId);
-        var request = new RequestMessage(requestId, method, @params);
-        var invocationState = new RpcInvocationState();
-
-        _serverToClientRequests.TryAdd(requestId, invocationState);
-
-        // Add the request to the counter
-        _requestCounter.AddCount();
-        await _messageHandler.WriteRequestAsync(request, cancellationToken);
-
-        using (cancellationToken.Register(() => _ = SendMessageAsync(
-            JsonRpcMethods.CancelRequest,
-            new CancelRequestArgs(requestId),
-            cancellationToken)))
+        if (!ServiceProvider.GetUnhandledExceptionsPolicy().FastFailOnFailure)
         {
-            await invocationState.CompletionSource.Task;
+            AppDomain.CurrentDomain.UnhandledException -= OnCurrentDomainUnhandledException;
+            TaskScheduler.UnobservedTaskException -= OnTaskSchedulerUnobservedTaskException;
         }
     }
 
-    public async Task PushDataAsync(IData value)
+    internal async Task SendTestUpdateCompleteAsync(Guid runId, CancellationToken cancellationToken)
+        => await SendTestUpdateAsync(new TestNodeStateChangedEventArgs(runId, Changes: null), cancellationToken).ConfigureAwait(false);
+
+    public async Task SendTestUpdateAsync(TestNodeStateChangedEventArgs update, CancellationToken cancellationToken)
+        => await SendMessageAsync(
+            method: JsonRpcMethods.TestingTestUpdatesTests,
+            @params: update,
+            cancellationToken).ConfigureAwait(false);
+
+    public async Task SendTelemetryEventUpdateAsync(TelemetryEventArgs args, CancellationToken cancellationToken)
+        => await SendMessageAsync(
+            method: JsonRpcMethods.TelemetryUpdate,
+            @params: args,
+            cancellationToken).ConfigureAwait(false);
+
+    public async Task PushDataAsync(IData value, CancellationToken cancellationToken)
     {
         switch (value)
         {
@@ -724,22 +722,31 @@ internal sealed partial class ServerTestHost : CommonTestHost, IServerTestHost, 
                 await SendMessageAsync(
                     method: JsonRpcMethods.ClientLog,
                     @params: new LogEventArgs(logMessage),
-                    _testApplicationCancellationTokenSource.CancellationToken,
-                    rethrowException: false);
+                    cancellationToken,
+
+                    // We could receive some log messages after the exit, a real sample is if telemetry provider is too slow and we log a warning.
+                    checkServerExit: true,
+                    rethrowException: false).ConfigureAwait(false);
                 break;
         }
     }
 
+    public Task<bool> IsEnabledAsync() => throw new NotImplementedException();
+
     private sealed class RpcInvocationState : IDisposable
     {
+#if NET9_0_OR_GREATER
+        private readonly Lock _cancellationTokenSourceLock = new();
+#else
         private readonly object _cancellationTokenSourceLock = new();
+#endif
         private readonly CancellationTokenSource _cancellationTokenSource = new();
         private volatile bool _isDisposed;
 
         /// <remarks>
         /// For outbound requests, this is populated with the response from the client.
         /// For inbound requests, this is set when the invoked request is completed
-        /// in <see cref="HandleRequestAsync(RequestMessage, CancellationToken)"/>.
+        /// in <see cref="HandleRequestAsync(RequestMessage, CancellationToken, CancellationToken)"/>.
         /// </remarks>
         public TaskCompletionSource<object> CompletionSource { get; } = new TaskCompletionSource<object>();
 

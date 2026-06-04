@@ -2,9 +2,6 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 #if WIN_UI
-using System.Reflection;
-using System.Runtime.CompilerServices;
-
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 
@@ -21,19 +18,8 @@ public class UITestMethodAttribute : TestMethodAttribute
     /// <summary>
     /// Initializes a new instance of the <see cref="UITestMethodAttribute"/> class.
     /// </summary>
-    public UITestMethodAttribute()
-        : base()
-    {
-    }
-
-    /// <summary>
-    /// Initializes a new instance of the <see cref="UITestMethodAttribute"/> class.
-    /// </summary>
-    /// <param name="displayName">
-    /// Display Name for the test.
-    /// </param>
-    public UITestMethodAttribute(string displayName)
-        : base(displayName)
+    public UITestMethodAttribute([CallerFilePath] string callerFilePath = "", [CallerLineNumber] int callerLineNumber = -1)
+        : base(callerFilePath, callerLineNumber)
     {
     }
 
@@ -55,60 +41,48 @@ public class UITestMethodAttribute : TestMethodAttribute
     /// </returns>
     /// Throws <exception cref="NotSupportedException"> when run on an async test method.
     /// </exception>
-    public override TestResult[] Execute(ITestMethod testMethod)
+    public override async Task<TestResult[]> ExecuteAsync(ITestMethod testMethod)
     {
-        var attribute = testMethod.GetAttributes<AsyncStateMachineAttribute>(false);
-        if (attribute.Length > 0)
-        {
-            throw new NotSupportedException(FrameworkMessages.AsyncUITestMethodNotSupported);
-        }
-
-        TestResult? result = null;
-
         // TODO: Code seems to be assuming DeclaringType is never null, but it can be null.
         // Using 'bang' notation for now to ensure same behavior.
-        var dispatcher = GetDispatcherQueue(testMethod.MethodInfo.DeclaringType!.Assembly) ?? throw new InvalidOperationException(FrameworkMessages.AsyncUITestMethodWithNoDispatcherQueue);
+        DispatcherQueue dispatcher = GetDispatcherQueue(testMethod.MethodInfo.DeclaringType!.Assembly) ?? throw new InvalidOperationException(FrameworkExtensionsMessages.AsyncUITestMethodWithNoDispatcherQueue);
         if (dispatcher.HasThreadAccess)
         {
             try
             {
-                result = testMethod.Invoke(null);
+                return [await testMethod.InvokeAsync(null).ConfigureAwait(false)];
             }
             catch (Exception e)
             {
                 return [new() { TestFailureException = e }];
             }
         }
-        else
+
+        var tcs = new TaskCompletionSource<TestResult>();
+
+#pragma warning disable VSTHRD101 // Avoid unsupported async delegates
+        if (!dispatcher.TryEnqueue(DispatcherQueuePriority.Normal, async () =>
         {
-            var taskCompletionSource = new TaskCompletionSource<object?>();
-
-            if (!dispatcher.TryEnqueue(DispatcherQueuePriority.Normal, () =>
-                {
-                    try
-                    {
-                        result = testMethod.Invoke(Array.Empty<object>());
-                        taskCompletionSource.SetResult(null);
-                    }
-                    catch (Exception e)
-                    {
-                        result = new TestResult { TestFailureException = e };
-                        taskCompletionSource.SetException(e);
-                    }
-                }))
+            try
             {
-                taskCompletionSource.SetResult(null);
+                tcs.SetResult(await testMethod.InvokeAsync(null).ConfigureAwait(false));
             }
-
-            taskCompletionSource.Task.GetAwaiter().GetResult();
+            catch (Exception e)
+            {
+                tcs.SetResult(new TestResult { TestFailureException = e });
+            }
+        }))
+        {
+            tcs.SetResult(null!);
         }
+#pragma warning restore VSTHRD101 // Avoid unsupported async delegates
 
-        return [result!];
+        return [await tcs.Task.ConfigureAwait(false)];
     }
 
     private static Type? GetApplicationType(Assembly assembly)
     {
-        var attribute = assembly.GetCustomAttribute<WinUITestTargetAttribute>();
+        WinUITestTargetAttribute? attribute = assembly.GetCustomAttribute<WinUITestTargetAttribute>();
         return attribute == null || attribute.ApplicationType == null ? null : attribute.ApplicationType;
     }
 
@@ -124,7 +98,7 @@ public class UITestMethodAttribute : TestMethodAttribute
             return null;
         }
 
-        var applicationType = GetApplicationType(assembly);
+        Type? applicationType = GetApplicationType(assembly);
         if (applicationType == null)
         {
             return null;
@@ -135,7 +109,7 @@ public class UITestMethodAttribute : TestMethodAttribute
         {
             // We need to execute all module initializers before doing any WinRT calls.
             // This will cause the [ModuleInitializer]s to execute, if they haven't yet.
-            var id = applicationType.Assembly.GetType("Microsoft.WindowsAppSDK.Runtime.Identity");
+            Type? id = applicationType.Assembly.GetType("Microsoft.WindowsAppSDK.Runtime.Identity");
             if (id != null)
             {
                 _ = Activator.CreateInstance(id);

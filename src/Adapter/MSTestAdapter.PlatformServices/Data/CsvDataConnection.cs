@@ -1,16 +1,12 @@
-// Copyright (c) Microsoft Corporation. All rights reserved.
+﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 #if NETFRAMEWORK
 
-using System.Collections;
 using System.Data;
 using System.Data.OleDb;
-using System.Diagnostics.CodeAnalysis;
-using System.Globalization;
-using System.Text;
 
-using Microsoft.VisualStudio.TestPlatform.ObjectModel;
+using Microsoft.VisualStudio.TestPlatform.MSTest.TestAdapter;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace Microsoft.VisualStudio.TestPlatform.MSTestAdapter.PlatformServices.Data;
@@ -33,21 +29,16 @@ internal sealed class CsvDataConnection : TestDataConnection
         _fileName = fileName;
     }
 
-    private string TableName
-    {
-        get
-        {
+    private string TableName =>
             // Only one table based on the name of the file, with dots converted to # signs
-            return Path.GetFileName(_fileName).Replace('.', '#');
-        }
-    }
+            Path.GetFileName(_fileName).Replace('.', '#');
 
     public override List<string> GetDataTablesAndViews()
     {
-        List<string> tableNames = new(1)
-        {
-            TableName,
-        };
+        List<string> tableNames =
+        [
+            TableName
+        ];
         return tableNames;
     }
 
@@ -72,7 +63,10 @@ internal sealed class CsvDataConnection : TestDataConnection
         }
         catch (Exception exception)
         {
-            EqtTrace.ErrorIf(EqtTrace.IsErrorEnabled, exception.Message + " for CSV data source " + _fileName);
+            if (PlatformServiceProvider.Instance.AdapterTraceLogger.IsErrorEnabled)
+            {
+                PlatformServiceProvider.Instance.AdapterTraceLogger.Error(exception.Message + " for CSV data source " + _fileName);
+            }
         }
 
         return null;
@@ -153,9 +147,6 @@ internal sealed class CsvDataConnection : TestDataConnection
         return table;
     }
 
-    public override DataTable ReadTable(string tableName, IEnumerable? columns)
-    {
-        return ReadTable(tableName, columns, -1);
-    }
+    public override DataTable ReadTable(string tableName, IEnumerable? columns) => ReadTable(tableName, columns, -1);
 }
 #endif

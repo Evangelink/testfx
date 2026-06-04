@@ -1,213 +1,230 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using Microsoft.Testing.Internal.Framework;
 using Microsoft.Testing.Platform.CommandLine;
 using Microsoft.Testing.Platform.Extensions.Messages;
 using Microsoft.Testing.Platform.Helpers;
 using Microsoft.Testing.Platform.OutputDevice;
 using Microsoft.Testing.Platform.Services;
-using Microsoft.Testing.TestInfrastructure;
 
 using Moq;
 
 namespace Microsoft.Testing.Platform.UnitTests;
 
-[TestGroup]
-public sealed class TestApplicationResultTests : TestBase
+[TestClass]
+public sealed class TestApplicationResultTests : IDisposable
 {
     private readonly TestApplicationResult _testApplicationResult
-        = new(new Mock<IOutputDevice>().Object, new Mock<ITestApplicationCancellationTokenSource>().Object, new Mock<ICommandLineOptions>().Object, new Mock<IEnvironment>().Object);
+        = new(new Mock<IOutputDevice>().Object, new Mock<ICommandLineOptions>().Object, new Mock<IEnvironment>().Object, new Mock<IStopPoliciesService>().Object, null);
 
-    public TestApplicationResultTests(ITestExecutionContext testExecutionContext)
-        : base(testExecutionContext)
-    {
-    }
+    public void Dispose() => _testApplicationResult.Dispose();
 
-    public async Task GetProcessExitCodeAsync_If_All_Skipped_Returns_Zero()
+    [TestMethod]
+    public async Task GetProcessExitCodeAsync_If_All_Skipped_Returns_ZeroTestsRan()
     {
         await _testApplicationResult.ConsumeAsync(new DummyProducer(), new TestNodeUpdateMessage(
             default,
-            new Extensions.Messages.TestNode()
+            new TestNode
             {
-                Uid = new Extensions.Messages.TestNodeUid("id"),
+                Uid = new TestNodeUid("id"),
                 DisplayName = "DisplayName",
                 Properties = new PropertyBag(SkippedTestNodeStateProperty.CachedInstance),
             }), CancellationToken.None);
 
-        Assert.AreEqual(ExitCodes.Success, await _testApplicationResult.GetProcessExitCodeAsync());
+        Assert.AreEqual((int)ExitCode.ZeroTests, _testApplicationResult.GetProcessExitCode());
     }
 
+    [TestMethod]
     public async Task GetProcessExitCodeAsync_If_No_Tests_Ran_Returns_ZeroTestsRan()
     {
         await _testApplicationResult.ConsumeAsync(new DummyProducer(), new TestNodeUpdateMessage(
             default,
-            new Extensions.Messages.TestNode()
+            new TestNode
             {
-                Uid = new Extensions.Messages.TestNodeUid("id"),
+                Uid = new TestNodeUid("id"),
                 DisplayName = "DisplayName",
                 Properties = new PropertyBag(),
             }), CancellationToken.None);
 
-        Assert.AreEqual(ExitCodes.ZeroTests, await _testApplicationResult.GetProcessExitCodeAsync());
+        Assert.AreEqual((int)ExitCode.ZeroTests, _testApplicationResult.GetProcessExitCode());
     }
 
-    [ArgumentsProvider(nameof(FailedState))]
+    [TestMethod]
+    [DynamicData(nameof(FailedState))]
     public async Task GetProcessExitCodeAsync_If_Failed_Tests_Returns_AtLeastOneTestFailed(TestNodeStateProperty testNodeStateProperty)
     {
         await _testApplicationResult.ConsumeAsync(new DummyProducer(), new TestNodeUpdateMessage(
             default,
-            new Extensions.Messages.TestNode()
+            new TestNode
             {
-                Uid = new Extensions.Messages.TestNodeUid("id"),
+                Uid = new TestNodeUid("id"),
                 DisplayName = "DisplayName",
                 Properties = new PropertyBag(testNodeStateProperty),
             }), CancellationToken.None);
 
-        Assert.AreEqual(ExitCodes.AtLeastOneTestFailed, await _testApplicationResult.GetProcessExitCodeAsync());
+        Assert.AreEqual((int)ExitCode.AtLeastOneTestFailed, _testApplicationResult.GetProcessExitCode());
     }
 
-    public async Task GetProcessExitCodeAsync_If_Cancelled_Returns_TestSessionAborted()
+    [TestMethod]
+    public async Task GetProcessExitCodeAsync_If_Canceled_Returns_TestSessionAborted()
     {
-        var testApplicationCancellationTokenSource = new Mock<ITestApplicationCancellationTokenSource>();
+        Mock<ITestApplicationCancellationTokenSource> testApplicationCancellationTokenSource = new();
+        // CTS should not be created in SetupGet so that the mocked ITestApplicationCancellationTokenSource returns the same instance on every access
+        // which is the case in the real production implementation.
+        CancellationTokenSource cancellationTokenSource = new();
         testApplicationCancellationTokenSource.SetupGet(x => x.CancellationToken).Returns(() =>
         {
-            CancellationTokenSource cancellationTokenSource = new();
             cancellationTokenSource.Cancel();
             return cancellationTokenSource.Token;
         });
 
         TestApplicationResult testApplicationResult
-            = new(new Mock<IOutputDevice>().Object, testApplicationCancellationTokenSource.Object, new Mock<ICommandLineOptions>().Object, new Mock<IEnvironment>().Object);
+            = new(new Mock<IOutputDevice>().Object, new Mock<ICommandLineOptions>().Object, new Mock<IEnvironment>().Object,
+                new StopPoliciesService(testApplicationCancellationTokenSource.Object), null);
 
         await testApplicationResult.ConsumeAsync(new DummyProducer(), new TestNodeUpdateMessage(
             default,
-            new Extensions.Messages.TestNode()
+            new TestNode
             {
-                Uid = new Extensions.Messages.TestNodeUid("id"),
+                Uid = new TestNodeUid("id"),
                 DisplayName = "DisplayName",
                 Properties = new PropertyBag(),
             }), CancellationToken.None);
 
-        Assert.AreEqual(ExitCodes.TestSessionAborted, await testApplicationResult.GetProcessExitCodeAsync());
+        Assert.AreEqual((int)ExitCode.TestSessionAborted, testApplicationResult.GetProcessExitCode());
     }
 
+    [TestMethod]
     public async Task GetProcessExitCodeAsync_If_TestAdapter_Returns_TestAdapterTestSessionFailure()
     {
-        await _testApplicationResult.SetTestAdapterTestSessionFailureAsync("Adapter error");
+        await _testApplicationResult.SetTestAdapterTestSessionFailureAsync("Adapter error", CancellationToken.None);
         await _testApplicationResult.ConsumeAsync(new DummyProducer(), new TestNodeUpdateMessage(
             default,
-            new Extensions.Messages.TestNode()
+            new TestNode
             {
-                Uid = new Extensions.Messages.TestNodeUid("id"),
+                Uid = new TestNodeUid("id"),
                 DisplayName = "DisplayName",
                 Properties = new PropertyBag(PassedTestNodeStateProperty.CachedInstance),
             }), CancellationToken.None);
 
-        Assert.AreEqual(ExitCodes.TestAdapterTestSessionFailure, await _testApplicationResult.GetProcessExitCodeAsync());
+        Assert.AreEqual((int)ExitCode.TestAdapterTestSessionFailure, _testApplicationResult.GetProcessExitCode());
     }
 
+    [TestMethod]
     public async Task GetProcessExitCodeAsync_If_MinimumExpectedTests_Violated_Returns_MinimumExpectedTestsPolicyViolation()
     {
         TestApplicationResult testApplicationResult
-            = new(new Mock<IOutputDevice>().Object, new Mock<ITestApplicationCancellationTokenSource>().Object,
-            new CommandLineOption(PlatformCommandLineProvider.MinimumExpectedTestsOptionKey, ["2"]),
-            new Mock<IEnvironment>().Object);
+            = new(
+                new Mock<IOutputDevice>().Object,
+                new CommandLineOption(PlatformCommandLineProvider.MinimumExpectedTestsOptionKey, ["2"]),
+                new Mock<IEnvironment>().Object,
+                new Mock<IStopPoliciesService>().Object,
+                null);
 
         await testApplicationResult.ConsumeAsync(new DummyProducer(), new TestNodeUpdateMessage(
             default,
-            new Extensions.Messages.TestNode()
+            new TestNode
             {
-                Uid = new Extensions.Messages.TestNodeUid("id"),
+                Uid = new TestNodeUid("id"),
                 DisplayName = "DisplayName",
                 Properties = new PropertyBag(PassedTestNodeStateProperty.CachedInstance),
             }), CancellationToken.None);
 
         await testApplicationResult.ConsumeAsync(new DummyProducer(), new TestNodeUpdateMessage(
             default,
-            new Extensions.Messages.TestNode()
+            new TestNode
             {
-                Uid = new Extensions.Messages.TestNodeUid("id"),
+                Uid = new TestNodeUid("id"),
                 DisplayName = "DisplayName",
                 Properties = new PropertyBag(InProgressTestNodeStateProperty.CachedInstance),
             }), CancellationToken.None);
 
-        Assert.AreEqual(ExitCodes.MinimumExpectedTestsPolicyViolation, await testApplicationResult.GetProcessExitCodeAsync());
+        Assert.AreEqual((int)ExitCode.MinimumExpectedTestsPolicyViolation, testApplicationResult.GetProcessExitCode());
     }
 
+    [TestMethod]
     public async Task GetProcessExitCodeAsync_OnDiscovery_No_Tests_Discovered_Returns_ZeroTests()
     {
         TestApplicationResult testApplicationResult
-            = new(new Mock<IOutputDevice>().Object, new Mock<ITestApplicationCancellationTokenSource>().Object,
-            new CommandLineOption(PlatformCommandLineProvider.DiscoverTestsOptionKey, []),
-            new Mock<IEnvironment>().Object);
+            = new(
+                new Mock<IOutputDevice>().Object,
+                new CommandLineOption(PlatformCommandLineProvider.DiscoverTestsOptionKey, []),
+                new Mock<IEnvironment>().Object, new Mock<IStopPoliciesService>().Object, null);
 
         await testApplicationResult.ConsumeAsync(new DummyProducer(), new TestNodeUpdateMessage(
             default,
-            new Extensions.Messages.TestNode()
+            new TestNode
             {
-                Uid = new Extensions.Messages.TestNodeUid("id"),
+                Uid = new TestNodeUid("id"),
                 DisplayName = "DisplayName",
             }), CancellationToken.None);
 
-        Assert.AreEqual(ExitCodes.ZeroTests, await testApplicationResult.GetProcessExitCodeAsync());
+        Assert.AreEqual((int)ExitCode.ZeroTests, testApplicationResult.GetProcessExitCode());
     }
 
+    [TestMethod]
     public async Task GetProcessExitCodeAsync_OnDiscovery_Some_Tests_Discovered_Returns_Success()
     {
         TestApplicationResult testApplicationResult
-            = new(new Mock<IOutputDevice>().Object, new Mock<ITestApplicationCancellationTokenSource>().Object,
-            new CommandLineOption(PlatformCommandLineProvider.DiscoverTestsOptionKey, []),
-            new Mock<IEnvironment>().Object);
+            = new(
+                new Mock<IOutputDevice>().Object,
+                new CommandLineOption(PlatformCommandLineProvider.DiscoverTestsOptionKey, []),
+                new Mock<IEnvironment>().Object, new Mock<IStopPoliciesService>().Object, null);
 
         await testApplicationResult.ConsumeAsync(new DummyProducer(), new TestNodeUpdateMessage(
             default,
-            new Extensions.Messages.TestNode()
+            new TestNode
             {
-                Uid = new Extensions.Messages.TestNodeUid("id"),
+                Uid = new TestNodeUid("id"),
                 DisplayName = "DisplayName",
                 Properties = new PropertyBag(DiscoveredTestNodeStateProperty.CachedInstance),
             }), CancellationToken.None);
 
-        Assert.AreEqual(ExitCodes.Success, await testApplicationResult.GetProcessExitCodeAsync());
+        Assert.AreEqual((int)ExitCode.Success, testApplicationResult.GetProcessExitCode());
     }
 
-    [Arguments("8", ExitCodes.Success)]
-    [Arguments("8;2", ExitCodes.Success)]
-    [Arguments("8;", ExitCodes.Success)]
-    [Arguments("8;2;", ExitCodes.Success)]
-    [Arguments("5", ExitCodes.ZeroTests)]
-    [Arguments("5;7", ExitCodes.ZeroTests)]
-    [Arguments("5;", ExitCodes.ZeroTests)]
-    [Arguments("5;7;", ExitCodes.ZeroTests)]
-    [Arguments(";", ExitCodes.ZeroTests)]
-    [Arguments(null, ExitCodes.ZeroTests)]
-    [Arguments("", ExitCodes.ZeroTests)]
-    public async Task GetProcessExitCodeAsync_IgnoreExitCodes(string argument, int expectedExitCode)
+    [DataRow("8", (int)ExitCode.Success)]
+    [DataRow("8;2", (int)ExitCode.Success)]
+    [DataRow("8;", (int)ExitCode.Success)]
+    [DataRow("8;2;", (int)ExitCode.Success)]
+    [DataRow("5", (int)ExitCode.ZeroTests)]
+    [DataRow("5;7", (int)ExitCode.ZeroTests)]
+    [DataRow("5;", (int)ExitCode.ZeroTests)]
+    [DataRow("5;7;", (int)ExitCode.ZeroTests)]
+    [DataRow(";", (int)ExitCode.ZeroTests)]
+    [DataRow(null, (int)ExitCode.ZeroTests)]
+    [DataRow("", (int)ExitCode.ZeroTests)]
+    [TestMethod]
+    public void GetProcessExitCodeAsync_IgnoreExitCodes(string? argument, int expectedExitCode)
     {
-        var environment = new Mock<IEnvironment>();
+        Mock<IEnvironment> environment = new();
         environment.Setup(x => x.GetEnvironmentVariable(EnvironmentVariableConstants.TESTINGPLATFORM_EXITCODE_IGNORE)).Returns(argument);
 
         foreach (TestApplicationResult testApplicationResult in new TestApplicationResult[]
         {
-            new(new Mock<IOutputDevice>().Object, new Mock<ITestApplicationCancellationTokenSource>().Object,
-                new CommandLineOption(PlatformCommandLineProvider.IgnoreExitCodeOptionKey, argument is null ? Array.Empty<string>() : new[] { argument }),
-                new Mock<IEnvironment>().Object),
-            new(new Mock<IOutputDevice>().Object, new Mock<ITestApplicationCancellationTokenSource>().Object,
+            new(
+                new Mock<IOutputDevice>().Object,
+                new CommandLineOption(PlatformCommandLineProvider.IgnoreExitCodeOptionKey, argument is null ? [] : [argument]),
+                new Mock<IEnvironment>().Object, new Mock<IStopPoliciesService>().Object, null),
+            new(
+                new Mock<IOutputDevice>().Object,
                 new Mock<ICommandLineOptions>().Object,
-                environment.Object),
+                environment.Object,
+                new Mock<IStopPoliciesService>().Object, null),
         })
         {
-            Assert.AreEqual(expectedExitCode, await testApplicationResult.GetProcessExitCodeAsync());
+            Assert.AreEqual(expectedExitCode, testApplicationResult.GetProcessExitCode());
         }
     }
 
-    internal static IEnumerable<TestNodeStateProperty> FailedState()
+    internal static IEnumerable<object[]> FailedState()
     {
-        yield return new FailedTestNodeStateProperty();
-        yield return new ErrorTestNodeStateProperty();
-        yield return new CancelledTestNodeStateProperty();
-        yield return new TimeoutTestNodeStateProperty();
+        yield return [new FailedTestNodeStateProperty()];
+        yield return [new ErrorTestNodeStateProperty()];
+#pragma warning disable CS0618, MTP0001 // Type or member is obsolete
+        yield return [new CancelledTestNodeStateProperty()];
+#pragma warning restore CS0618, MTP0001 // Type or member is obsolete
+        yield return [new TimeoutTestNodeStateProperty()];
     }
 
     private sealed class CommandLineOption : ICommandLineOptions

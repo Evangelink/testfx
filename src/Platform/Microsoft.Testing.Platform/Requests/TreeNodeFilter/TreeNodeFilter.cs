@@ -1,21 +1,22 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System.Globalization;
-using System.Text;
-using System.Text.RegularExpressions;
-
 using Microsoft.Testing.Platform.Extensions.Messages;
 using Microsoft.Testing.Platform.Helpers;
 using Microsoft.Testing.Platform.Resources;
 
 namespace Microsoft.Testing.Platform.Requests;
 
-internal sealed class TreeNodeFilter : ITestExecutionFilter
+/// <summary>
+/// A tree based filter for test execution.
+/// </summary>
+[Experimental("TPEXP", UrlFormat = "https://aka.ms/testingplatform/diagnostics#{0}")]
+public sealed class TreeNodeFilter : ITestExecutionFilter
 {
+    /// <summary>
+    /// The path separator character.
+    /// </summary>
     public const char PathSeparator = '/';
-    internal const char PropertyPerEdgeStartChar = '[';
-    internal const char PropertyPerEdgeEndChar = ']';
 
     // Note: After the token gets expanded into regex ** gets converted to .*.*.
     internal const string AllNodesBelowRegexString = ".*.*";
@@ -23,12 +24,32 @@ internal sealed class TreeNodeFilter : ITestExecutionFilter
 
     internal TreeNodeFilter(string filter)
     {
-        ArgumentGuard.IsNotNull(filter);
-        Filter = filter;
+        Filter = filter ?? throw new ArgumentNullException(nameof(filter));
         _filters = ParseFilter(filter);
+        bool containsPropertyFilters = false;
+        for (int i = 0; i < _filters.Count; i++)
+        {
+            if (HasPropertyFilterExpression(_filters[i]))
+            {
+                containsPropertyFilters = true;
+                break;
+            }
+        }
+
+        ContainsPropertyFilters = containsPropertyFilters;
     }
 
+    /// <summary>
+    /// Gets the filter string.
+    /// </summary>
     public string Filter { get; }
+
+    /// <summary>
+    /// Gets a value indicating whether any filter segment contains a property expression (e.g., <c>Method[Trait=Foo]</c>).
+    /// When <see langword="false"/>, the <see cref="PropertyBag"/> argument to <see cref="MatchesFilter"/> is never
+    /// inspected, and callers may safely pass an empty bag to avoid per-node allocation.
+    /// </summary>
+    internal bool ContainsPropertyFilters { get; }
 
     /// <remarks>
     /// The current grammar for the filter looks as follows:
@@ -41,11 +62,18 @@ internal sealed class TreeNodeFilter : ITestExecutionFilter
     /// FILTER_EXPR =
     ///   '(' FILTER_EXPR ')'
     ///   | TOKEN '=' TOKEN
+    ///   | TOKEN '!=' TOKEN
     ///   | FILTER_EXPR OP FILTER_EXPR
     ///   | TOKEN
     /// OP = '&amp;' | '|'
     /// NODE_VALUE = TOKEN | TOKEN '[' FILTER_EXPR ']'
     /// TOKEN = string
+    ///
+    /// OR expressions are supported for a single path segment, for example:
+    /// <c>/A/B/C/(Test1|Test2)</c>.
+    ///
+    /// OR expressions over full paths are not supported, for example:
+    /// <c>(/A/B/C/Test1)|(/A/B/C/Test2)</c>.
     /// </code>
     /// </remarks>
     /// <exception cref="InvalidOperationException">
@@ -72,7 +100,7 @@ internal sealed class TreeNodeFilter : ITestExecutionFilter
         //       of an expression operators are not allowed.
         bool isOperatorAllowed = false;
         bool isPropAllowed = false;
-
+        bool lastWasOpenParen = false;
         OperatorKind topStackOperator;
 
         foreach (string token in TokenizeFilter(filter))
@@ -93,14 +121,14 @@ internal sealed class TreeNodeFilter : ITestExecutionFilter
                         _ => throw ApplicationStateGuard.Unreachable(),
                     };
 
-                    ProcessHigherPrecedenceOperators(expressionStack, operatorStack, currentOp);
+                    ProcessHigherPrecedenceOperators(expressionStack, operatorStack, currentOp, filter);
 
                     isOperatorAllowed = false;
                     isPropAllowed = false;
                     break;
 
                 case "/":
-                    ProcessHigherPrecedenceOperators(expressionStack, operatorStack, OperatorKind.Separator);
+                    ProcessHigherPrecedenceOperators(expressionStack, operatorStack, OperatorKind.Separator, filter);
 
                     isOperatorAllowed = false;
                     isPropAllowed = false;
@@ -143,7 +171,7 @@ internal sealed class TreeNodeFilter : ITestExecutionFilter
                             break;
                         }
 
-                        ProcessStackOperator(topStackOperator, expressionStack, operatorStack);
+                        ProcessStackOperator(topStackOperator, expressionStack, operatorStack, filter);
                     }
 
                     isOperatorAllowed = true;
@@ -175,7 +203,7 @@ internal sealed class TreeNodeFilter : ITestExecutionFilter
                             break;
                         }
 
-                        ProcessStackOperator(topStackOperator, expressionStack, operatorStack);
+                        ProcessStackOperator(topStackOperator, expressionStack, operatorStack, filter);
                     }
 
                     // We should end up with an expression and a property.
@@ -213,6 +241,17 @@ internal sealed class TreeNodeFilter : ITestExecutionFilter
                     isPropAllowed = false;
                     break;
 
+                case "!=":
+                    operatorStack.Push(OperatorKind.FilterNotEquals);
+
+                    isOperatorAllowed = false;
+                    isPropAllowed = false;
+                    break;
+
+                case "!" when lastWasOpenParen:
+                    operatorStack.Push(OperatorKind.UnaryNot);
+                    break;
+
                 default:
                     expressionStack.Push(new ValueExpression(token));
 
@@ -220,6 +259,8 @@ internal sealed class TreeNodeFilter : ITestExecutionFilter
                     isPropAllowed = true;
                     break;
             }
+
+            lastWasOpenParen = token == "(";
         }
 
         // Note: What we should end with (as long as the expression is a valid filter)
@@ -227,7 +268,7 @@ internal sealed class TreeNodeFilter : ITestExecutionFilter
         while (operatorStack.Count > 0 && operatorStack.Peek() != OperatorKind.Separator)
         {
             topStackOperator = operatorStack.Pop();
-            ProcessStackOperator(topStackOperator, expressionStack, operatorStack);
+            ProcessStackOperator(topStackOperator, expressionStack, operatorStack, filter);
         }
 
         var parsedFilter = expressionStack.Reverse().ToList();
@@ -248,14 +289,13 @@ internal sealed class TreeNodeFilter : ITestExecutionFilter
         static void ProcessHigherPrecedenceOperators(
             Stack<FilterExpression> expressionStack,
             Stack<OperatorKind> operatorStack,
-            OperatorKind currentOp)
+            OperatorKind currentOp,
+            string currentFilter)
         {
-            OperatorKind topStackOperator;
-
             while (operatorStack.Count != 0 && operatorStack.Peek() > currentOp)
             {
-                topStackOperator = operatorStack.Pop();
-                ProcessStackOperator(topStackOperator, expressionStack, operatorStack);
+                OperatorKind topStackOperator = operatorStack.Pop();
+                ProcessStackOperator(topStackOperator, expressionStack, operatorStack, currentFilter);
                 break;
             }
 
@@ -268,8 +308,8 @@ internal sealed class TreeNodeFilter : ITestExecutionFilter
         switch (expr)
         {
             case OperatorExpression { Op: FilterOperator.Not, SubExpressions: var subexprsNot } when subexprsNot.Count != 1:
-            case OperatorExpression { Op: FilterOperator.And, SubExpressions: var subexprsAnd } when subexprsAnd.Count < 2:
-            case OperatorExpression { Op: FilterOperator.Or, SubExpressions: var subexprsOr } when subexprsOr.Count < 2:
+            case OperatorExpression { Op: FilterOperator.And, SubExpressions.Count: < 2 }:
+            case OperatorExpression { Op: FilterOperator.Or, SubExpressions.Count: < 2 }:
                 throw ApplicationStateGuard.Unreachable();
 
             case OperatorExpression opExpr:
@@ -288,17 +328,17 @@ internal sealed class TreeNodeFilter : ITestExecutionFilter
         }
     }
 
-    private static void ProcessStackOperator(OperatorKind op, Stack<FilterExpression> expr, Stack<OperatorKind> ops)
+    private static void ProcessStackOperator(OperatorKind op, Stack<FilterExpression> expr, Stack<OperatorKind> ops, string filter)
     {
         switch (op)
         {
             case OperatorKind.And:
             case OperatorKind.Or:
-                var subexprs = new List<FilterExpression>
-                {
+                List<FilterExpression> subexprs =
+                [
                     expr.Pop(),
-                    expr.Pop(),
-                };
+                    expr.Pop()
+                ];
 
                 // Note: An OR/AND operator allow to pass it in a list of expressions.
                 // We can keep popping following operators and add them to the collection,
@@ -310,18 +350,18 @@ internal sealed class TreeNodeFilter : ITestExecutionFilter
                     subexprs.Add(expr.Pop());
                 }
 
-                FilterOperator filter = op switch
+                FilterOperator filterOperator = op switch
                 {
                     OperatorKind.And => FilterOperator.And,
                     OperatorKind.Or => FilterOperator.Or,
-                    OperatorKind.FilterEquals => FilterOperator.Equals,
                     _ => throw ApplicationStateGuard.Unreachable(),
                 };
 
-                expr.Push(new OperatorExpression(filter, subexprs));
+                expr.Push(new OperatorExpression(filterOperator, subexprs.ToArray()));
                 break;
 
             case OperatorKind.FilterEquals:
+            case OperatorKind.FilterNotEquals:
                 FilterExpression valueExpr = expr.Pop();
                 FilterExpression propExpr = expr.Pop();
 
@@ -331,21 +371,33 @@ internal sealed class TreeNodeFilter : ITestExecutionFilter
                     throw new InvalidOperationException();
                 }
 
-                expr.Push(new PropertyExpression(propValueExpr, valueValueExpr));
+                FilterExpression filterExpression = new PropertyExpression(propValueExpr, valueValueExpr);
+                if (op == OperatorKind.FilterNotEquals)
+                {
+                    filterExpression = new OperatorExpression(FilterOperator.Not, [filterExpression]);
+                }
+
+                expr.Push(filterExpression);
+                break;
+
+            case OperatorKind.UnaryNot:
+                FilterExpression notOperator = expr.Pop();
+                expr.Push(new OperatorExpression(FilterOperator.Not, [notOperator]));
                 break;
 
             default:
                 // Note: Handling of other operations in valid scenarios should be handled by the caller.
                 //       Reaching this code for instance means that we're trying to process / operator
                 //       in the middle of a ( expression ).
-                throw new InvalidOperationException(PlatformResources.TreeNodeFilterUnexpectedSlashOperatorErrorMessage);
+                throw new InvalidOperationException(
+                    string.Format(CultureInfo.InvariantCulture, PlatformResources.TreeNodeFilterUnexpectedSlashOperatorInPathSegmentErrorMessage, filter));
         }
     }
 
     private static IEnumerable<string> TokenizeFilter(string filter)
     {
         int i = 0;
-        var lastStringTokenBuilder = new StringBuilder();
+        StringBuilder lastStringTokenBuilder = new();
         int openedSquareBrackets = 0;
 
         while (i < filter.Length)
@@ -410,6 +462,31 @@ internal sealed class TreeNodeFilter : ITestExecutionFilter
 
                     break;
 
+                case '!':
+                    if (i + 1 < filter.Length && filter[i + 1] == '=')
+                    {
+                        if (lastStringTokenBuilder.Length > 0)
+                        {
+                            yield return lastStringTokenBuilder.ToString();
+                            lastStringTokenBuilder.Clear();
+                        }
+
+                        yield return "!=";
+                        i++;
+                    }
+                    else if (i - 1 >= 0 && filter[i - 1] == '(')
+                    {
+                        // Note: If we have a ! at the start of an expression, we should
+                        //       treat it as a NOT operator.
+                        yield return "!";
+                    }
+                    else
+                    {
+                        goto default;
+                    }
+
+                    break;
+
                 default:
                     lastStringTokenBuilder.Append(Regex.Escape(filter[i].ToString()));
                     break;
@@ -431,8 +508,8 @@ internal sealed class TreeNodeFilter : ITestExecutionFilter
     /// <param name="filterableProperties">The URL encoded node properties.</param>
     public bool MatchesFilter(string testNodeFullPath, PropertyBag filterableProperties)
     {
-        ArgumentGuard.IsNotNullOrEmpty(testNodeFullPath);
-        ArgumentGuard.Ensure(testNodeFullPath[0] == PathSeparator, nameof(testNodeFullPath),
+        _ = testNodeFullPath ?? throw new ArgumentNullException(nameof(testNodeFullPath));
+        ArgumentGuard.Ensure(testNodeFullPath.Length > 0 && testNodeFullPath[0] == PathSeparator, nameof(testNodeFullPath),
             string.Format(CultureInfo.InvariantCulture, PlatformResources.TreeNodeFilterPathShouldStartWithSlashErrorMessage, PathSeparator));
 
         int currentCharIndex = 1;
@@ -444,7 +521,13 @@ internal sealed class TreeNodeFilter : ITestExecutionFilter
             if (currentFragmentIndex >= _filters.Count)
             {
                 // Note: The regex for ** is .*.*, so we match against such a value expression.
-                return currentFragmentIndex > 0 && _filters.Last() is ValueExpression { Value: ".*.*" };
+                FilterExpression lastFilter = _filters[^1];
+                if (lastFilter is ValueAndPropertyExpression valueAndPropertyExpression)
+                {
+                    lastFilter = valueAndPropertyExpression.Value;
+                }
+
+                return currentFragmentIndex > 0 && lastFilter is ValueExpression { Value: ".*.*" };
             }
 
             if (!MatchFilterPattern(
@@ -485,35 +568,113 @@ internal sealed class TreeNodeFilter : ITestExecutionFilter
         FilterExpression filterExpression,
         string testNodeFragment,
         PropertyBag properties)
-        => filterExpression switch
+    {
+        switch (filterExpression)
         {
-            ValueExpression vExpr => vExpr.Regex.IsMatch(testNodeFragment),
-            OperatorExpression { Op: FilterOperator.Or, SubExpressions: var subexprs }
-                => subexprs.Any(expr => MatchFilterPattern(expr, testNodeFragment, properties)),
-            OperatorExpression { Op: FilterOperator.And, SubExpressions: var subexprs }
-                => subexprs.All(expr => MatchFilterPattern(expr, testNodeFragment, properties)),
-            OperatorExpression { Op: FilterOperator.Not, SubExpressions: var subexprs }
-                => !MatchFilterPattern(subexprs.Single(), testNodeFragment, properties),
-            ValueAndPropertyExpression { Value: var valueExpr, Properties: var propExpr }
-                => MatchFilterPattern(valueExpr, testNodeFragment, properties)
-                    && MatchProperties(propExpr, properties),
-            NopExpression => true,
-            _ => throw ApplicationStateGuard.Unreachable(),
-        };
+            case ValueExpression vExpr:
+                return vExpr.Regex.IsMatch(testNodeFragment);
+            case OperatorExpression { Op: FilterOperator.Or, SubExpressions: var subexprs }:
+                for (int i = 0; i < subexprs.Count; i++)
+                {
+                    if (MatchFilterPattern(subexprs[i], testNodeFragment, properties))
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            case OperatorExpression { Op: FilterOperator.And, SubExpressions: var subexprs }:
+                for (int i = 0; i < subexprs.Count; i++)
+                {
+                    if (!MatchFilterPattern(subexprs[i], testNodeFragment, properties))
+                    {
+                        return false;
+                    }
+                }
+
+                return true;
+            case OperatorExpression { Op: FilterOperator.Not, SubExpressions: [var singleSubExpr] }:
+                return !MatchFilterPattern(singleSubExpr, testNodeFragment, properties);
+            case ValueAndPropertyExpression { Value: var valueExpr, Properties: var propExpr }:
+                return MatchFilterPattern(valueExpr, testNodeFragment, properties)
+                    && MatchProperties(propExpr, properties);
+            case NopExpression:
+                return true;
+            default:
+                throw ApplicationStateGuard.Unreachable();
+        }
+    }
 
     private static bool MatchProperties(
         FilterExpression propertyExpr,
         PropertyBag properties)
-        => propertyExpr switch
+    {
+        switch (propertyExpr)
         {
-            PropertyExpression { PropertyName: var propExpr, Value: var valueExpr }
-                => properties.AsEnumerable().Any(prop => prop is KeyValuePairStringProperty kvpProperty && propExpr.Regex.IsMatch(kvpProperty.Key) && valueExpr.Regex.IsMatch(kvpProperty.Value)),
-            OperatorExpression { Op: FilterOperator.Or, SubExpressions: var subExprs }
-                => subExprs.Any(expr => MatchProperties(expr, properties)),
-            OperatorExpression { Op: FilterOperator.And, SubExpressions: var subExprs }
-                => subExprs.All(expr => MatchProperties(expr, properties)),
-            OperatorExpression { Op: FilterOperator.Not, SubExpressions: var subExprs }
-                => !MatchProperties(subExprs.Single(), properties),
-            _ => throw ApplicationStateGuard.Unreachable(),
-        };
+            case PropertyExpression { PropertyName: var propExpr, Value: var valueExpr }:
+                // Use the struct-based enumerator on PropertyBag to iterate every property
+                // (including TestNodeStateProperty) without allocating, while keeping
+                // TreeNodeFilter decoupled from PropertyBag's internal storage layout.
+                PropertyBag.PropertyBagEnumerator enumerator = properties.GetStructEnumerator();
+                while (enumerator.MoveNext())
+                {
+                    if (IsMatchingProperty(enumerator.Current, propExpr, valueExpr))
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            case OperatorExpression { Op: FilterOperator.Or, SubExpressions: var subExprs }:
+                for (int i = 0; i < subExprs.Count; i++)
+                {
+                    if (MatchProperties(subExprs[i], properties))
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            case OperatorExpression { Op: FilterOperator.And, SubExpressions: var subExprs }:
+                for (int i = 0; i < subExprs.Count; i++)
+                {
+                    if (!MatchProperties(subExprs[i], properties))
+                    {
+                        return false;
+                    }
+                }
+
+                return true;
+            case OperatorExpression { Op: FilterOperator.Not, SubExpressions: [var singleSubExpr] }:
+                return !MatchProperties(singleSubExpr, properties);
+            default:
+                throw ApplicationStateGuard.Unreachable();
+        }
+    }
+
+    private static bool IsMatchingProperty(IProperty prop, ValueExpression propExpr, ValueExpression valueExpr)
+        => prop is TestMetadataProperty testMetadataProperty &&
+            propExpr.Regex.IsMatch(testMetadataProperty.Key) &&
+            valueExpr.Regex.IsMatch(testMetadataProperty.Value);
+
+    private static bool HasPropertyFilterExpression(FilterExpression expression)
+    {
+        if (expression is ValueAndPropertyExpression)
+        {
+            return true;
+        }
+
+        if (expression is OperatorExpression op)
+        {
+            for (int i = 0; i < op.SubExpressions.Count; i++)
+            {
+                if (HasPropertyFilterExpression(op.SubExpressions[i]))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
 }

@@ -3,63 +3,43 @@
   <file datatype="xml" source-language="en" target-language="cs" original="../Resources.resx">
     <body>
       <trans-unit id="AssemblyCleanupShouldBeValidDescription">
-        <source>Methods marked with [AssemblyCleanup] should follow the following layout to be valid:
-- it should be 'public' 
-- it should be 'static'
-- it should not be generic
-- it should not take any parameter
-- return type should be 'void', 'Task' or 'ValueTask'
-- it should not be 'async void'
-- it should not be a special method (finalizer, operator...).</source>
+        <source>Methods marked with '[AssemblyCleanup]' should follow the following layout to be valid:
+-it can't be declared on a generic class
+-it should be 'public'
+-it should be 'static'
+-it should not be 'async void'
+-it should not be a special method (finalizer, operator...).
+-it should not be generic
+-it should either not take any parameter, or take a single parameter of type 'TestContext'
+-return type should be 'void', 'Task' or 'ValueTask'
+
+The type declaring these methods should also respect the following rules:
+-The type should be a class
+-The class should be 'public' or 'internal' (if the test project is using the '[DiscoverInternals]' attribute)
+-The class shouldn't be 'static'
+-The class should be marked with '[TestClass]' (or a derived attribute)
+-the class should not be generic.</source>
         <target state="translated">Aby byly metody s označením [AssemblyCleanup] platné, musí se řídit následujícím rozložením: 
-.
-– musí být public, 
-– musí být static,
-– nesmí být obecné,
-– nesmí přijímat žádný parametr,
-– návratový typ musí být void, Task nebo ValueTask,
-– nesmí být async void,
-– nesmí být speciální metodou (finalizační metoda, operátor...).</target>
+– Nesmí být deklarované pro obecnou třídu.
+– Musí být public.
+– Musí být static.
+– Nesmí být async void.
+– Nesmí být speciální metodou (finalizační metoda, operátor...).
+– Nesmí být obecné.
+– Nesmí přijímat žádný parametr, nebo musí přijímat jediný parametr typu TestContext.
+– Návratový typ musí být void, Task nebo ValueTask.
+
+Typ deklarující tyto metody by měl také respektovat následující pravidla: 
+– Typ by měl být třída.
+– Třída by měla být public nebo internal (pokud testovací projekt používá atribut [DiscoverInternals]).
+– Třída by neměla být static.
+– Třída by měla být označena atributem [TestClass] (nebo odvozeným atributem).
+– Třída by neměla být obecná.</target>
         <note />
       </trans-unit>
-      <trans-unit id="AssemblyCleanupShouldBeValidMessageFormat_NoParameters">
-        <source>AssemblyCleanup method '{0}' should not take any parameter</source>
-        <target state="translated">Metoda AssemblyCleanup {0} by neměla přijímat žádný parametr.</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="AssemblyCleanupShouldBeValidMessageFormat_NotAGenericClass">
-        <source>AssemblyCleanup method '{0}' can't be declared on a generic class</source>
-        <target state="translated">Metodu AssemblyCleanup {0} nelze deklarovat pro obecnou třídu.</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="AssemblyCleanupShouldBeValidMessageFormat_NotAsyncVoid">
-        <source>AssemblyCleanup method '{0}' should return 'void', 'Task' or 'ValueTask'</source>
-        <target state="translated">Metoda AssemblyCleanup {0} by měla vracet hodnoty void, Task nebo ValueTask.</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="AssemblyCleanupShouldBeValidMessageFormat_NotGeneric">
-        <source>AssemblyCleanup method '{0}' should not be generic</source>
-        <target state="translated">Metoda AssemblyCleanup {0} by neměla být obecná.</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="AssemblyCleanupShouldBeValidMessageFormat_Ordinary">
-        <source>AssemblyCleanup method '{0}' should be an 'ordinary' method</source>
-        <target state="translated">Metoda AssemblyCleanup {0} by měla být metoda ordinary.</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="AssemblyCleanupShouldBeValidMessageFormat_Public">
-        <source>AssemblyCleanup method '{0}' should be 'public'</source>
-        <target state="translated">Metoda AssemblyCleanup {0} by měla být public.</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="AssemblyCleanupShouldBeValidMessageFormat_ReturnType">
-        <source>AssemblyCleanup method '{0}' should return 'void', 'Task' or 'ValueTask'</source>
-        <target state="translated">Metoda AssemblyCleanup {0} by měla vracet hodnoty void, Task nebo ValueTask.</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="AssemblyCleanupShouldBeValidMessageFormat_Static">
-        <source>AssemblyCleanup method '{0}' should be 'static'</source>
-        <target state="translated">Metoda AssemblyCleanup {0} by neměla být static.</target>
+      <trans-unit id="AssemblyCleanupShouldBeValidMessageFormat">
+        <source>AssemblyCleanup method '{0}' signature is invalid</source>
+        <target state="translated">Signatura „{0}“ metody AssemblyCleanup je neplatná</target>
         <note />
       </trans-unit>
       <trans-unit id="AssemblyCleanupShouldBeValidTitle">
@@ -68,68 +48,58 @@
         <note />
       </trans-unit>
       <trans-unit id="AssemblyInitializeShouldBeValidDescription">
-        <source>Methods marked with [AssemblyInitialize] should follow the following layout to be valid:
-- it should be 'public' 
-- it should be 'static'
-- it should not be generic
-- it should take one parameter of type 'TestContext'
-- return type should be 'void', 'Task' or 'ValueTask'
-- it should not be 'async void'
-- it should not be a special method (finalizer, operator...).</source>
+        <source>Methods marked with '[AssemblyInitialize]' should follow the following layout to be valid:
+-it can't be declared on a generic class
+-it should be 'public'
+-it should be 'static'
+-it should not be 'async void'
+-it should not be a special method (finalizer, operator...).
+-it should not be generic
+-it should take one parameter of type 'TestContext'
+-return type should be 'void', 'Task' or 'ValueTask'
+
+The type declaring these methods should also respect the following rules:
+-The type should be a class
+-The class should be 'public' or 'internal' (if the test project is using the '[DiscoverInternals]' attribute)
+-The class shouldn't be 'static'
+-The class should be marked with '[TestClass]' (or a derived attribute)
+-the class should not be generic.</source>
         <target state="translated">Aby byly metody s označením [AssemblyInitialize] platné, musí se řídit následujícím rozložením: 
-.
-– musí být public, 
-– musí být static,
-– nesmí být obecné,
-– musí mít jeden parametr typu TestContext,
-– návratový typ musí být void, Task nebo ValueTask,
-– nesmí být async void,
-– nesmí být speciální metodou (finalizační metoda, operátor...).</target>
+– Nesmí být deklarované pro obecnou třídu.
+– Musí být public.
+– Musí být static.
+– Nesmí být async void.
+– Nesmí být speciální metodou (finalizační metoda, operátor...).
+– Nesmí být obecné.
+– Musí mít jeden parametr typu TestContext.
+– Návratový typ musí být void, Task nebo ValueTask.
+
+Typ deklarující tyto metody by měl také respektovat následující pravidla: 
+– Typ by měl být třída.
+– Třída by měla být public nebo internal (pokud testovací projekt používá atribut [DiscoverInternals]).
+– Třída by neměla být static.
+– Třída by měla být označena atributem [TestClass] (nebo odvozeným atributem).
+– Třída by neměla být obecná.</target>
         <note />
       </trans-unit>
-      <trans-unit id="AssemblyInitializeShouldBeValidMessageFormat_NotAGenericClass">
-        <source>AssemblyInitialize method '{0}' can't be declared on a generic class</source>
-        <target state="translated">Metodu AssemblyInitialize {0} nelze deklarovat pro obecnou třídu.</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="AssemblyInitializeShouldBeValidMessageFormat_NotAsyncVoid">
-        <source>AssemblyInitialize method '{0}' should return 'void', 'Task' or 'ValueTask'</source>
-        <target state="translated">Metoda AssemblyInitialize {0} by měla vracet hodnoty void, Task nebo ValueTask.</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="AssemblyInitializeShouldBeValidMessageFormat_NotGeneric">
-        <source>AssemblyInitialize method '{0}' should not be generic</source>
-        <target state="translated">Metoda AssemblyInitialize {0} by neměla být obecná.</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="AssemblyInitializeShouldBeValidMessageFormat_Ordinary">
-        <source>AssemblyInitialize method '{0}' should be an 'ordinary' method</source>
-        <target state="translated">Metoda AssemblyInitialize {0} by měla být metoda ordinary.</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="AssemblyInitializeShouldBeValidMessageFormat_Public">
-        <source>AssemblyInitialize method '{0}' should be 'public'</source>
-        <target state="translated">Metoda AssemblyInitialize {0} by měla být public.</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="AssemblyInitializeShouldBeValidMessageFormat_ReturnType">
-        <source>AssemblyInitialize method '{0}' should return 'void', 'Task' or 'ValueTask'</source>
-        <target state="translated">Metoda AssemblyInitialize {0} by měla vracet hodnoty void, Task nebo ValueTask.</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="AssemblyInitializeShouldBeValidMessageFormat_SingleContextParameter">
-        <source>AssemblyInitialize method '{0}' should take a single parameter of type 'TestContext'</source>
-        <target state="translated">Metoda AssemblyInitialize {0} by měla mít jeden parametr typu TestContext.</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="AssemblyInitializeShouldBeValidMessageFormat_Static">
-        <source>AssemblyInitialize method '{0}' should be 'static'</source>
-        <target state="translated">Metoda AssemblyInitialize {0} by měla být static.</target>
+      <trans-unit id="AssemblyInitializeShouldBeValidMessageFormat">
+        <source>AssemblyInitialize method '{0}' signature is invalid</source>
+        <target state="translated">Signatura „{0}“ metody AssemblyInitialize je neplatná</target>
         <note />
       </trans-unit>
       <trans-unit id="AssemblyInitializeShouldBeValidTitle">
         <source>AssemblyInitialize methods should have valid layout</source>
         <target state="translated">Metody AssemblyInitialize musí mít platné rozložení</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="AssertionArgsShouldAvoidConditionalAccessMessageFormat">
+        <source>Prefer adding an additional assertion that checks for null</source>
+        <target state="translated">Preferovat přidání dalšího kontrolního výrazu, který kontroluje hodnotu null</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="AssertionArgsShouldAvoidConditionalAccessTitle">
+        <source>Avoid conditional access in assertions</source>
+        <target state="translated">Vyhnout se podmíněnému přístupu v kontrolních výrazech</target>
         <note />
       </trans-unit>
       <trans-unit id="AssertionArgsShouldBePassedInCorrectOrderDescription">
@@ -147,79 +117,118 @@
         <target state="translated">Argumenty kontrolního výrazu musí být předány ve správném pořadí</target>
         <note />
       </trans-unit>
-      <trans-unit id="AvoidExpectedExceptionAttributeDescription">
-        <source>Prefer 'Assert.ThrowsException' or 'Assert.ThrowsExceptionAsync' over '[ExpectedException]' as it ensures that only the expected call throws the expected exception. The assert APIs also provide more flexibility and allow you to assert extra properties of the exeption.</source>
-        <target state="translated">Preferujte Assert.ThrowsException nebo Assert.ThrowsExceptionAsync před [ExpectedException], protože zajišťuje, že očekávanou výjimku vyvolá pouze očekávané volání. Rozhraní API assert také poskytují větší flexibilitu a umožňují vyhodnocovat další vlastnosti výjimky.</target>
+      <trans-unit id="AvoidAssertAreEqualOnCollectionsDescription">
+        <source>`Assert.AreEqual` and `Assert.AreNotEqual` use `EqualityComparer&lt;T&gt;.Default`. For collection-like types this relies on the type's own equality semantics instead of comparing sequence elements, so `Assert.AreSequenceEqual`/`Assert.AreNotSequenceEqual` or `Assert.AreEquivalent`/`Assert.AreNotEquivalent` are usually the better fit.</source>
+        <target state="translated">`Assert.AreEqual` a `Assert.AreNotEqual` používají `EqualityComparer&lt;T&gt;.Default`. U typů podobných kolekcím se používá vlastní sémantika rovnosti daného typu místo porovnávání elementů sekvence, takže vhodnější volbou obvykle bývá `Assert.AreSequenceEqual`/`Assert.AreNotSequenceEqual` nebo `Assert.AreEquivalent`/`Assert.AreNotEquivalent`.</target>
         <note />
       </trans-unit>
-      <trans-unit id="AvoidExpectedExceptionAttributeMessageFormat">
-        <source>Prefer 'Assert.ThrowsException/ThrowsExceptionAsync' over '[ExpectedException]'</source>
-        <target state="translated">Preferovat Assert.ThrowsException/ThrowsExceptionAsync před [ExpectedException]</target>
+      <trans-unit id="AvoidAssertAreEqualOnCollectionsMessageFormat">
+        <source>`{0}` on {1} (which implements IEnumerable&lt;T&gt;) does not perform element-wise sequence comparison. Use `Assert.AreSequenceEqual` for ordered element-wise comparison, `Assert.AreSequenceEqual(..., SequenceOrder.InAnyOrder)` for unordered, or `Assert.AreEquivalent` for deep structural comparison.</source>
+        <target state="translated">`{0}` na {1} (implementující rozhraní IEnumerable&lt;T&gt;) neprovádí porovnání sekvencí po elementech. Pro uspořádané porovnání elementů použijte `Assert.AreSequenceEqual`, pro neuspořádané `Assert.AreSequenceEqual(..., SequenceOrder.InAnyOrder)` nebo pro hloubkové strukturální porovnání `Assert.AreEquivalent`.</target>
         <note />
       </trans-unit>
-      <trans-unit id="AvoidExpectedExceptionAttributeTitle">
-        <source>Avoid '[ExpectedException]'</source>
-        <target state="translated">Vyhněte se [ExpectedException]</target>
+      <trans-unit id="AvoidAssertAreEqualOnCollectionsTitle">
+        <source>Avoid Assert.AreEqual on collection types</source>
+        <target state="translated">Nepoužívat Assert.AreEqual u typů kolekcí</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="AvoidAssertAreSameWithValueTypesDescription">
+        <source>Use 'Assert.AreEqual'/'Assert.AreNotEqual' instead of 'Assert.AreSame'/'Assert.AreNotSame' when comparing value types. Passing a value type to 'Assert.AreSame'/'Assert.AreNotSame' will be boxed (creating a new object). Because 'Assert.AreSame'/'Assert.AreNotSame' does the comparison by reference, 'Assert.AreSame' will fail when boxing happens, and 'Assert.AreNotSame' will always pass.</source>
+        <target state="translated">Při porovnávání typů hodnot použijte Assert.AreEqual/Assert.AreNotEqual místo Assert.AreSame/Assert.AreNotSame. Předání typu hodnoty do assert.AreSame/Assert.AreNotSame bude zabaleno (vytváření nového objektu). Protože Assert.AreSame/Assert.AreNotSame provádí porovnání podle odkazu, Assert.AreSame selže, když dojde k zabalení, a Assert.AreNotSame vždy proběhne.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="AvoidAssertAreSameWithValueTypesMessageFormat">
+        <source>Use '{0}' instead of '{1}' when comparing value types</source>
+        <target state="translated">Při porovnávání typů hodnot použít '{0}' místo '{1}'</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="AvoidAssertAreSameWithValueTypesTitle">
+        <source>Don't use 'Assert.AreSame' or 'Assert.AreNotSame' with value types</source>
+        <target state="translated">Nepoužívejte Assert.AreSame ani Assert.AreNotSame s typy hodnot.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="AvoidExplicitDynamicDataSourceTypeMessageFormat">
+        <source>Remove the 'DynamicDataSourceType' argument to use the default auto detect behavior</source>
+        <target state="translated">Pokud chcete použít výchozí chování automatického zjišťování, odeberte argument DynamicDataSourceType.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="AvoidExplicitDynamicDataSourceTypeTitle">
+        <source>Avoid passing an explicit 'DynamicDataSourceType' and use the default auto detect behavior</source>
+        <target state="translated">Vyhněte se předávání explicitního typu DynamicDataSourceType a použijte výchozí chování automatického zjišťování.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="AvoidThreadSleepAndTaskWaitInTestsDescription">
+        <source>Synchronously blocking the current thread with 'Thread.Sleep', 'Task.Wait', 'Task.WaitAll', 'Task.WaitAny' or 'Task&lt;TResult&gt;.Result' inside test methods or test fixtures is a common source of flakiness and can also deadlock when the test framework runs tests on a SynchronizationContext that requires cooperative scheduling. Prefer 'await Task.Delay' for time-based waits and 'await' the task to observe its result.</source>
+        <target state="translated">Synchronní blokování aktuálního vlákna pomocí „Thread.Sleep“, „Task.Wait“, „Task.WaitAll“, „Task.WaitAny“ nebo „Task&lt;TResult&gt;.Result“ uvnitř testovacích metod nebo testovacích přípravků je běžným zdrojem nestability a může také způsobit zablokování, když testovací rámec spouští testy na SynchronizationContextu, který vyžaduje kooperativní plánování. Pokud chcete sledovat příslušný výsledek, upřednostňujte „await Task.Delay“ pro čekání na základě času a „await“.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="AvoidThreadSleepAndTaskWaitInTestsMessageFormat">
+        <source>Avoid '{0}' in test code as it can cause test flakiness; consider an asynchronous alternative such as 'await Task.Delay' or 'await' the task</source>
+        <target state="translated">Vyhněte se v testovacím kódu „{0}“, protože to může způsobit nestabilitu testů; zvažte asynchronní alternativu, například „await Task.Delay“ nebo „await“ pro danou úlohu</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="AvoidThreadSleepAndTaskWaitInTestsTitle">
+        <source>Avoid synchronously blocking calls such as 'Thread.Sleep', 'Task.Wait', 'Task.WaitAll', 'Task.WaitAny' or 'Task&lt;TResult&gt;.Result' in test code</source>
+        <target state="translated">Vyhněte se synchronnímu blokování volání, jako jsou „Thread.Sleep“, „Task.Wait“, „Task.WaitAll“, „Task.WaitAny“ nebo „Task&lt;TResult&gt;.Result“ v testovacím kódu</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="AvoidUsingAssertsInAsyncVoidContextDescription">
+        <source>Do not assert inside 'async void' methods, local functions, or lambdas. Exceptions that are thrown in this context will be unhandled exceptions. When using VSTest under .NET Framework, they will be silently swallowed. When using Microsoft.Testing.Platform or VSTest under modern .NET, they may crash the process.</source>
+        <target state="translated">Nepoužívejte výraz uvnitř metod async void, místních funkcí nebo výrazů lambda. Výjimky vyvolané v tomto kontextu budou neošetřené výjimky. Když používáte VSTest v .NET Framework, budou se bezobslužně používat. Když používáte Microsoft.Testing.Platform nebo VSTest v moderním rozhraní .NET, může dojít k chybovému ukončení procesu.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="AvoidUsingAssertsInAsyncVoidContextMessageFormat">
+        <source>Do not assert inside 'async void' methods, local functions, or lambdas because they may not fail the test</source>
+        <target state="translated">Neprosazovat uvnitř metod async void, místních funkcí nebo výrazů lambda, protože test nemusí selhat</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="AvoidUsingAssertsInAsyncVoidContextTitle">
+        <source>Do not assert inside 'async void' contexts</source>
+        <target state="translated">Neprosazovat uvnitř kontextů async void</target>
         <note />
       </trans-unit>
       <trans-unit id="ClassCleanupShouldBeValidDescription">
-        <source>Methods marked with [ClassCleanup] should follow the following layout to be valid:
-- it should be 'public' 
-- it should not 'static'
-- it should not be generic
-- it should not take any parameter
-- return type should be 'void', 'Task' or 'ValueTask'
-- it should not be 'async void'
-- it should not be a special method (finalizer, operator...).</source>
+        <source>Methods marked with '[ClassCleanup]' should follow the following layout to be valid:
+-it can't be declared on a generic class without the 'InheritanceBehavior' mode is set
+-it should be 'public'
+-it should be 'static'
+-it should not be 'async void'
+-it should not be a special method (finalizer, operator...).
+-it should not be generic
+-it should either not take any parameter, or take a single parameter of type 'TestContext'
+-return type should be 'void', 'Task' or 'ValueTask'
+-'InheritanceBehavior.BeforeEachDerivedClass' attribute parameter should be specified if the class is 'abstract'
+-'InheritanceBehavior.BeforeEachDerivedClass' attribute parameter should not be specified if the class is 'sealed'
+
+The type declaring these methods should also respect the following rules:
+-The type should be a class
+-The class should be 'public' or 'internal' (if the test project is using the '[DiscoverInternals]' attribute)
+-The class shouldn't be 'static'
+-If the class is 'sealed', it should be marked with '[TestClass]' (or a derived attribute)
+-the class should not be generic.</source>
         <target state="translated">Aby byly metody s označením [ClassCleanup] platné, musí se řídit následujícím rozložením: 
-.
-– musí být public, 
-– nesmí být static,
-– nesmí být obecné,
-– nesmí přijímat žádný parametr,
-– návratový typ musí být void, Task nebo ValueTask,
-– nesmí být async void,
-– nesmí být speciální metodou (finalizační metoda, operátor...).</target>
+– Nesmí být deklarované pro obecnou třídu bez nastavení režimu InheritanceBehavior.
+– Musí být public.
+– Musí být static.
+– Nesmí být async void.
+– Nesmí být speciální metodou (finalizační metoda, operátor...).
+– Nesmí být obecné.
+– Nesmí přijímat žádný parametr, nebo musí přijímat jediný parametr typu TestContext.
+– Návratový typ musí být void, Task nebo ValueTask.
+– V případě třídy abstract by měl být zadán parametr atributu InheritanceBehavior.BeforeEachDerivedClass.
+– V případě třídy sealed by neměl být zadán parametr atributu InheritanceBehavior.BeforeEachDerivedClass.
+
+Typ deklarující tyto metody by měl také respektovat následující pravidla: 
+– Typ by měl být třída.
+– Třída by měla být public nebo internal (pokud testovací projekt používá atribut [DiscoverInternals]).
+– Třída by neměla být static.
+– Pokud je třída sealed, měla by být označena atributem [TestClass] (nebo odvozeným atributem).
+– Třída by neměla být obecná.</target>
         <note />
       </trans-unit>
-      <trans-unit id="ClassCleanupShouldBeValidMessageFormat_NoParameters">
-        <source>ClassCleanup method '{0}' should not take any parameter</source>
-        <target state="translated">Metoda ClassCleanup {0} by neměla přijímat žádný parametr.</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="ClassCleanupShouldBeValidMessageFormat_NotAGenericClassUnlessInheritanceModeSet">
-        <source>ClassCleanup method '{0}' can't be declared on a generic class without the `InheritanceBehavior` mode is set</source>
-        <target state="translated">Metodu ClassCleanup {0} nelze deklarovat pro obecnou třídu bez nastavení režimu InheritanceBehavior.</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="ClassCleanupShouldBeValidMessageFormat_NotAsyncVoid">
-        <source>ClassCleanup method '{0}' should return 'void', 'Task' or 'ValueTask'</source>
-        <target state="translated">Metoda ClassCleanup {0} by měla vracet hodnoty void, Task nebo ValueTask.</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="ClassCleanupShouldBeValidMessageFormat_NotGeneric">
-        <source>ClassCleanup method '{0}' should not be generic</source>
-        <target state="translated">Metoda ClassCleanup {0} by neměla být obecná.</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="ClassCleanupShouldBeValidMessageFormat_Ordinary">
-        <source>ClassCleanup method '{0}' should be an 'ordinary' method</source>
-        <target state="translated">Metoda ClassCleanup {0} by měla být metoda ordinary.</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="ClassCleanupShouldBeValidMessageFormat_Public">
-        <source>ClassCleanup method '{0}' should be 'public'</source>
-        <target state="translated">Metoda ClassCleanup {0} by měla být public.</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="ClassCleanupShouldBeValidMessageFormat_ReturnType">
-        <source>ClassCleanup method '{0}' should return 'void', 'Task' or 'ValueTask'</source>
-        <target state="translated">Metoda ClassCleanup {0} by měla vracet hodnoty void, Task nebo ValueTask.</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="ClassCleanupShouldBeValidMessageFormat_Static">
-        <source>ClassCleanup method '{0}' should be 'static'</source>
-        <target state="translated">Metoda ClassCleanup {0} by měla být static.</target>
+      <trans-unit id="ClassCleanupShouldBeValidMessageFormat">
+        <source>ClassCleanup method '{0}' signature is invalid</source>
+        <target state="translated">Signatura „{0}“ metody ClassCleanup je neplatná</target>
         <note />
       </trans-unit>
       <trans-unit id="ClassCleanupShouldBeValidTitle">
@@ -228,68 +237,62 @@
         <note />
       </trans-unit>
       <trans-unit id="ClassInitializeShouldBeValidDescription">
-        <source>Methods marked with [ClassInitialize] should follow the following layout to be valid:
-- it should be 'public' 
-- it should be 'static'
-- it should not be generic
-- it should take one parameter of type 'TestContext'
-- return type should be 'void', 'Task' or 'ValueTask'
-- it should not be 'async void'
-- it should not be a special method (finalizer, operator...).</source>
+        <source>Methods marked with '[ClassInitialize]' should follow the following layout to be valid:
+-it can't be declared on a generic class without the 'InheritanceBehavior' mode is set
+-it should be 'public'
+-it should be 'static'
+-it should not be 'async void'
+-it should not be a special method (finalizer, operator...).
+-it should not be generic
+-it should take one parameter of type 'TestContext'
+-return type should be 'void', 'Task' or 'ValueTask'
+-'InheritanceBehavior.BeforeEachDerivedClass' attribute parameter should be specified if the class is 'abstract'
+-'InheritanceBehavior.BeforeEachDerivedClass' attribute parameter should not be specified if the class is 'sealed'
+
+The type declaring these methods should also respect the following rules:
+-The type should be a class
+-The class should be 'public' or 'internal' (if the test project is using the '[DiscoverInternals]' attribute)
+-The class shouldn't be 'static'
+-If the class is 'sealed', it should be marked with '[TestClass]' (or a derived attribute)
+-the class should not be generic.</source>
         <target state="translated">Aby byly metody s označením [ClassInitialize] platné, musí se řídit následujícím rozložením: 
-.
-– musí být public, 
-– musí být static,
-– nesmí být obecné,
-– musí mít jeden parametr typu TestContext,
-– návratový typ musí být void, Task nebo ValueTask,
-– nesmí být async void,
-– nesmí být speciální metodou (finalizační metoda, operátor...).</target>
+– Nesmí být deklarované pro obecnou třídu bez nastavení režimu InheritanceBehavior.
+– Musí být public.
+– Musí být static.
+– Nesmí být async void.
+– Nesmí být speciální metodou (finalizační metoda, operátor...).
+– Nesmí být obecné.
+– Musí mít jeden parametr typu TestContext.
+– Návratový typ musí být void, Task nebo ValueTask.
+– V případě třídy abstract by měl být zadán parametr atributu InheritanceBehavior.BeforeEachDerivedClass.
+– V případě třídy sealed by neměl být zadán parametr atributu InheritanceBehavior.BeforeEachDerivedClass.
+
+Typ deklarující tyto metody by měl také respektovat následující pravidla: 
+– Typ by měl být třída.
+– Třída by měla být public nebo internal (pokud testovací projekt používá atribut [DiscoverInternals]).
+– Třída by neměla být static.
+– Pokud je třída sealed, měla by být označena atributem [TestClass] (nebo odvozeným atributem).
+– Třída by neměla být obecná.</target>
         <note />
       </trans-unit>
-      <trans-unit id="ClassInitializeShouldBeValidMessageFormat_NotAGenericClassUnlessInheritanceModeSet">
-        <source>ClassInitialize method '{0}' can't be declared on a generic class without the `InheritanceBehavior` mode is set</source>
-        <target state="translated">Metodu ClassInitialize {0} nelze deklarovat pro obecnou třídu bez nastavení režimu InheritanceBehavior.</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="ClassInitializeShouldBeValidMessageFormat_NotAsyncVoid">
-        <source>ClassInitialize method '{0}' should return 'void', 'Task' or 'ValueTask'</source>
-        <target state="translated">Metoda ClassInitialize {0} by měla vracet hodnoty void, Task nebo ValueTask.</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="ClassInitializeShouldBeValidMessageFormat_NotGeneric">
-        <source>ClassInitialize method '{0}' should not be generic</source>
-        <target state="translated">Metoda ClassInitialize {0} by neměla být obecná.</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="ClassInitializeShouldBeValidMessageFormat_Ordinary">
-        <source>ClassInitialize method '{0}' should be an 'ordinary' method</source>
-        <target state="translated">Metoda ClassInitialize {0} by měla být metoda ordinary.</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="ClassInitializeShouldBeValidMessageFormat_Public">
-        <source>ClassInitialize method '{0}' should be 'public'</source>
-        <target state="translated">Metoda ClassInitialize {0} by měla být public.</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="ClassInitializeShouldBeValidMessageFormat_ReturnType">
-        <source>ClassInitialize method '{0}' should return 'void', 'Task' or 'ValueTask'</source>
-        <target state="translated">Metoda ClassInitialize {0} by měla vracet hodnoty void, Task nebo ValueTask.</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="ClassInitializeShouldBeValidMessageFormat_SingleContextParameter">
-        <source>ClassInitialize method '{0}' should take a single parameter of type 'TestContext'</source>
-        <target state="translated">Metoda ClassInitialize {0} by měla mít jeden parametr typu TestContext.</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="ClassInitializeShouldBeValidMessageFormat_Static">
-        <source>ClassInitialize method '{0}' should be 'static'</source>
-        <target state="translated">Metoda ClassInitialize {0} by měla být static.</target>
+      <trans-unit id="ClassInitializeShouldBeValidMessageFormat">
+        <source>ClassInitialize method '{0}' signature is invalid</source>
+        <target state="translated">Signatura „{0}“ metody ClassInitialize je neplatná</target>
         <note />
       </trans-unit>
       <trans-unit id="ClassInitializeShouldBeValidTitle">
         <source>ClassInitialize methods should have valid layout</source>
         <target state="translated">Metody ClassInitialize musí mít platné rozložení</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="CollectionAssertToAssertMessageFormat">
+        <source>Use 'Assert.{0}' instead of 'CollectionAssert.{1}'</source>
+        <target state="new">Use 'Assert.{0}' instead of 'CollectionAssert.{1}'</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="CollectionAssertToAssertTitle">
+        <source>Use 'Assert' instead of 'CollectionAssert'</source>
+        <target state="new">Use 'Assert' instead of 'CollectionAssert'</target>
         <note />
       </trans-unit>
       <trans-unit id="DataRowShouldBeValidDescription">
@@ -309,8 +312,23 @@
         <note />
       </trans-unit>
       <trans-unit id="DataRowShouldBeValidMessageFormat_ArgumentTypeMismatch">
-        <source>DataRow argument type should match method parameter type. Mismatches occur at indices: {0}</source>
-        <target state="translated">Typ argumentu DataRow by měl odpovídat typu parametru metody. V indexech dochází k neshodě: {0}</target>
+        <source>DataRow argument types do not match method parameter types. {0}</source>
+        <target state="translated">Typy argumentů DataRow neodpovídají typům parametrů metody. {0}</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DataRowShouldBeValidMessageFormat_ParameterMismatch">
+        <source>Parameter '{0}' expects type '{1}', but the provided value has type '{2}'</source>
+        <target state="translated">Parametr '{0}' očekává typ '{1}', ale zadaná hodnota má typ '{2}'</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DataRowShouldBeValidMessageFormat_GenericTypeArgumentConflictingTypes">
+        <source>Found two conflicting types for generic parameter '{0}'. The conflicting types are '{1}' and '{2}'.</source>
+        <target state="translated">Byly nalezeny dva konfliktní typy pro obecný parametr '{0}'. Konfliktní typy jsou '{1}' a '{2}'.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DataRowShouldBeValidMessageFormat_GenericTypeArgumentNotResolved">
+        <source>The type of the generic parameter '{0}' could not be inferred.</source>
+        <target state="translated">Typ obecného parametru '{0}' nelze odvodit.</target>
         <note />
       </trans-unit>
       <trans-unit id="DataRowShouldBeValidMessageFormat_OnTestMethod">
@@ -321,6 +339,16 @@
       <trans-unit id="DataRowShouldBeValidTitle">
         <source>DataRow should be valid</source>
         <target state="translated">Argument DataRow by měl být platný</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DoNotNegateBooleanAssertionFix">
+        <source>Use 'Assert.{0}' instead</source>
+        <target state="translated">Použijte místo toho Assert.{0}.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DoNotNegateBooleanAssertionFixAllTitle">
+        <source>Use proper Assert methods for all negated assertions</source>
+        <target state="translated">Použijte správné metody Assert pro všechny negované kontrolní výrazy</target>
         <note />
       </trans-unit>
       <trans-unit id="DoNotNegateBooleanAssertionMessageFormat">
@@ -341,6 +369,262 @@
       <trans-unit id="DoNotStoreStaticTestContextAnalyzerTitle">
         <source>Do not store TestContext in a static member</source>
         <target state="translated">Neukládejte TestContext ve statickém členu</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DoNotUseShadowingDescription">
+        <source>Shadowing test members could cause testing issues (such as NRE).</source>
+        <target state="translated">Členové testů stínového provozu (vzdáleného řízení) by mohli způsobovat problémy s testováním (například NRE).</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DoNotUseShadowingMessageFormat">
+        <source>Member '{0}' already exists in the base class</source>
+        <target state="translated">Člen {0} už v základní (kořenové) třídě existuje.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DoNotUseShadowingTitle">
+        <source>Do not use shadowing</source>
+        <target state="translated">Nepoužívat stínový provoz (vzdálené řízení)</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DoNotUseSystemDescriptionAttributeDescription">
+        <source>'System.ComponentModel.DescriptionAttribute' has no effect in the context of tests and you likely wanted to use 'Microsoft.VisualStudio.TestTools.UnitTesting.DescriptionAttribute' instead.</source>
+        <target state="translated">System.ComponentModel.DescriptionAttribute nemá v kontextu testů žádný účinek a pravděpodobně jste místo toho chtěli použít Microsoft.VisualStudio.TestTools.UnitTesting.DescriptionAttribute.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DoNotUseSystemDescriptionAttributeMessageFormat">
+        <source>Did you mean to be using 'Microsoft.VisualStudio.TestTools.UnitTesting.DescriptionAttribute'?</source>
+        <target state="translated">Nechtěli jste použít Microsoft.VisualStudio.TestTools.UnitTesting.DescriptionAttribute?</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DoNotUseSystemDescriptionAttributeTitle">
+        <source>'System.ComponentModel.DescriptionAttribute' has no effect on test methods</source>
+        <target state="translated">System.ComponentModel.DescriptionAttribute nemá žádný vliv na testovací metody</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DuplicateDataRowMessageFormat">
+        <source>Do not duplicate 'DataRow' attributes. This is usually a copy/paste error. The attribute indices are '{0}' and '{1}'.</source>
+        <target state="translated">Neduplikujte atributy DataRow. Obvykle se jedná o chybu kopírování a vložení. Indexy atributů jsou {0} a {1}.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DuplicateDataRowTitle">
+        <source>Avoid duplicated 'DataRow' entries</source>
+        <target state="translated">Vyhněte se duplicitním položkám DataRow</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DynamicDataShouldBeValidDescription">
+        <source>'DynamicData' entry should have the following layout to be valid:
+- should only be set on a test method;
+- member should be defined on the type specified;
+- member should be a method if DynamicDataSourceType.Method is specified or a property otherwise.</source>
+        <target state="translated">Aby byla položka DynamicData platná, musí se řídit následujícím rozložením:
+– měla by být nastavena jenom pro testovací metodu;
+– člen by měl být definovaný pro zadaný typ;
+– pokud je zadáno DynamicDataSourceType.Method, měl by být člen metoda, jinak vlastnost.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DynamicDataShouldBeValidMessageFormat_DataMemberSignature">
+        <source>'[DynamicData]' data member '{0}.{1}' signature is invalid</source>
+        <target state="translated">Signatura datového členu [DynamicData] {0}.{1} je neplatná.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DynamicDataShouldBeValidMessageFormat_DisplayMethodSignature">
+        <source>'[DynamicData]' display name method '{0}.{1}' signature is invalid</source>
+        <target state="translated">Signatura metody zobrazovaného názvu [DynamicData] {0}.{1} je neplatná.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DynamicDataShouldBeValidMessageFormat_MemberMethod">
+        <source>'[DynamicData]' member '{0}.{1}' should be a method</source>
+        <target state="translated">Člen [DynamicData] {0}.{1} by měla být metoda.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DynamicDataShouldBeValidMessageFormat_MemberNotFound">
+        <source>'[DynamicData]' member '{0}.{1}' cannot be found</source>
+        <target state="translated">Člen [DynamicData] {0}.{1} nelze najít.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DynamicDataShouldBeValidMessageFormat_MemberType">
+        <source>'[DynamicData]' referenced member '{0}.{1}' should return 'IEnumerable&lt;object[]&gt;', 'IEnumerable&lt;Tuple&gt;` or 'IEnumerable&lt;ValueTuple&gt;'</source>
+        <target state="translated">Odkazovaný člen [DynamicData] {0}.{1} by měl vracet IEnumerable&lt;object[]&gt;, IEnumerable&lt;Tuple&gt; nebo IEnumerable&lt;ValueTuple&gt;.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DynamicDataShouldBeValidMessageFormat_OnTestMethod">
+        <source>'[DynamicData]' should only be set on a test method</source>
+        <target state="translated">Položka [DynamicData] by měla být nastavená jenom u testovací metody.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DynamicDataShouldBeValidMessageFormat_SourceTypeField">
+        <source>'[DynamicData]' member '{0}.{1}' is a field so you should use 'DynamicDataSourceType.AutoDetect' or 'DynamicDataSourceType.Field' (auto detect is the default when not specified explicitly, and is recommended)</source>
+        <target state="translated">Člen [DynamicData] {0}.{1} je pole, měli byste použít DynamicDataSourceType.AutoDetect nebo DynamicDataSourceType.Field (výchozí nastavení je automatické rozpoznávání, pokud není zadané explicitně, a je doporučeno).</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DynamicDataShouldBeValidMessageFormat_SourceTypeMethod">
+        <source>'[DynamicData]' member '{0}.{1}' is a method so you should use 'DynamicDataSourceType.AutoDetect' or 'DynamicDataSourceType.Method' (auto detect is the default when not specified explicitly, and is recommended)</source>
+        <target state="translated">'[DynamicData]' člen {0}.{1} je metoda, takže byste měli použít DynamicDataSourceType.AutoDetect nebo DynamicDataSourceType.Method (automatické zjišťování je výchozí, pokud není explicitně zadáno, a doporučuje se)</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DynamicDataShouldBeValidMessageFormat_SourceTypeNotPropertyMethodOrField">
+        <source>'[DynamicData]' member '{0}.{1}' is not a property, method, or field. Only properties, methods, and fields are supported.</source>
+        <target state="translated">Člen [DynamicData] {0}.{1} není vlastnost, metoda ani pole. Podporují se jen vlastnosti, metody a pole.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DynamicDataShouldBeValidMessageFormat_SourceTypeNotPropertyOrMethod">
+        <source>'[DynamicData]' member '{0}.{1}' is not a property nor a method. Only properties and methods are supported.</source>
+        <target state="translated">'[DynamicData]' člen {0}.{1} není vlastnost ani metoda. Jsou podporovány pouze vlastnosti a metody.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DynamicDataShouldBeValidMessageFormat_SourceTypeProperty">
+        <source>'[DynamicData]' member '{0}.{1}' is a property so you should use 'DynamicDataSourceType.AutoDetect' or 'DynamicDataSourceType.Property' (auto detect is the default when not specified explicitly, and is recommended)</source>
+        <target state="translated">'[DynamicData]' člen {0}.{1} je vlastnost, takže byste měli použít DynamicDataSourceType.AutoDetect nebo DynamicDataSourceType.Property (automatické zjišťování je výchozí, pokud není explicitně zadáno, a doporučuje se)</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DynamicDataShouldBeValidMessageFormat_TooManyMembers">
+        <source>'[DynamicData]' member '{0}.{1}' is found more than once</source>
+        <target state="translated">Člen [DynamicData] {0}.{1} byl nalezen více než jednou.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DynamicDataShouldBeValidTitle">
+        <source>DynamicData should be valid</source>
+        <target state="translated">Položka DynamicData by měla být platná.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="FlowTestContextCancellationTokenDescription">
+        <source>When calling async methods that have overloads accepting a CancellationToken parameter, prefer using the overload with TestContext.CancellationToken to enable cooperative cancellation and respect test timeouts.</source>
+        <target state="translated">Při volání asynchronních metod, které mají přetížení akceptující parametr CancellationToken, upřednostňujte použití přetížení s TestContext.CancellationToken, aby se umožnilo kooperativní rušení a dodržování časových limitů testů.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="FlowTestContextCancellationTokenMessageFormat">
+        <source>Consider using the overload that accepts a CancellationToken and pass 'TestContext.CancellationToken'</source>
+        <target state="translated">Zvažte použití přetížení, které přijímá CancellationToken a předejte TestContext.CancellationToken.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="FlowTestContextCancellationTokenTitle">
+        <source>Flow TestContext.CancellationToken to async operations</source>
+        <target state="translated">Přenesení TestContext.CancellationToken do asynchronních operací</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="GlobalTestFixtureShouldBeValidDescription">
+        <source>Methods marked with '[GlobalTestInitialize]' or '[GlobalTestCleanup]' should follow the following layout to be valid:
+-it can't be declared on a generic class
+-it should be 'public'
+-it should be 'static'
+-it should not be 'async void'
+-it should not be a special method (finalizer, operator...).
+-it should not be generic
+-it should take one parameter of type 'TestContext'
+-return type should be 'void', 'Task' or 'ValueTask'
+
+The type declaring these methods should also respect the following rules:
+-The type should be a class
+-The class should be 'public'
+-The class shouldn't be 'static'
+-The class should be marked with '[TestClass]' (or a derived attribute)
+-the class should not be generic.</source>
+        <target state="translated">Aby byly metody s označením [GlobalTestInitialize] nebo [GlobalTestCleanup] platné, musí se řídit následujícím rozložením:
+– Nesmí být deklarované pro obecnou třídu.
+– Musí být „public“.
+– Musí být „static“.
+– Nesmí být „async void“.
+– Nesmí být speciální metodou („finalizer“, „operator“...).
+– Nesmí být obecné.
+– Musí mít jeden parametr typu TestContext.
+– Návratový typ musí být „void“, „Task“ nebo „ValueTask“.
+
+Typ deklarující tyto metody by měl také respektovat následující pravidla: 
+– Typ by měl být třída.
+– Třída by měla být „public“.
+– Třída by neměla být „static“.
+– Třída by měla být označena atributem [TestClass] (nebo odvozeným atributem).
+– Třída by neměla být obecná.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="GlobalTestFixtureShouldBeValidMessageFormat">
+        <source>Global test fixture method '{0}' signature is invalid</source>
+        <target state="translated">Podpis metody globálního testovacího přípravku {0} je neplatný.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="GlobalTestFixtureShouldBeValidTitle">
+        <source>GlobalTestInitialize and GlobalTestCleanup methods should have valid layout</source>
+        <target state="translated">Metody GlobalTestInitialize a GlobalTestCleanup by měly mít platné rozložení.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="IgnoreShouldHaveJustificationDescription">
+        <source>An '[Ignore]' attribute applied to a test method or test class should include a non-empty message explaining why the test or class is ignored. A justification message makes it easier to triage skipped tests, helps reviewers understand the intent, and prevents tests from being silently disabled forever.</source>
+        <target state="translated">Atribut „[Ignore]“ použitý u testovací metody nebo testovací třídy by měl obsahovat neprázdnou zprávu vysvětlující, proč jsou test nebo třída ignorovány. Zpráva o odůvodnění usnadňuje třídění přeskočených testů, pomáhá revidujícím porozumět záměru a zabránit tomu, aby se testy navždy bezobslužně zakázaly.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="IgnoreShouldHaveJustificationMessageFormat">
+        <source>'[Ignore]' should specify a message explaining why '{0}' is ignored</source>
+        <target state="translated">[Ignore] by měl určovat zprávu vysvětlující, proč se {0} ignoruje</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="IgnoreShouldHaveJustificationTitle">
+        <source>'[Ignore]' should specify a justification</source>
+        <target state="translated">„[Ignore]“ by mělo určovat odůvodnění</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="IgnoreStringMethodReturnValueDescription">
+        <source>Methods like Contains, StartsWith, and EndsWith return boolean values that indicate whether the condition was met. Ignoring these return values is likely a mistake.</source>
+        <target state="translated">Metody jako Contains, StartsWith a EndsWith vracejí logické hodnoty, které označují, jestli byla podmínka splněna. Ignorování těchto vrácených hodnot je pravděpodobně chyba.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="IgnoreStringMethodReturnValueMessageFormat">
+        <source>The return value of '{0}' should not be ignored</source>
+        <target state="translated">Návratová hodnota {0} by neměla být ignorována</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="IgnoreStringMethodReturnValueTitle">
+        <source>Do not ignore the return value of string methods</source>
+        <target state="translated">Neignorovat návratovou hodnotu řetězcových metod</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PreferAssertFailOverAlwaysFalseConditionsMessageFormat">
+        <source>Use 'Assert.Fail' instead of an always-failing 'Assert.{0}' assert</source>
+        <target state="translated">Místo trvalého neúspěšného vyhodnocovacího výrazu „Assert.{0}“ použijte „Assert.Fail“.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PreferAssertFailOverAlwaysFalseConditionsTitle">
+        <source>Use 'Assert.Fail' instead of an always-failing assert</source>
+        <target state="translated">Místo trvalého neúspěšného vyhodnocovacího výrazu použijte „Assert.Fail“.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PreferAsyncAssertionDescription">
+        <source>When verifying exceptions from asynchronous code, use the async assertion methods instead of blocking the asynchronous operation with GetAwaiter().GetResult().</source>
+        <target state="translated">Při ověřování výjimek z asynchronního kódu používejte asynchronní metody kontrolních výrazů místo blokování asynchronní operace pomocí GetAwaiter().GetResult().</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PreferAsyncAssertionMessageFormat">
+        <source>Use 'Assert.{0}' instead of blocking an async call in 'Assert.{1}'</source>
+        <target state="translated">Místo blokování asynchronního volání v Assert.{1} použijte Assert.{0}.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PreferAsyncAssertionTitle">
+        <source>Prefer async assertion methods</source>
+        <target state="translated">Upřednostňovat asynchronní metody kontrolních výrazů</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PreferTestMethodOverDataTestMethodAnalyzerDescription">
+        <source>'DataTestMethodAttribute' is obsolete and provides no additional functionality over 'TestMethodAttribute'. Use 'TestMethodAttribute' for all test methods, including parameterized tests.</source>
+        <target state="translated">Možnost DataTestMethodAttribute je zastaralá a neposkytuje žádné funkce navíc oproti možnosti TestMethodAttribute. Pro všechny testovací metody, včetně parametrizovaných testů, použijte možnost TestMethodAttribute.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PreferTestMethodOverDataTestMethodAnalyzerMessageFormat">
+        <source>'DataTestMethod' is obsolete. Use 'TestMethod' instead.</source>
+        <target state="translated">Možnost DataTestMethod je zastaralá. Místo ní použijte možnost TestMethod.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PreferTestMethodOverDataTestMethodAnalyzerTitle">
+        <source>Prefer 'TestMethod' over 'DataTestMethod'</source>
+        <target state="translated">Preferovat TestMethod před DataTestMethod</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ReviewAlwaysTrueAssertConditionAnalyzerMessageFormat">
+        <source>Review or remove the assertion as its condition is known to be always true</source>
+        <target state="translated">Zkontrolujte nebo odeberte kontrolní výraz, protože jeho podmínka je vždy true.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ReviewAlwaysTrueAssertConditionAnalyzerTitle">
+        <source>Assertion condition is always true</source>
+        <target state="translated">Podmínka kontrolního výrazu je vždy true.</target>
         <note />
       </trans-unit>
       <trans-unit id="PreferConstructorOverTestInitializeMessageFormat">
@@ -383,6 +667,21 @@
         <target state="translated">Upřednostňovat metody TestInitialize před konstruktory</target>
         <note />
       </trans-unit>
+      <trans-unit id="PublicMethodShouldBeTestMethodAnalyzerDescription">
+        <source>Public methods should be test methods (marked with `[TestMethod]`).</source>
+        <target state="translated">Veřejné metody by měly být testovací metody (označené jako [TestMethod]).</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PublicMethodShouldBeTestMethodAnalyzerFormat">
+        <source>Public method '{0}' should be a test method</source>
+        <target state="translated">Veřejná metoda {0} by měla být testovací metoda.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PublicMethodShouldBeTestMethodAnalyzerTitle">
+        <source>Public methods should be test methods</source>
+        <target state="translated">Veřejné metody by měly být testovací metody</target>
+        <note />
+      </trans-unit>
       <trans-unit id="PublicTypeShouldBeTestClassDescription">
         <source>It's considered a good practice to have only test classes marked public in a test project.</source>
         <target state="translated">Osvědčeným postupem je označit jako veřejné v testovacím projektu jen testovací třídy.</target>
@@ -398,6 +697,66 @@
         <target state="translated">Veřejné typy by měly být testovací třídy.</target>
         <note />
       </trans-unit>
+      <trans-unit id="StringAssertToAssertMessageFormat">
+        <source>Use 'Assert.{0}' instead of 'StringAssert.{1}'</source>
+        <target state="translated">Použijte Assert.{0}' místo StringAssert.{1}'</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="StringAssertToAssertTitle">
+        <source>Use 'Assert' instead of 'StringAssert'</source>
+        <target state="translated">Použijte Assert místo StringAssert</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="TestClassShouldBeValidMessageFormat">
+        <source>Test class '{0}' should be valid</source>
+        <target state="translated">Testovací třída {0} by měla být platná.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="TestContextShouldBeValidMessageFormat">
+        <source>Property 'TestContext' should be valid</source>
+        <target state="translated">Vlastnost TestContext by měla být platná.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="TestMethodAttributeShouldPropagateSourceInformationMessageFormat">
+        <source>TestMethodAttribute derived class '{0}' should add CallerFilePath and CallerLineNumber parameters to its constructor</source>
+        <target state="translated">Odvozená třída TestMethodAttribute {0} by měla do svého konstruktoru přidat parametry CallerFilePath a CallerLineNumber</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="TestMethodAttributeShouldPropagateSourceInformationTitle">
+        <source>TestMethodAttribute derived class should propagate source information</source>
+        <target state="translated">Odvozená třída TestMethodAttribute by měla šířit informace o zdroji</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="TestMethodAttributeShouldSetDisplayNameCorrectlyMessageFormat">
+        <source>Use the 'DisplayName' property instead of passing a string argument to TestMethodAttribute</source>
+        <target state="translated">Místo předání řetězcového argumentu atributu TestMethodAttribute použijte vlastnost DisplayName</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="TestMethodAttributeShouldSetDisplayNameCorrectlyTitle">
+        <source>TestMethodAttribute should set DisplayName correctly</source>
+        <target state="translated">TestMethodAttribute by měl správně nastavit DisplayName</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="TestMethodShouldBeValidMessageFormat">
+        <source>Test method '{0}' signature is invalid</source>
+        <target state="translated">Signatura {0} metody Test je neplatná.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="UseCancellationTokenPropertyDescription">
+        <source>TestContext.CancellationToken provides a more direct way to access the cancellation token compared to TestContext.CancellationTokenSource.Token.</source>
+        <target state="translated">TestContext.CancellationToken poskytuje přímější způsob přístupu k tokenu zrušení v porovnání s TestContext.CancellationTokenSource.Token.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="UseCancellationTokenPropertyMessageFormat">
+        <source>Use 'TestContext.CancellationToken' instead of 'TestContext.CancellationTokenSource.Token'</source>
+        <target state="translated">Místo TestContext.CancellationTokenSource.Token použijte TestContext.CancellationToken.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="UseCancellationTokenPropertyTitle">
+        <source>Use TestContext.CancellationToken instead of TestContext.CancellationTokenSource.Token</source>
+        <target state="translated">Místo TestContext.CancellationTokenSource.Token použijte TestContext.CancellationToken.</target>
+        <note />
+      </trans-unit>
       <trans-unit id="TestClassShouldBeValidDescription">
         <source>Test classes, classes marked with the '[TestClass]' attribute, should respect the following layout to be considered valid by MSTest:
 - it should be 'public' (or 'internal' if '[assembly: DiscoverInternals]' attribute is set)
@@ -409,34 +768,19 @@
 – nesmí být obecné.</target>
         <note />
       </trans-unit>
-      <trans-unit id="TestClassShouldBeValidMessageFormat_NotStatic">
-        <source>Test class '{0}' should not be 'static'</source>
-        <target state="translated">Testovací třída {0} by neměla být static.</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="TestClassShouldBeValidMessageFormat_Public">
-        <source>Test class '{0}' should be 'public'</source>
-        <target state="translated">Testovací třída {0} by měla být public.</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="TestClassShouldBeValidMessageFormat_PublicOrInternal">
-        <source>Test class '{0}' should be 'public' or 'internal'</source>
-        <target state="translated">Testovací třída {0} by měla být public nebo internal.</target>
-        <note />
-      </trans-unit>
       <trans-unit id="TestClassShouldBeValidTitle">
         <source>Test classes should have valid layout</source>
         <target state="translated">Testovací třídy by měly mít platné rozložení.</target>
         <note />
       </trans-unit>
       <trans-unit id="TestClassShouldHaveTestMethodDescription">
-        <source>Test class should have at least one test method or be 'static' with method(s) marked by '[AssemblyInitialization]' and/or '[AssemblyCleanup]'.</source>
-        <target state="translated">Testovací třída by měla mít aspoň jednu testovací metodu nebo by měla být static s metodami s označením [AssemblyInitialization] a/nebo [AssemblyCleanup].</target>
+        <source>Test class should have at least one test method or be 'static' with method(s) marked by '[AssemblyInitialize]' and/or '[AssemblyCleanup]'.</source>
+        <target state="translated">Testovací třída by měla mít aspoň jednu testovací metodu nebo by měla být static s metodami s označením [AssemblyInitialize] a/nebo [AssemblyCleanup].</target>
         <note />
       </trans-unit>
       <trans-unit id="TestClassShouldHaveTestMethodMessageFormat">
-        <source>Test class '{0}' should have at least one test method or be 'static' with method(s) marked by '[AssemblyInitialization]' and/or '[AssemblyCleanup]'</source>
-        <target state="translated">Testovací třída {0} by měla mít aspoň jednu testovací metodu nebo by měla být static s metodami s označením [AssemblyInitialization] a/nebo [AssemblyCleanup].</target>
+        <source>Test class '{0}' should have at least one test method or be 'static' with method(s) marked by '[AssemblyInitialize]' and/or '[AssemblyCleanup]'</source>
+        <target state="translated">Testovací třída {0} by měla mít aspoň jednu testovací metodu nebo by měla být static s metodami s označením [AssemblyInitialize] a/nebo [AssemblyCleanup].</target>
         <note />
       </trans-unit>
       <trans-unit id="TestClassShouldHaveTestMethodTitle">
@@ -445,65 +789,41 @@
         <note />
       </trans-unit>
       <trans-unit id="TestCleanupShouldBeValidDescription">
-        <source>Methods marked with [TestCleanup] should follow the following layout to be valid:
-- it should be 'public' 
-- it should not be 'static'
-- it should not be generic
-- it should not be 'abstract'
-- it should not take any parameter
-- return type should be 'void', 'Task' or 'ValueTask'
-- it should not be 'async void'
-- it should not be a special method (finalizer, operator...).</source>
+        <source>Methods marked with '[TestCleanup]' should follow the following layout to be valid:
+-it should be 'public'
+-it should not be 'abstract'
+-it should not be 'async void'
+-it should not be 'static'
+-it should not be a special method (finalizer, operator...).
+-it should not be generic
+-it should not take any parameter
+-return type should be 'void', 'Task' or 'ValueTask'
+
+The type declaring these methods should also respect the following rules:
+-The type should be a class
+-The class should be 'public' or 'internal' (if the test project is using the '[DiscoverInternals]' attribute)
+-The class shouldn't be 'static'
+-If the class is 'sealed', it should be marked with '[TestClass]' (or a derived attribute).</source>
         <target state="translated">Aby byly metody s označením [TestCleanup] platné, musí se řídit následujícím rozložením: 
-.
-– musí být public, 
-– nesmí být static,
-– nesmí být obecné,
-– nesmí být abstract,
-– nesmí přijímat žádný parametr,
-– návratový typ musí být void, Task nebo ValueTask,
-– nesmí být async void,
-– nesmí být speciální metodou (finalizační metoda, operátor...).</target>
+– Musí být public.
+– Nesmí být abstract.
+– Nesmí být async void.
+– Nesmí být static.
+– Nesmí být speciální metodou (finalizační metoda, operátor...).
+– Nesmí být obecné.
+– Nesmí přijímat žádný parametr.
+– Návratový typ musí být void, Task nebo ValueTask.
+
+Typ deklarující tyto metody by měl také respektovat následující pravidla: 
+– Typ by měl být třída.
+– Třída by měla být public nebo internal (pokud testovací projekt používá atribut [DiscoverInternals]).
+– Třída by neměla být static.
+– Pokud je třída sealed, měla by být označena atributem [TestClass] (nebo odvozeným atributem).</target>
         <note />
       </trans-unit>
-      <trans-unit id="TestCleanupShouldBeValidMessageFormat_NoParameters">
-        <source>TestCleanup method '{0}' should not take any parameter</source>
-        <target state="translated">Metoda TestCleanup {0} by neměla přijímat žádný parametr.</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="TestCleanupShouldBeValidMessageFormat_NotAbstract">
-        <source>TestCleanup method '{0}' should not be 'abstract'</source>
-        <target state="translated">Metoda TestCleanup {0} by neměla být abstract.</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="TestCleanupShouldBeValidMessageFormat_NotAsyncVoid">
-        <source>TestCleanup method '{0}' should not be 'async void'</source>
-        <target state="translated">Metoda TestCleanup {0} by neměla být async void.</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="TestCleanupShouldBeValidMessageFormat_NotGeneric">
-        <source>TestCleanup method '{0}' should not be generic</source>
-        <target state="translated">Metoda TestCleanup {0} by neměla být obecná.</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="TestCleanupShouldBeValidMessageFormat_NotStatic">
-        <source>TestCleanup method '{0}' should not be 'static'</source>
-        <target state="translated">Metoda TestCleanup {0} by neměla být static.</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="TestCleanupShouldBeValidMessageFormat_Ordinary">
-        <source>TestCleanup method '{0}' should be an 'ordinary' method</source>
-        <target state="translated">Metoda TestCleanup {0} by měla být metoda ordinary.</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="TestCleanupShouldBeValidMessageFormat_Public">
-        <source>TestCleanup method '{0}' should be 'public'</source>
-        <target state="translated">Metoda TestCleanup {0} by měla být public.</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="TestCleanupShouldBeValidMessageFormat_ReturnType">
-        <source>TestCleanup method '{0}' should return 'void', 'Task' or 'ValueTask'</source>
-        <target state="translated">Metoda TestCleanup {0} by měla vracet hodnoty void, Task nebo ValueTask.</target>
+      <trans-unit id="TestCleanupShouldBeValidMessageFormat">
+        <source>TestCleanup method '{0}' signature is invalid</source>
+        <target state="translated">Signatura „{0}“ metody TestCleanup je neplatná</target>
         <note />
       </trans-unit>
       <trans-unit id="TestCleanupShouldBeValidTitle">
@@ -512,41 +832,14 @@
         <note />
       </trans-unit>
       <trans-unit id="TestContextShouldBeValidDescription">
-        <source>TestContext property should follow the following layout to be valid:
-- it should be a property
-- it should be 'public' (or 'internal' if '[assembly: DiscoverInternals]' attribute is set)
+        <source>'TestContext' should be a non-static property assigned in constructor or set by MSTest. To be set by MSTest, it should follow the layout:
+- it should be 'public' regardless of whether '[assembly: DiscoverInternals]' attribute is set or not.
 - it should not be 'static'
-- it should not be readonly.</source>
-        <target state="translated">Aby byla vlastnost TestContext platná, měla by se řídit následujícím rozložením:
-– měla by to být vlastnost,
-– musí být public (nebo internal, pokud je nastaven atribut [assembly: DiscoverInternals]),
-– musí být static,
-– nemělo by být jen pro čtení.</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="TestContextShouldBeValidMessageFormat_NotField">
-        <source>Member 'TestContext' should be a property and not a field</source>
-        <target state="translated">Člen TestContext by měl být vlastnost, nikoli pole.</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="TestContextShouldBeValidMessageFormat_NotReadonly">
-        <source>Property 'TestContext' should be settable</source>
-        <target state="translated">Vlastnost TestContext by měla být nastavitelná.</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="TestContextShouldBeValidMessageFormat_NotStatic">
-        <source>Property 'TestContext' should not be 'static'</source>
-        <target state="translated">Vlastnost TestContext by neměla být static.</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="TestContextShouldBeValidMessageFormat_Public">
-        <source>Property 'TestContext' should be 'public'</source>
-        <target state="translated">Vlastnost TestContext by měla být public.</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="TestContextShouldBeValidMessageFormat_PublicOrInternal">
-        <source>Property 'TestContext' should be 'public' or 'internal'</source>
-        <target state="translated">Vlastnost TestContext by měla být public nebo internal.</target>
+- it should have a setter.</source>
+        <target state="translated">TestContext musí být nestatická vlastnost přiřazená v konstruktoru nebo nastavená přes MSTest. Pokud se má nastavit přes MSTest, musí splňovat následující rozložení:
+– Musí být public bez ohledu na to, jestli je nastavený atribut [assembly: DiscoverInternals].
+– Nesmí být static.
+– Musí mít metodu setter.</target>
         <note />
       </trans-unit>
       <trans-unit id="TestContextShouldBeValidTitle">
@@ -555,65 +848,41 @@
         <note />
       </trans-unit>
       <trans-unit id="TestInitializeShouldBeValidDescription">
-        <source>Methods marked with [TestInitialize] should follow the following layout to be valid:
-- it should be 'public' 
-- it should not be 'static'
-- it should not be generic
-- it should not be 'abstract'
-- it should not take any parameter
-- return type should be 'void', 'Task' or 'ValueTask'
-- it should not be 'async void'
-- it should not be a special method (finalizer, operator...).</source>
+        <source>Methods marked with '[TestInitialize]' should follow the following layout to be valid:
+-it should be 'public'
+-it should not be 'abstract'
+-it should not be 'async void'
+-it should not be 'static'
+-it should not be a special method (finalizer, operator...).
+-it should not be generic
+-it should not take any parameter
+-return type should be 'void', 'Task' or 'ValueTask'
+
+The type declaring these methods should also respect the following rules:
+-The type should be a class
+-The class should be 'public' or 'internal' (if the test project is using the '[DiscoverInternals]' attribute)
+-The class shouldn't be 'static'
+-If the class is 'sealed', it should be marked with '[TestClass]' (or a derived attribute).</source>
         <target state="translated">Aby byly metody s označením [TestInitialize] platné, musí se řídit následujícím rozložením: 
-.
-– musí být public, 
-– nesmí být static,
-– nesmí být obecné,
-– nesmí být abstract,
-– nesmí přijímat žádný parametr,
-– návratový typ musí být void, Task nebo ValueTask,
-– nesmí být async void,
-– nesmí být speciální metodou (finalizační metoda, operátor...).</target>
+– Musí být public.
+– Nesmí být abstract.
+– Nesmí být async void.
+– Nesmí být static.
+– Nesmí být speciální metodou (finalizační metoda, operátor...).
+– Nesmí být obecné.
+– Nesmí přijímat žádný parametr.
+– Návratový typ musí být void, Task nebo ValueTask.
+
+Typ deklarující tyto metody by měl také respektovat následující pravidla: 
+– Typ by měl být třída.
+– Třída by měla být public nebo internal (pokud testovací projekt používá atribut [DiscoverInternals]).
+– Třída by neměla být static.
+– Pokud je třída sealed, měla by být označena atributem [TestClass] (nebo odvozeným atributem).</target>
         <note />
       </trans-unit>
-      <trans-unit id="TestInitializeShouldBeValidMessageFormat_NoParameters">
-        <source>TestInitialize method '{0}' should not take any parameter</source>
-        <target state="translated">Metoda TestInitialize {0} by neměla přijímat žádný parametr.</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="TestInitializeShouldBeValidMessageFormat_NotAbstract">
-        <source>TestInitialize method '{0}' should not be 'abstract'</source>
-        <target state="translated">Metoda TestInitialize {0} by neměla být abstract.</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="TestInitializeShouldBeValidMessageFormat_NotAsyncVoid">
-        <source>TestInitialize method  '{0}' should not be 'async void'</source>
-        <target state="translated">Metoda TestInitialize {0} by neměla být async void.</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="TestInitializeShouldBeValidMessageFormat_NotGeneric">
-        <source>TestInitialize method '{0}' should not be generic</source>
-        <target state="translated">Metoda TestInitialize {0} by neměla být obecná.</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="TestInitializeShouldBeValidMessageFormat_NotStatic">
-        <source>TestInitialize method '{0}' should not be 'static'</source>
-        <target state="translated">Metoda TestInitialize {0} by neměla být static.</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="TestInitializeShouldBeValidMessageFormat_Ordinary">
-        <source>TestInitialize method '{0}' should be an 'ordinary' method</source>
-        <target state="translated">Metoda TestInitialize {0} by měla být metoda ordinary.</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="TestInitializeShouldBeValidMessageFormat_Public">
-        <source>TestInitialize method '{0}' should be 'public'</source>
-        <target state="translated">Metoda TestInitialize {0} by neměla být public.</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="TestInitializeShouldBeValidMessageFormat_ReturnType">
-        <source>TestInitialize method '{0}' should return 'void', 'Task' or 'ValueTask'</source>
-        <target state="translated">Metoda TestInitialize {0} by měla vracet hodnoty void, Task nebo ValueTask.</target>
+      <trans-unit id="TestInitializeShouldBeValidMessageFormat">
+        <source>TestInitialize method '{0}' signature is invalid</source>
+        <target state="translated">Signatura „{0}“ metody TestInitialize je neplatná</target>
         <note />
       </trans-unit>
       <trans-unit id="TestInitializeShouldBeValidTitle">
@@ -625,7 +894,7 @@
         <source>Test methods, methods marked with the '[TestMethod]' attribute, should respect the following layout to be considered valid by MSTest:
 - it should be 'public' (or 'internal' if '[assembly: DiscoverInternals]' attribute is set)
 - it should not be 'static'
-- it should not be generic
+- it should may be generic as long as type parameters can be inferred and argument types are compatible
 - it should not be 'abstract'
 - return type should be 'void', 'Task' or 'ValueTask'
 - it should not be 'async void'
@@ -633,51 +902,11 @@
         <target state="translated">Testovací metody (metody označené atributem [TestMethod]) by měly respektovat následující rozložení, které MSTest považuje za platné:
 – musí být public (nebo internal, pokud je nastaven atribut [assembly: DiscoverInternals]),
 – musí být static,
-– nesmí být obecné,
+– můžou být obecné, pokud lze odvodit parametry typu a typy argumentů jsou kompatibilní
 – nesmí být abstract,
 – návratový typ by měl být void, Task nebo ValueTask,
 – nesmí být async void,
 – nesmí být speciální metodou (finalizační metoda, operátor...).</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="TestMethodShouldBeValidMessageFormat_NotAbstract">
-        <source>Test method '{0}' should not be 'abstract'</source>
-        <target state="translated">Testovací metoda {0} by neměla být abstract.</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="TestMethodShouldBeValidMessageFormat_NotAsyncVoid">
-        <source>Test method '{0}' should not be 'async void'</source>
-        <target state="translated">Testovací metoda {0} by neměla být async void.</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="TestMethodShouldBeValidMessageFormat_NotGeneric">
-        <source>Test method '{0}' should not be generic</source>
-        <target state="translated">Testovací metoda {0} by neměla být obecná.</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="TestMethodShouldBeValidMessageFormat_NotStatic">
-        <source>Test method '{0}' should not be 'static'</source>
-        <target state="translated">Testovací metoda {0} by neměla být static.</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="TestMethodShouldBeValidMessageFormat_Ordinary">
-        <source>Test method '{0}' should be an 'ordinary' method</source>
-        <target state="translated">Testovací metoda {0} by měla být metoda ordinary.</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="TestMethodShouldBeValidMessageFormat_Public">
-        <source>Test method '{0}' should be 'public'</source>
-        <target state="translated">Testovací metoda {0} by měla být public.</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="TestMethodShouldBeValidMessageFormat_PublicOrInternal">
-        <source>Test method '{0}' should be 'public' or 'internal'</source>
-        <target state="translated">Testovací metoda {0} by měla být public nebo internal.</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="TestMethodShouldBeValidMessageFormat_ReturnType">
-        <source>Test method '{0}' should return 'void', 'Task' or 'ValueTask'</source>
-        <target state="translated">Testovací metoda {0} by měla vrátit void, Task nebo ValueTask.</target>
         <note />
       </trans-unit>
       <trans-unit id="TestMethodShouldBeValidTitle">
@@ -700,6 +929,36 @@
         <target state="translated">Testovací metoda by se neměla ignorovat.</target>
         <note />
       </trans-unit>
+      <trans-unit id="TypeContainingTestMethodShouldBeATestClassDescription">
+        <source>Type containing '[TestMethod]' should be marked with '[TestClass]', otherwise the test method will be silently ignored.</source>
+        <target state="translated">Typ obsahující [TestMethod] by měl mít označení [TestClass], jinak se bude testovací metoda bez upozornění ignorovat.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="TypeContainingTestMethodShouldBeATestClassMessageFormat">
+        <source>Type '{0}' contains test methods and should be marked with '[TestClass]'</source>
+        <target state="translated">Třída {0} obsahuje testovací metody a měla by mít označení [TestClass].</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="TypeContainingTestMethodShouldBeATestClassTitle">
+        <source>Type containing '[TestMethod]' should be marked with '[TestClass]'</source>
+        <target state="translated">Typ obsahující [TestMethod] by měl mít označení [TestClass]</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="UseAsyncSuffixTestFixtureMethodSuppressorJustification">
+        <source>Asynchronous test fixture methods do not require the 'Async' suffix</source>
+        <target state="translated">Asynchronní metody testovacích přípravků nevyžadují příponu Async.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="UseAsyncSuffixTestMethodSuppressorJustification">
+        <source>Asynchronous test methods do not require the 'Async' suffix</source>
+        <target state="translated">Asynchronní testovací metody nevyžadují příponu Async.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="UnusedParameterSuppressorJustification">
+        <source>TestContext parameter is required by MSTest for AssemblyInitialize and ClassInitialize methods</source>
+        <target state="translated">Parametr TestContext vyžaduje MSTest pro metody AssemblyInitialize a ClassInitialize.</target>
+        <note />
+      </trans-unit>
       <trans-unit id="UseAttributeOnTestMethodAnalyzerMessageFormat">
         <source>[{0}] can only be set on methods marked with [TestMethod]</source>
         <target state="translated">[{0}] lze nastavit pouze u metod označených pomocí metody [TestMethod].</target>
@@ -708,6 +967,41 @@
       <trans-unit id="UseAttributeOnTestMethodAnalyzerTitle">
         <source>[{0}] can only be set on methods marked with [TestMethod]</source>
         <target state="translated">[{0}] lze nastavit pouze u metod označených pomocí metody [TestMethod].</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="UseConditionBaseWithTestClassMessageFormat">
+        <source>The attribute '{0}' which derives from 'ConditionBaseAttribute' should be used only on classes marked with `TestClassAttribute`</source>
+        <target state="translated">Atribut '{0}' odvozený od atributu ConditionBaseAttribute by měl být použit pouze u tříd označených atributem TestClassAttribute.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="UseConditionBaseWithTestClassTitle">
+        <source>Use 'ConditionBaseAttribute' on test classes</source>
+        <target state="translated">Použít ConditionBaseAttribute u testovacích tříd</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="UseCooperativeCancellationForTimeoutDescription">
+        <source>Using '[Timeout]' without explicitly setting 'CooperativeCancellation = true' is discouraged. In a future version, cooperative cancellation will become the default behavior. Set 'CooperativeCancellation = true' to opt into the recommended behavior and avoid breaking changes.</source>
+        <target state="translated">Použití „[Timeout]“ bez explicitního nastavení „CooperativeCancellation = true“ se nedoporučuje. V budoucí verzi se kooperativní zrušení stane výchozím chováním. Nastavte „CooperativeCancellation = true“, abyste zapnuli doporučené chování a vyhnuli se změnám, které by mohly způsobit problémy.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="UseCooperativeCancellationForTimeoutMessageFormat">
+        <source>Use 'CooperativeCancellation = true' with '[Timeout]' to enable cooperative cancellation behavior</source>
+        <target state="translated">Použijte „CooperativeCancellation = true“ s „[Timeout]“, abyste povolili chování kooperativního zrušení</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="UseCooperativeCancellationForTimeoutTitle">
+        <source>Use 'CooperativeCancellation = true' with '[Timeout]'</source>
+        <target state="translated">Použijte „CooperativeCancellation = true“ s „[Timeout]“</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="UseDeploymentItemWithTestMethodOrTestClassMessageFormat">
+        <source>'[DeploymentItem]' can be specified only on test class or test method</source>
+        <target state="translated">[DeploymentItem] se dá zadat jenom pro testovací třídu nebo testovací metodu.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="UseDeploymentItemWithTestMethodOrTestClassTitle">
+        <source>'[DeploymentItem]' can be specified only on test class or test method</source>
+        <target state="translated">[DeploymentItem] se dá zadat jenom pro testovací třídu nebo testovací metodu.</target>
         <note />
       </trans-unit>
       <trans-unit id="UseParallelizeAttributeAnalyzerDescription">
@@ -723,6 +1017,146 @@
       <trans-unit id="UseParallelizeAttributeAnalyzerTitle">
         <source>Explicitly enable or disable tests parallelization</source>
         <target state="translated">Explicitně povolit nebo zakázat paralelizaci testů</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="UseProperAssertMethodsMessageFormat">
+        <source>Use 'Assert.{0}' instead of 'Assert.{1}'</source>
+        <target state="translated">Místo Assert.{1} použijte Assert.{0}.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="UseProperAssertMethodsTitle">
+        <source>Use proper 'Assert' methods</source>
+        <target state="translated">Použít správné metody Assert</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="UseRetryWithTestMethodMessageFormat">
+        <source>An attribute that derives from 'RetryBaseAttribute' can be specified only on a test method or a test class</source>
+        <target state="translated">Atribut, který je odvozen od retryBaseAttribute, lze zadat pouze v testovací metodě nebo testovací třídě</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="UseRetryWithTestMethodTitle">
+        <source>Use retry attribute on test method or test class</source>
+        <target state="translated">Použití atributu retry u testovací metody nebo testovací třídy</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="TestContextPropertyUsageTitle">
+        <source>TestContext property cannot be accessed in this context</source>
+        <target state="translated">Vlastnost TestContext není v tomto kontextu přístupná</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="TestContextPropertyUsageMessageFormat">
+        <source>TestContext property '{0}' cannot be accessed in '{1}' method</source>
+        <target state="translated">Vlastnost TestContext {0} není přístupná v metodě {1}</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="TestContextPropertyUsageDescription">
+        <source>Some TestContext properties are only available during test execution and cannot be accessed in assembly initialize, class initialize, class cleanup, or assembly cleanup methods.</source>
+        <target state="translated">Některé vlastnosti TestContext jsou k dispozici pouze během provádění testu a nelze k nim přistupovat v metodách inicializace sestavení, inicializace třídy, vyčištění třídy nebo vyčištění sestavení.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="AssertThrowsShouldContainSingleStatementDescription">
+        <source>Assert.Throws methods should contain only a single statement or expression. Multiple statements can be misleading - if the first statement throws, subsequent statements are never executed; if it doesn't throw, it should be moved outside the Assert.Throws.</source>
+        <target state="translated">Metody Assert.Throws by měly obsahovat pouze jeden příkaz nebo výraz. Více příkazů může být zavádějící – pokud se vyvolá první příkaz, následující příkazy se nikdy neprovedou. Pokud se nevyvolá, měl by se přesunout mimo Assert.Throws.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="AssertThrowsShouldContainSingleStatementMessageFormat">
+        <source>Assert.Throws should contain only a single statement/expression</source>
+        <target state="translated">Parametr Assert.Throws by měl obsahovat jenom jeden příkaz nebo výraz</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="AssertThrowsShouldContainSingleStatementTitle">
+        <source>Assert.Throws should contain only a single statement/expression</source>
+        <target state="translated">Parametr Assert.Throws by měl obsahovat jenom jeden příkaz nebo výraz</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="AvoidAssertsInCatchBlocksTitle">
+        <source>Do not use asserts in catch blocks</source>
+        <target state="translated">Nepoužívat kontrolní výrazy v blocích catch</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="AvoidAssertsInCatchBlocksMessageFormat">
+        <source>Do not use asserts in catch blocks because they may not fail the test if no exception is thrown</source>
+        <target state="translated">Nepoužívejte kontrolní výrazy v blocích catch, protože test nemusí selhat, pokud není vyvolána žádná výjimka.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="AvoidAssertsInCatchBlocksDescription">
+        <source>Using asserts in catch blocks is problematic because the test will pass even if no exception is thrown and the catch block is never executed. Use 'Assert.Throws', 'Assert.ThrowsExactly', 'Assert.ThrowsAsync' or 'Assert.ThrowsExactlyAsync' to verify that an exception is thrown, and then make additional assertions on the caught exception without using the try-catch block. The rule also flags 'throw new AssertFailedException(...)' and 'throw new AssertInconclusiveException(...)' (the desugared forms of 'Assert.Fail' and 'Assert.Inconclusive'). 'Assert.Inconclusive' (and 'throw new AssertInconclusiveException(...)') is exempt when used inside a filtered catch ('catch (...) when (...)'), because demoting a caught failure to an Inconclusive outcome is the only use case that cannot be expressed without a catch block. For other intentional bypasses (for example, attaching a runtime-built message to the failure), suppress the diagnostic with '#pragma warning disable MSTEST0058'.</source>
+        <target state="translated">Používání kontrolních výrazů v blocích catch je problematické, protože test projde, i když se nevyvolá žádná výjimka a blok catch se nikdy nespustí. K ověření, že je vyvolána výjimka, použijte metody Assert.Throws, Assert.ThrowsExactly, Assert.ThrowsAsync nebo Assert.ThrowsExactlyAsync a poté proveďte další kontrolní výrazy nad zachycenou výjimkou bez použití bloku try-catch. Pravidlo také označí výjimku throw new AssertFailedException(...) a throw new AssertInconclusiveException(...). (asynchronní tvary Assert.Fail a Assert.Inconclusive). Assert.Inconclusive (a throw new AssertInconclusiveException(...)) se vyloučí při použití uvnitř filtrovaného catch ('catch (...) when (...)'), protože snížení úrovně zachyceného selhání na neprůkazný výsledek je jediný případ použití, který se nedá vyjádřit bez bloku catch. U jiných záměrných obejití (například při připojení zprávy sestavené za běhu k selhání) potlačte diagnostiku pomocí „#pragma warning disable MSTEST0058“.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DoNotUseParallelizeAndDoNotParallelizeTogetherDescription">
+        <source>An assembly should have either '[Parallelize]' or '[DoNotParallelize]' attribute, but not both. Having both attributes creates an ambiguous configuration. When both are present, '[DoNotParallelize]' takes precedence and parallelization will be disabled.</source>
+        <target state="translated">Sestavení by mělo mít buď atribut [Parallelize], nebo atribut [DoNotParallelize], ale ne oba. Přítomnost obou atributů způsobuje nejednoznačnou konfiguraci. Když jsou přítomny oba atributy, má přednost atribut [DoNotParallelize] a bude zakázána paralelizace.</target>
+        <note>{Locked="[Parallelize]"}{Locked="[DoNotParallelize]"}</note>
+      </trans-unit>
+      <trans-unit id="DoNotUseParallelizeAndDoNotParallelizeTogetherMessageFormat">
+        <source>Assembly has both '[Parallelize]' and '[DoNotParallelize]' attributes which creates ambiguity</source>
+        <target state="translated">Sestavení má atributy [Parallelize] i [DoNotParallelize], což způsobuje nejednoznačnost.</target>
+        <note>{Locked="[Parallelize]"}{Locked="[DoNotParallelize]"}</note>
+      </trans-unit>
+      <trans-unit id="DoNotUseParallelizeAndDoNotParallelizeTogetherTitle">
+        <source>Do not use both '[Parallelize]' and '[DoNotParallelize]' attributes</source>
+        <target state="translated">Nepoužívejte současně atributy [Parallelize] a [DoNotParallelize].</target>
+        <note>{Locked="[Parallelize]"}{Locked="[DoNotParallelize]"}</note>
+      </trans-unit>
+      <trans-unit id="UseOSConditionAttributeInsteadOfRuntimeCheckTitle">
+        <source>Use '[OSCondition]' attribute instead of 'RuntimeInformation.IsOSPlatform' calls with early return or 'Assert.Inconclusive'</source>
+        <target state="translated">Místo volání „RuntimeInformation.IsOSPlatform“ použijte atribut „[OSCondition]“ s časným vrácením nebo „Assert.Inconclusive“</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="UseOSConditionAttributeInsteadOfRuntimeCheckMessageFormat">
+        <source>Use '[OSCondition]' attribute instead of 'RuntimeInformation.IsOSPlatform' calls with early return or 'Assert.Inconclusive'</source>
+        <target state="translated">Místo volání „RuntimeInformation.IsOSPlatform“ použijte atribut „[OSCondition]“ s časným vrácením nebo „Assert.Inconclusive“</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="UseOSConditionAttributeInsteadOfRuntimeCheckDescription">
+        <source>Test methods that use 'RuntimeInformation.IsOSPlatform' with early return or 'Assert.Inconclusive' should use the '[OSCondition]' attribute instead. This attribute provides a more declarative and discoverable way to specify OS-specific test requirements.</source>
+        <target state="translated">Testovací metody, které používají „RuntimeInformation.IsOSPlatform“ s časným vrácením nebo „Assert.Inconclusive“, by místo toho měly používat atribut „[OSCondition]“. Tento atribut poskytuje deklarativní a zjistitelný způsob určení požadavků na testy specifické pro operační systém.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DuplicateTestMethodAttributeTitle">
+        <source>Avoid duplicate test method attributes</source>
+        <target state="translated">Vyhněte se duplicitním atributům testovací metody</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DuplicateTestMethodAttributeMessageFormat">
+        <source>Test method '{0}' has multiple attributes that inherit from 'TestMethodAttribute'. Only one test method attribute should be used.</source>
+        <target state="translated">Testovací metoda {0} má několik atributů, které dědí z atributu TestMethodAttribute. Měl by být použit pouze jeden atribut testovací metody.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DuplicateTestMethodAttributeDescription">
+        <source>A test method should be marked with exactly one attribute that is or inherits from 'TestMethodAttribute'. When multiple such attributes are present, only the first one returned by reflection will be used.</source>
+        <target state="translated">Testovací metoda by měla být označena přesně jedním atributem, který je nebo dědí z atributu TestMethodAttribute. Pokud je přítomno více takových atributů, použije se pouze první vrácený odezvou.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="AvoidOutRefTestMethodParametersTitle">
+        <source>Avoid using 'out' or 'ref' parameters in test methods</source>
+        <target state="translated">Vyhněte se použití parametrů out nebo ref v testovacích metodách</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="AvoidOutRefTestMethodParametersMessageFormat">
+        <source>Test method '{0}' has 'out' or 'ref' parameters for which support will be dropped in a future major version</source>
+        <target state="translated">Testovací metoda {0} má parametry out nebo ref, pro které se v budoucí hlavní verzi zruší podpora</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="AvoidOutRefTestMethodParametersDescription">
+        <source>'out' and 'ref' parameters add no value in test methods and they can safely be replaced by normal parameters.</source>
+        <target state="translated">Parametry out a ref nepřidávají v testovacích metodách žádnou hodnotu a je možné je bezpečně nahradit normálními parametry.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="TestClassConstructorShouldBeValidTitle">
+        <source>Test classes should have valid constructors</source>
+        <target state="translated">Testovací třídy by měly mít platné konstruktory.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="TestClassConstructorShouldBeValidMessageFormat">
+        <source>Test class '{0}' does not have a valid constructor. Valid constructors are 'public' and either parameterless or with one parameter of type 'TestContext'.</source>
+        <target state="translated">Testovací třída {0} nemá platný konstruktor. Platné konstruktory jsou public a buď bez parametrů, nebo s jedním parametrem typu TestContext.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="TestClassConstructorShouldBeValidDescription">
+        <source>Test classes must have a public constructor that is either parameterless or accepts a single TestContext parameter. This allows the test framework to instantiate the test class properly.</source>
+        <target state="translated">Testovací třídy musí mít veřejný konstruktor, který je buď bez parametrů, nebo přijímá jeden parametr typu TestContext. To umožňuje testovací architektuře správně vytvořit instanci testovací třídy.</target>
         <note />
       </trans-unit>
     </body>

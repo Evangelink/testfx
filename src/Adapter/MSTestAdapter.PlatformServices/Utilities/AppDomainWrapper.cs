@@ -10,17 +10,13 @@ namespace Microsoft.VisualStudio.TestPlatform.MSTestAdapter.PlatformServices;
 /// <summary>
 /// Abstraction over the AppDomain APIs.
 /// </summary>
-internal class AppDomainWrapper : IAppDomain
+internal sealed class AppDomainWrapper : IAppDomain
 {
     public AppDomain CreateDomain(string friendlyName, Evidence securityInfo, AppDomainSetup info)
-    {
-        return AppDomain.CreateDomain(friendlyName, securityInfo, info);
-    }
+        => AppDomain.CreateDomain(friendlyName, securityInfo, info);
 
     public void Unload(AppDomain appDomain)
-    {
-        AppDomain.Unload(appDomain);
-    }
+        => AppDomain.Unload(appDomain);
 }
 
 #endif

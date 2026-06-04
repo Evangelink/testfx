@@ -1,84 +1,224 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using Microsoft.Testing.Internal.Framework;
 using Microsoft.Testing.Platform.Extensions.Messages;
 using Microsoft.Testing.Platform.Requests;
-using Microsoft.Testing.TestInfrastructure;
+#pragma warning disable CS0618 // Type or member is obsolete
 
 namespace Microsoft.Testing.Platform.UnitTests;
 
-[TestGroup]
-public class TreeNodeFilterTests : TestBase
+[TestClass]
+public sealed class TreeNodeFilterTests
 {
-    public TreeNodeFilterTests(ITestExecutionContext testExecutionContext)
-        : base(testExecutionContext)
-    {
-    }
-
+    [TestMethod]
     public void MatchAllFilter_MatchesAnyPath()
     {
-        var filter = new TreeNodeFilter("/**");
+        TreeNodeFilter filter = new("/**");
         Assert.IsTrue(filter.MatchesFilter("/Any/Path", new PropertyBag()));
         Assert.IsTrue(filter.MatchesFilter("/Path/Of/The/Test", new PropertyBag()));
     }
 
+    [TestMethod]
     public void MatchAllFilter_MatchesSubpaths()
     {
-        var filter = new TreeNodeFilter("/Path/**");
+        TreeNodeFilter filter = new("/Path/**");
         Assert.IsTrue(filter.MatchesFilter("/Path/Of/The/Test", new PropertyBag()));
     }
 
-    public void MatchAllFilter_Invalid() => Assert.Throws<InvalidOperationException>(() => _ = new TreeNodeFilter("/A(&B)"));
+    [TestMethod]
+    public void MatchAllFilter_Invalid() => Assert.ThrowsExactly<InvalidOperationException>(() => _ = new TreeNodeFilter("/A(&B)"));
 
-    public void MatchAllFilter_DoNotAllowInMiddleOfFilter() => Assert.Throws<ArgumentException>(() => _ = new TreeNodeFilter("/**/Path"));
+    [TestMethod]
+    public void MatchAllFilter_DoNotAllowInMiddleOfFilter() => Assert.ThrowsExactly<ArgumentException>(() => _ = new TreeNodeFilter("/**/Path"));
 
+    [TestMethod]
     public void MatchWildcard_MatchesSubstrings()
     {
-        var filter = new TreeNodeFilter("/*.UnitTests");
+        TreeNodeFilter filter = new("/*.UnitTests");
         Assert.IsTrue(filter.MatchesFilter("/ProjectA.UnitTests", new PropertyBag()));
         Assert.IsTrue(filter.MatchesFilter("/ProjectB.UnitTests", new PropertyBag()));
         Assert.IsFalse(filter.MatchesFilter("/ProjectB.FunctionalTests", new PropertyBag()));
     }
 
+    [TestMethod]
     public void EscapeSequences_SupportsWildcard()
     {
-        var filter = new TreeNodeFilter("/*.\\*UnitTests");
+        TreeNodeFilter filter = new("/*.\\*UnitTests");
         Assert.IsTrue(filter.MatchesFilter("/ProjectA.*UnitTests", new PropertyBag()));
         Assert.IsTrue(filter.MatchesFilter("/ProjectB.*UnitTests", new PropertyBag()));
         Assert.IsFalse(filter.MatchesFilter("/ProjectB.AUnitTests", new PropertyBag()));
     }
 
+    [TestMethod]
     public void EscapeSequences_SupportsParentheses()
     {
-        var filter = new TreeNodeFilter("/*.\\(UnitTests\\)");
+        TreeNodeFilter filter = new("/*.\\(UnitTests\\)");
         Assert.IsTrue(filter.MatchesFilter("/ProjectA.(UnitTests)", new PropertyBag()));
         Assert.IsTrue(filter.MatchesFilter("/ProjectB.(UnitTests)", new PropertyBag()));
         Assert.IsFalse(filter.MatchesFilter("/ProjectB.(UnitTests", new PropertyBag()));
     }
 
-    public void EscapeSequences_ThrowsIfLastCharIsAnEscapeChar() => Assert.Throws<InvalidOperationException>(() => _ = new TreeNodeFilter("/*.\\(UnitTests\\)\\"));
+    [TestMethod]
+    public void EscapeSequences_ThrowsIfLastCharIsAnEscapeChar() => Assert.ThrowsExactly<InvalidOperationException>(() => _ = new TreeNodeFilter("/*.\\(UnitTests\\)\\"));
 
+    [TestMethod]
     public void OrExpression_WorksForLiteralStrings()
     {
-        var filter = new TreeNodeFilter("/A|B");
+        TreeNodeFilter filter = new("/A|B");
         Assert.IsTrue(filter.MatchesFilter("/A", new PropertyBag()));
         Assert.IsTrue(filter.MatchesFilter("/B", new PropertyBag()));
         Assert.IsFalse(filter.MatchesFilter("/C", new PropertyBag()));
     }
 
+    [TestMethod]
+    public void OrExpression_WorksForSinglePathSegmentInsideParentheses()
+    {
+        TreeNodeFilter filter = new("/*/*/*/(MyTest1|MyTest2)");
+
+        Assert.IsTrue(filter.MatchesFilter("/A/B/C/MyTest1", new PropertyBag()));
+        Assert.IsTrue(filter.MatchesFilter("/A/B/C/MyTest2", new PropertyBag()));
+        Assert.IsFalse(filter.MatchesFilter("/A/B/C/MyTest3", new PropertyBag()));
+    }
+
+    [TestMethod]
+    public void FullPathOrInsideParenthesizedExpressions_IsNotSupported_ThrowsActionableMessage()
+    {
+        const string Filter = "(/*/*/*/MyTest1)|(/*/*/*/MyTest2)";
+        InvalidOperationException exception = Assert.ThrowsExactly<InvalidOperationException>(
+            () => _ = new TreeNodeFilter(Filter));
+
+        // Verify the diagnostic includes the original filter string (so the test fails if the
+        // filter is no longer threaded through to the exception message).
+        Assert.IsTrue(
+            exception.Message.Contains(Filter, StringComparison.Ordinal),
+            $"Expected exception message to contain the original filter '{Filter}', but was: {exception.Message}");
+
+        // Verify the diagnostic also surfaces the suggested supported syntax.
+        Assert.IsTrue(
+            exception.Message.Contains("/A/B/C/(X|Y)", StringComparison.Ordinal),
+            $"Expected exception message to contain the suggested syntax '/A/B/C/(X|Y)', but was: {exception.Message}");
+    }
+
+    [TestMethod]
     public void AndExpression()
     {
-        var filter = new TreeNodeFilter("/(*.UnitTests)&(*ProjectB*)");
+        TreeNodeFilter filter = new("/(*.UnitTests)&(*ProjectB*)");
         Assert.IsTrue(filter.MatchesFilter("/ProjectB.UnitTests", new PropertyBag()));
         Assert.IsTrue(filter.MatchesFilter("/Hello.ProjectB.UnitTests", new PropertyBag()));
         Assert.IsFalse(filter.MatchesFilter("/ProjectC.UnitTests", new PropertyBag()));
         Assert.IsFalse(filter.MatchesFilter("/ProjectC.UnitTests.SomeExtension", new PropertyBag()));
     }
 
+    [TestMethod]
+    public void NotExpression_DisallowSuffix()
+    {
+        TreeNodeFilter filter = new("/(!*UnitTests)");
+        Assert.IsFalse(filter.MatchesFilter("/A.UnitTests", new PropertyBag()));
+        Assert.IsFalse(filter.MatchesFilter("/UnitTests", new PropertyBag()));
+        Assert.IsTrue(filter.MatchesFilter("/A", new PropertyBag()));
+        Assert.IsTrue(filter.MatchesFilter("/UnitTests.A", new PropertyBag()));
+    }
+
+    [TestMethod]
+    public void NotExpression_DisallowPrefix()
+    {
+        TreeNodeFilter filter = new("/(!UnitTests*)");
+        Assert.IsFalse(filter.MatchesFilter("/UnitTests.A", new PropertyBag()));
+        Assert.IsFalse(filter.MatchesFilter("/UnitTests", new PropertyBag()));
+        Assert.IsTrue(filter.MatchesFilter("/A", new PropertyBag()));
+        Assert.IsTrue(filter.MatchesFilter("/A.UnitTests", new PropertyBag()));
+    }
+
+    [TestMethod]
+    public void NotExpression_DisallowContains()
+    {
+        TreeNodeFilter filter = new("/(!*UnitTests*)");
+        Assert.IsFalse(filter.MatchesFilter("/UnitTests.A", new PropertyBag()));
+        Assert.IsFalse(filter.MatchesFilter("/A.UnitTests", new PropertyBag()));
+        Assert.IsFalse(filter.MatchesFilter("/UnitTests", new PropertyBag()));
+        Assert.IsTrue(filter.MatchesFilter("/A", new PropertyBag()));
+    }
+
+    [TestMethod]
+    public void NotExpression_CombinedWithAND_Parenthesized()
+    {
+        // Matches anything except A*Z
+        TreeNodeFilter filter = new("/(!(A*&*Z))");
+        Assert.IsFalse(filter.MatchesFilter("/AZ", new PropertyBag())); // !(true && true)  ==> false
+        Assert.IsFalse(filter.MatchesFilter("/ABCZ", new PropertyBag())); // !(true && true)  ==> false
+        Assert.IsTrue(filter.MatchesFilter("/C", new PropertyBag())); // !(false && false) ==> true
+        Assert.IsTrue(filter.MatchesFilter("/A", new PropertyBag())); // !(true && false)  ==> true
+        Assert.IsTrue(filter.MatchesFilter("/ABC", new PropertyBag())); // !(true && false)  ==> true
+        Assert.IsTrue(filter.MatchesFilter("/Z", new PropertyBag())); // !(false && true)  ==> true
+        Assert.IsTrue(filter.MatchesFilter("/XYZ", new PropertyBag())); // !(false && true) ==> true
+    }
+
+    [TestMethod]
+    public void NotExpression_CombinedWithOR_Parenthesized()
+    {
+        // Doesn't match A*, and also doesn't match *Z
+        TreeNodeFilter filter = new("/(!(A*|*Z))");
+        Assert.IsFalse(filter.MatchesFilter("/AZ", new PropertyBag())); // !(true || true) ==> false
+        Assert.IsFalse(filter.MatchesFilter("/AB", new PropertyBag())); // !(true || false) ==> false
+        Assert.IsFalse(filter.MatchesFilter("/A", new PropertyBag())); // !(true || true) ==> false
+        Assert.IsFalse(filter.MatchesFilter("/ABZ", new PropertyBag())); // !(true || true) ==> false
+        Assert.IsFalse(filter.MatchesFilter("/YZ", new PropertyBag())); // !(false || true) ==> false
+        Assert.IsFalse(filter.MatchesFilter("/Z", new PropertyBag())); // !(false || true) ==> false
+
+        Assert.IsTrue(filter.MatchesFilter("/C", new PropertyBag())); // !(false || false) ==> true
+        Assert.IsTrue(filter.MatchesFilter("/CA", new PropertyBag())); // !(false || false) ==> true
+        Assert.IsTrue(filter.MatchesFilter("/ZS", new PropertyBag())); // !(false || false) ==> true
+        Assert.IsTrue(filter.MatchesFilter("/ZA", new PropertyBag())); // !(false || false) ==> true
+        Assert.IsTrue(filter.MatchesFilter("/ZYYA", new PropertyBag())); // !(false || false) ==> true
+    }
+
+    [TestMethod]
+    public void NotExpression_CombinedWithAND_NotParenthesized()
+    {
+        // Matches anything that doesn't start with A, but should end with Z
+        TreeNodeFilter filter = new("/(!A*&*Z)");
+
+        // Cases not ending with Z, filter doesn't match.
+        Assert.IsFalse(filter.MatchesFilter("/A", new PropertyBag()));
+        Assert.IsFalse(filter.MatchesFilter("/ZA", new PropertyBag()));
+        Assert.IsFalse(filter.MatchesFilter("/AZA", new PropertyBag()));
+
+        // Cases ending with Z but starts with A. Filter shouldn't match.
+        Assert.IsFalse(filter.MatchesFilter("/AZ", new PropertyBag()));
+        Assert.IsFalse(filter.MatchesFilter("/ABZ", new PropertyBag()));
+
+        // Cases ending with Z and don't start with A. Filter should match.
+        Assert.IsTrue(filter.MatchesFilter("/BAZ", new PropertyBag()));
+        Assert.IsTrue(filter.MatchesFilter("/BZ", new PropertyBag()));
+    }
+
+    [TestMethod]
+    public void NotExpression_CombinedWithOR_NotParenthesized()
+    {
+        // Matches anything that either doesn't start with A, or ends with Z
+        TreeNodeFilter filter = new("/(!A*|*Z)");
+
+        // Cases not starting with A
+        Assert.IsTrue(filter.MatchesFilter("/Y", new PropertyBag()));
+        Assert.IsTrue(filter.MatchesFilter("/Z", new PropertyBag()));
+        Assert.IsTrue(filter.MatchesFilter("/ZA", new PropertyBag()));
+        Assert.IsTrue(filter.MatchesFilter("/ZAZ", new PropertyBag()));
+        Assert.IsTrue(filter.MatchesFilter("/YAZ", new PropertyBag()));
+
+        // Cases starting with A, and ending with Z
+        Assert.IsTrue(filter.MatchesFilter("/AZ", new PropertyBag()));
+        Assert.IsTrue(filter.MatchesFilter("/ABZ", new PropertyBag()));
+
+        // Cases starting with A, and not ending with Z
+        Assert.IsFalse(filter.MatchesFilter("/A", new PropertyBag()));
+        Assert.IsFalse(filter.MatchesFilter("/AB", new PropertyBag()));
+        Assert.IsFalse(filter.MatchesFilter("/AZB", new PropertyBag()));
+    }
+
+    [TestMethod]
     public void Parentheses_EnsuresOrdering()
     {
-        var filter = new TreeNodeFilter("/((*.UnitTests)&(*ProjectB*))|C");
+        TreeNodeFilter filter = new("/((*.UnitTests)&(*ProjectB*))|C");
         Assert.IsTrue(filter.MatchesFilter("/ProjectB.UnitTests", new PropertyBag()));
         Assert.IsTrue(filter.MatchesFilter("/Hello.ProjectB.UnitTests", new PropertyBag()));
         Assert.IsTrue(filter.MatchesFilter("/C", new PropertyBag()));
@@ -87,36 +227,80 @@ public class TreeNodeFilterTests : TestBase
         Assert.IsFalse(filter.MatchesFilter("/C.UnitTests", new PropertyBag()));
     }
 
-    public void Parenthesis_DisallowSeparatorInside() => Assert.Throws<InvalidOperationException>(() => _ = new TreeNodeFilter("/(A/B)"));
+    [TestMethod]
+    public void Parenthesis_DisallowSeparatorInside()
+        => Assert.ThrowsExactly<InvalidOperationException>(() => new TreeNodeFilter("/(A/B)"));
 
+    [TestMethod]
     public void Parameters_PropertyCheck()
     {
-        var filter = new TreeNodeFilter("/*.UnitTests[Tag=Fast]");
-        Assert.IsTrue(filter.MatchesFilter("/ProjectB.UnitTests", new PropertyBag(new KeyValuePairStringProperty("Tag", "Fast"))));
-        Assert.IsFalse(filter.MatchesFilter("/ProjectB.UnitTests", new PropertyBag(new KeyValuePairStringProperty("Tag", "Slow"))));
+        TreeNodeFilter filter = new("/*.UnitTests[Tag=Fast]");
+        Assert.IsTrue(filter.MatchesFilter("/ProjectB.UnitTests", new PropertyBag(new TestMetadataProperty("Tag", "Fast"))));
+        Assert.IsFalse(filter.MatchesFilter("/ProjectB.UnitTests", new PropertyBag(new TestMetadataProperty("Tag", "Slow"))));
         Assert.IsFalse(filter.MatchesFilter("/ProjectB.UnitTests", new PropertyBag()));
     }
 
+    [TestMethod]
+    public void Parameters_NegatedPropertyCheck()
+    {
+        TreeNodeFilter filter = new("/*.UnitTests[Tag!=Fast]");
+        Assert.IsFalse(filter.MatchesFilter("/ProjectB.UnitTests", new PropertyBag(new TestMetadataProperty("Tag", "Fast"))));
+        Assert.IsTrue(filter.MatchesFilter("/ProjectB.UnitTests", new PropertyBag(new TestMetadataProperty("Tag", "Slow"))));
+        Assert.IsTrue(filter.MatchesFilter("/ProjectB.UnitTests", new PropertyBag()));
+    }
+
+    [TestMethod]
+    public void Parameters_NegatedPropertyCheckWithMatchAllFilter()
+    {
+        TreeNodeFilter filter = new("/**[Tag!=Fast]");
+        Assert.IsFalse(filter.MatchesFilter("/ProjectB.UnitTests", new PropertyBag(new TestMetadataProperty("Tag", "Fast"))));
+        Assert.IsTrue(filter.MatchesFilter("/ProjectB.UnitTests", new PropertyBag(new TestMetadataProperty("Tag", "Slow"))));
+        Assert.IsTrue(filter.MatchesFilter("/ProjectB.UnitTests", new PropertyBag()));
+    }
+
+    [TestMethod]
+    public void Parameters_NegatedPropertyCheckCombinedWithAnd()
+    {
+        TreeNodeFilter filter = new("/*.UnitTests[(Tag!=Fast)&(Tag!=Slow)]");
+        Assert.IsFalse(filter.MatchesFilter("/ProjectB.UnitTests", new PropertyBag(new TestMetadataProperty("Tag", "Fast"))));
+        Assert.IsFalse(filter.MatchesFilter("/ProjectB.UnitTests", new PropertyBag(new TestMetadataProperty("Tag", "Slow"))));
+        Assert.IsTrue(filter.MatchesFilter("/ProjectB.UnitTests", new PropertyBag()));
+    }
+
+    [TestMethod]
+    public void Parameters_NegatedPropertyCheckCombinedWithOr()
+    {
+        TreeNodeFilter filter = new("/*.UnitTests[(Tag!=Fast)|(Tag!=Slow)]");
+        Assert.IsTrue(filter.MatchesFilter("/ProjectB.UnitTests", new PropertyBag(new TestMetadataProperty("Tag", "Fast"))));
+        Assert.IsTrue(filter.MatchesFilter("/ProjectB.UnitTests", new PropertyBag(new TestMetadataProperty("Tag", "Slow"))));
+        Assert.IsTrue(filter.MatchesFilter("/ProjectB.UnitTests", new PropertyBag()));
+    }
+
+    [TestMethod]
     public void Parameters_DisallowAtStart()
-        => Assert.Throws<InvalidOperationException>(() => _ = new TreeNodeFilter("/[Tag=Fast]"));
+        => Assert.ThrowsExactly<InvalidOperationException>(() => _ = new TreeNodeFilter("/[Tag=Fast]"));
 
+    [TestMethod]
     public void Parameters_DisallowEmpty()
-        => Assert.Throws<InvalidOperationException>(() => _ = new TreeNodeFilter("/Path[]"));
+        => Assert.ThrowsExactly<InvalidOperationException>(() => _ = new TreeNodeFilter("/Path[]"));
 
+    [TestMethod]
     public void Parameters_DisallowMultiple()
-        => Assert.Throws<InvalidOperationException>(() => _ = new TreeNodeFilter("/Path[Prop=2][Prop=B]"));
+        => Assert.ThrowsExactly<InvalidOperationException>(() => _ = new TreeNodeFilter("/Path[Prop=2][Prop=B]"));
 
+    [TestMethod]
     public void Parameters_DisallowNested()
-        => Assert.Throws<InvalidOperationException>(() => _ = new TreeNodeFilter("/Path[X=[Y=1]]"));
+        => Assert.ThrowsExactly<InvalidOperationException>(() => _ = new TreeNodeFilter("/Path[X=[Y=1]]"));
 
-    [Arguments("/A/B", "/A/B", true)]
-    [Arguments("/A/B", "/A%2FB", false)]
-    [Arguments("/A%2FB", "/A/B", false)]
-    [Arguments("/A%2FB", "/A%2FB", true)]
+    [DataRow("/A/B", "/A/B", true)]
+    [DataRow("/A/B", "/A%2FB", false)]
+    [DataRow("/A%2FB", "/A/B", false)]
+    [DataRow("/A%2FB", "/A%2FB", true)]
+    [TestMethod]
     public void TestNodeFilterNeedsUrlEncodingOfSlashes(string filter, string nodePath, bool isMatched)
     {
-        var filterInstance = new TreeNodeFilter(filter);
-        var nodeProperties = new PropertyBag();
+        TreeNodeFilter filterInstance = new(filter);
+        PropertyBag nodeProperties = new();
 
         if (isMatched)
         {
@@ -128,21 +312,22 @@ public class TreeNodeFilterTests : TestBase
         }
     }
 
-    [Arguments("/A/B[ValueWithSlash=Some/thing]", "/A/B", true)]
-    [Arguments("/A/B[ValueWithSlash=Some%2Fthing]", "/A/B", false)]
-    [Arguments("/A/B[Other/thing=KeyWithSlash]", "/A/B", true)]
-    [Arguments("/A/B[Other%2Fthing=KeyWithSlash]", "/A/B", false)]
-    [Arguments("/A%2FB[ValueWithSlash=Some/thing]", "/A%2FB", true)]
-    [Arguments("/A%2FB[ValueWithSlash=Some%2Fthing]", "/A%2FB", false)]
-    [Arguments("/A%2FB[Other/thing=KeyWithSlash]", "/A%2FB", true)]
-    [Arguments("/A%2FB[Other%2Fthing=KeyWithSlash]", "/A%2FB", false)]
+    [DataRow("/A/B[ValueWithSlash=Some/thing]", "/A/B", true)]
+    [DataRow("/A/B[ValueWithSlash=Some%2Fthing]", "/A/B", false)]
+    [DataRow("/A/B[Other/thing=KeyWithSlash]", "/A/B", true)]
+    [DataRow("/A/B[Other%2Fthing=KeyWithSlash]", "/A/B", false)]
+    [DataRow("/A%2FB[ValueWithSlash=Some/thing]", "/A%2FB", true)]
+    [DataRow("/A%2FB[ValueWithSlash=Some%2Fthing]", "/A%2FB", false)]
+    [DataRow("/A%2FB[Other/thing=KeyWithSlash]", "/A%2FB", true)]
+    [DataRow("/A%2FB[Other%2Fthing=KeyWithSlash]", "/A%2FB", false)]
+    [TestMethod]
     public void PropertiesDoNotNeedUrlEncodingOfSlashes(string filter, string nodePath, bool isMatched)
     {
-        var filterInstance = new TreeNodeFilter(filter);
-        var nodeProperties = new PropertyBag(
-            new KeyValuePairStringProperty("Tag", "Fast"),
-            new KeyValuePairStringProperty("ValueWithSlash", "Some/thing"),
-            new KeyValuePairStringProperty("Other/thing", "KeyWithSlash"));
+        TreeNodeFilter filterInstance = new(filter);
+        PropertyBag nodeProperties = new(
+            new TestMetadataProperty("Tag", "Fast"),
+            new TestMetadataProperty("ValueWithSlash", "Some/thing"),
+            new TestMetadataProperty("Other/thing", "KeyWithSlash"));
 
         if (isMatched)
         {
@@ -152,5 +337,38 @@ public class TreeNodeFilterTests : TestBase
         {
             Assert.IsFalse(filterInstance.MatchesFilter(nodePath, nodeProperties));
         }
+    }
+
+    [TestMethod]
+    public void MatchAllFilterWithPropertyExpression()
+    {
+        TreeNodeFilter filter = new("/**[A=B]");
+        Assert.IsTrue(filter.MatchesFilter("/A/B/C/D", new PropertyBag(new TestMetadataProperty("A", "B"))));
+        Assert.IsFalse(filter.MatchesFilter("/A/B/C/D", new PropertyBag(new TestMetadataProperty("A", "C"))));
+    }
+
+    [TestMethod]
+    public void MatchAllFilterSubpathWithPropertyExpression()
+    {
+        TreeNodeFilter filter = new("/A/**[A=B]");
+        Assert.IsTrue(filter.MatchesFilter("/A/B/C/D", new PropertyBag(new TestMetadataProperty("A", "B"))));
+        Assert.IsFalse(filter.MatchesFilter("/B/A/C/D", new PropertyBag(new TestMetadataProperty("A", "B"))));
+    }
+
+    [TestMethod]
+    public void MatchAllFilterWithPropertyExpression_DoNotAllowInMiddleOfFilter() => Assert.ThrowsExactly<ArgumentException>(() => _ = new TreeNodeFilter("/**/Path[A=B]"));
+
+    [DataRow("/**", false)]
+    [DataRow("/A/B", false)]
+    [DataRow("/(A|B)", false)]
+    [DataRow("/(A&B)", false)]
+    [DataRow("/*.UnitTests[Tag=Fast]", true)]
+    [DataRow("/**[A=B]", true)]
+    [DataRow("/(A[Tag=Fast]&B)", true)]
+    [TestMethod]
+    public void ContainsPropertyFilters_ReturnsExpectedValue(string filterExpression, bool expected)
+    {
+        TreeNodeFilter filter = new(filterExpression);
+        Assert.AreEqual(expected, filter.ContainsPropertyFilters);
     }
 }

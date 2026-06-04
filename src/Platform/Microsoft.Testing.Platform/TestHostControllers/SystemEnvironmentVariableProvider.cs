@@ -1,8 +1,6 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System.Collections;
-
 using Microsoft.Testing.Platform.Extensions;
 using Microsoft.Testing.Platform.Extensions.TestHostControllers;
 using Microsoft.Testing.Platform.Helpers;
@@ -22,13 +20,13 @@ internal sealed class SystemEnvironmentVariableProvider(IEnvironment environment
 
     public string Description => _systemExtension.Description;
 
-    public async Task<bool> IsEnabledAsync() => await _systemExtension.IsEnabledAsync();
+    public async Task<bool> IsEnabledAsync() => await _systemExtension.IsEnabledAsync().ConfigureAwait(false);
 
     public Task UpdateAsync(IEnvironmentVariables environmentVariables)
     {
         foreach (DictionaryEntry entry in _environment.GetEnvironmentVariables())
         {
-            environmentVariables.SetVariable(new(entry.Key!.ToString()!, entry.Value!.ToString(), false, false));
+            environmentVariables.SetVariable(new(entry.Key.ToString()!, entry.Value!.ToString(), false, false));
         }
 
         return Task.CompletedTask;

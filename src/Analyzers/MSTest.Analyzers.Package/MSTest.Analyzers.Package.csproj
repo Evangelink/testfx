@@ -4,13 +4,11 @@
     <TargetFramework>netstandard2.0</TargetFramework>
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
-    <GeneratePackageOnBuild Condition=" '$(OS)' == 'Windows_NT' ">true</GeneratePackageOnBuild>
   </PropertyGroup>
 
   <PropertyGroup>
     <IsPackable>true</IsPackable>
     <PackageId>MSTest.Analyzers</PackageId>
-    <PackageReadmeFile>PACKAGE.md</PackageReadmeFile>
     <PackageTags>MSTest Analyzers TestFramework Unittest MSTestV2 Microsoft Test Testing TDD Framework</PackageTags>
     <PackageDescription>
       MSTest is Microsoft supported Test Framework.
@@ -29,13 +27,29 @@
 
   <ItemGroup>
     <None Update="tools\*.ps1" CopyToOutputDirectory="PreserveNewest" Pack="true" PackagePath="" />
-    <None Include="$(PackageReadmeFile)" Pack="true" PackagePath="\" />
   </ItemGroup>
 
-  <Target Name="_AddAnalyzersToOutput">
+  <Target Name="_GenerateGlobalConfigs">
+    <PropertyGroup>
+      <DotNetExecutable Condition="'$(OS)' == 'Windows_NT'">$(DotNetRoot)dotnet.exe</DotNetExecutable>
+      <DotNetExecutable Condition="'$(DotNetExecutable)' == ''">$(DotNetRoot)dotnet</DotNetExecutable>
+    </PropertyGroup>
+    <Exec Command="$(DotNetExecutable) run --no-build -c $(Configuration)" WorkingDirectory="$(RepoRoot)src\Analyzers\MSTest.GlobalConfigsGenerator" EnvironmentVariables="OUTPUT_PATH=$(OutputPath)" />
+  </Target>
+
+  <Target Name="_AddAnalyzersToOutput" DependsOnTargets="_GenerateGlobalConfigs">
     <ItemGroup>
       <TfmSpecificPackageFile Include="$(OutputPath)\MSTest.Analyzers.dll" PackagePath="analyzers/dotnet/cs" />
       <TfmSpecificPackageFile Include="$(OutputPath)\MSTest.Analyzers.CodeFixes.dll" PackagePath="analyzers/dotnet/cs" />
+      <TfmSpecificPackageFile Include="$(OutputPath)\**\MSTest.Analyzers.resources.dll" PackagePath="analyzers/dotnet/cs/" />
+      <TfmSpecificPackageFile Include="$(OutputPath)\**\MSTest.Analyzers.CodeFixes.resources.dll" PackagePath="analyzers/dotnet/cs/" />
+
+      <!-- NOTE: Currently, code fixes are C# only. -->
+      <TfmSpecificPackageFile Include="$(OutputPath)\MSTest.Analyzers.dll" PackagePath="analyzers/dotnet/vb" />
+      <TfmSpecificPackageFile Include="$(OutputPath)\**\MSTest.Analyzers.resources.dll" PackagePath="analyzers/dotnet/vb/" />
+
+      <TfmSpecificPackageFile Include="$(OutputPath)\globalconfigs\*.globalconfig" PackagePath="globalconfigs" />
+      <TfmSpecificPackageFile Include="buildTransitive\*" PackagePath="buildTransitive" />
     </ItemGroup>
   </Target>
 

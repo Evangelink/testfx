@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>netstandard2.0;$(SupportedNetFrameworks)</TargetFrameworks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(RepoRoot)src\Platform\Microsoft.Testing.Platform\Microsoft.Testing.Platform.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AdditionalFiles Include="BannedSymbols.txt" />
+    <!-- API that is common to all frameworks that we build for. -->
+    <AdditionalFiles Include="PublicAPI/PublicAPI.Shipped.txt" />
+    <AdditionalFiles Include="PublicAPI/PublicAPI.Unshipped.txt" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="$(RepoRoot)src/Polyfills/**/*.cs" Link="Polyfills\%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+
+</Project>

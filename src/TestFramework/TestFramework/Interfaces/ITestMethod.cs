@@ -1,7 +1,5 @@
-// Copyright (c) Microsoft Corporation. All rights reserved.
+﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
-
-using System.Reflection;
 
 namespace Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -56,29 +54,23 @@ public interface ITestMethod
     /// <remarks>
     /// This call handles asynchronous test methods as well.
     /// </remarks>
-    TestResult Invoke(object[]? arguments);
+    Task<TestResult> InvokeAsync(object[]? arguments);
 
     /// <summary>
     /// Get all attributes of the test method.
     /// </summary>
-    /// <param name="inherit">
-    /// Whether attribute defined in parent class is valid.
-    /// </param>
     /// <returns>
     /// All attributes.
     /// </returns>
-    Attribute[]? GetAllAttributes(bool inherit);
+    Attribute[]? GetAllAttributes();
 
     /// <summary>
     /// Get attribute of specific type.
     /// </summary>
     /// <typeparam name="TAttributeType"> System.Attribute type. </typeparam>
-    /// <param name="inherit">
-    /// Whether attribute defined in parent class is valid.
-    /// </param>
     /// <returns>
     /// The attributes of the specified type.
     /// </returns>
-    TAttributeType[] GetAttributes<TAttributeType>(bool inherit)
+    TAttributeType[] GetAttributes<TAttributeType>()
         where TAttributeType : Attribute;
 }

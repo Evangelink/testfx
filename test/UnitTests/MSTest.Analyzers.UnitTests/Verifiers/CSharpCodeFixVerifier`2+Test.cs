@@ -6,7 +6,8 @@ using Microsoft.CodeAnalysis.CodeFixes;
 using Microsoft.CodeAnalysis.CSharp.Testing;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Testing;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+using TestContext = Microsoft.VisualStudio.TestTools.UnitTesting.TestContext;
 
 namespace MSTest.Analyzers.Test;
 
@@ -18,12 +19,19 @@ public static partial class CSharpCodeFixVerifier<TAnalyzer, TCodeFix>
     {
         public Test()
         {
-            ReferenceAssemblies = ReferenceAssemblies.Net.Net60;
+            string nuGetConfigFilePath = Path.Combine(RootFinder.Find(), "NuGet.config");
+#if NET462
+            ReferenceAssemblies = ReferenceAssemblies.NetFramework.Net462.WithNuGetConfigFilePath(nuGetConfigFilePath);
+            TestState.AdditionalReferences.Add(MetadataReference.CreateFromFile(typeof(ValueTask<>).Assembly.Location));
+            TestState.AdditionalReferences.Add(MetadataReference.CreateFromFile(typeof(IAsyncDisposable).Assembly.Location));
+#else
+            ReferenceAssemblies = ReferenceAssemblies.Net.Net80.WithNuGetConfigFilePath(nuGetConfigFilePath);
+#endif
             TestState.AdditionalReferences.Add(MetadataReference.CreateFromFile(typeof(ParallelizeAttribute).Assembly.Location));
             TestState.AdditionalReferences.Add(MetadataReference.CreateFromFile(typeof(TestContext).Assembly.Location));
             SolutionTransforms.Add((solution, projectId) =>
             {
-                var compilationOptions = solution.GetProject(projectId).CompilationOptions;
+                CompilationOptions compilationOptions = solution.GetProject(projectId)!.CompilationOptions!;
                 compilationOptions = compilationOptions.WithSpecificDiagnosticOptions(
                     compilationOptions.SpecificDiagnosticOptions.SetItems(CSharpVerifierHelper.NullableWarnings));
                 solution = solution.WithProjectCompilationOptions(projectId, compilationOptions);

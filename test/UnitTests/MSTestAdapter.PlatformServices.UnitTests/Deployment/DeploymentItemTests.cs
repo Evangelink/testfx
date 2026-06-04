@@ -1,14 +1,14 @@
-// Copyright (c) Microsoft Corporation. All rights reserved.
+﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System.Globalization;
+using AwesomeAssertions;
 
-using Microsoft.VisualStudio.TestPlatform.MSTestAdapter.PlatformServices;
 using Microsoft.VisualStudio.TestPlatform.MSTestAdapter.PlatformServices.Deployment;
+using Microsoft.VisualStudio.TestPlatform.MSTestAdapter.PlatformServices.Resources;
 
 using TestFramework.ForTestingMSTest;
 
-namespace MSTestAdapter.PlatformServices.Tests.Deployment;
+namespace MSTestAdapter.PlatformServices.UnitTests.Deployment;
 
 public class DeploymentItemTests : TestContainer
 {
@@ -16,14 +16,14 @@ public class DeploymentItemTests : TestContainer
     {
         DeploymentItem item = new("e:\\temp\\temp1.dll");
 
-        Verify(!item.Equals(null));
+        item.Equals(null).Should().BeFalse();
     }
 
     public void EqualsShouldReturnFalseIfOtherItemIsNotDeploymentItem()
     {
         DeploymentItem item = new("e:\\temp\\temp1.dll");
 
-        Verify(!item.Equals(new DeploymentItemTests()));
+        item.Equals(new DeploymentItemTests()).Should().BeFalse();
     }
 
     public void EqualsShouldReturnFalseIfSourcePathIsDifferent()
@@ -31,7 +31,7 @@ public class DeploymentItemTests : TestContainer
         DeploymentItem item1 = new("e:\\temp\\temp1.dll");
         DeploymentItem item2 = new("e:\\temp\\temp2.dll");
 
-        Verify(!item1.Equals(item2));
+        item1.Equals(item2).Should().BeFalse();
     }
 
     public void EqualsShouldReturnFalseIfRelativeOutputDirectoryIsDifferent()
@@ -39,7 +39,7 @@ public class DeploymentItemTests : TestContainer
         DeploymentItem item1 = new("e:\\temp\\temp1.dll", "foo1");
         DeploymentItem item2 = new("e:\\temp\\temp1.dll", "foo2");
 
-        Verify(!item1.Equals(item2));
+        item1.Equals(item2).Should().BeFalse();
     }
 
     public void EqualsShouldReturnTrueIfSourcePathDiffersByCase()
@@ -47,7 +47,7 @@ public class DeploymentItemTests : TestContainer
         DeploymentItem item1 = new("e:\\temp\\temp1.dll");
         DeploymentItem item2 = new("e:\\temp\\Temp1.dll");
 
-        Verify(item1.Equals(item2));
+        item1.Equals(item2).Should().BeTrue();
     }
 
     public void EqualsShouldReturnTrueIfRelativeOutputDirectoryDiffersByCase()
@@ -55,7 +55,7 @@ public class DeploymentItemTests : TestContainer
         DeploymentItem item1 = new("e:\\temp\\temp1.dll", "foo1");
         DeploymentItem item2 = new("e:\\temp\\temp1.dll", "Foo1");
 
-        Verify(item1.Equals(item2));
+        item1.Equals(item2).Should().BeTrue();
     }
 
     public void EqualsShouldReturnTrueIfSourceAndRelativeOutputDirectoryAreSame()
@@ -63,32 +63,32 @@ public class DeploymentItemTests : TestContainer
         DeploymentItem item1 = new("e:\\temp\\temp1.dll", "foo1");
         DeploymentItem item2 = new("e:\\temp\\temp1.dll", "foo1");
 
-        Verify(item1.Equals(item2));
+        item1.Equals(item2).Should().BeTrue();
     }
 
     public void GetHashCodeShouldConsiderSourcePathAndRelativeOutputDirectory()
     {
-        var sourcePath = "e:\\temp\\temp1.dll";
-        var relativeOutputDirectory = "foo1";
+        string sourcePath = "e:\\temp\\temp1.dll";
+        string relativeOutputDirectory = "foo1";
         DeploymentItem item = new(sourcePath, relativeOutputDirectory);
 
-        Verify(sourcePath.GetHashCode() + relativeOutputDirectory.GetHashCode() == item.GetHashCode());
+        item.GetHashCode().Should().Be(sourcePath.GetHashCode() + relativeOutputDirectory.GetHashCode());
     }
 
     public void ToStringShouldReturnDeploymentItemIfRelativeOutputDirectoryIsNotSpecified()
     {
-        var sourcePath = "e:\\temp\\temp1.dll";
+        string sourcePath = "e:\\temp\\temp1.dll";
         DeploymentItem item = new(sourcePath);
 
-        Verify(string.Format(CultureInfo.InvariantCulture, Resource.DeploymentItem, sourcePath) == item.ToString());
+        item.ToString().Should().Be(string.Format(CultureInfo.InvariantCulture, Resource.DeploymentItem, sourcePath));
     }
 
     public void ToStringShouldReturnDeploymentItemAndRelativeOutputDirectory()
     {
-        var sourcePath = "e:\\temp\\temp1.dll";
-        var relativeOutputDirectory = "foo1";
+        string sourcePath = "e:\\temp\\temp1.dll";
+        string relativeOutputDirectory = "foo1";
         DeploymentItem item = new(sourcePath, relativeOutputDirectory);
 
-        Verify(string.Format(CultureInfo.InvariantCulture, Resource.DeploymentItemWithOutputDirectory, sourcePath, relativeOutputDirectory) == item.ToString());
+        item.ToString().Should().Be(string.Format(CultureInfo.InvariantCulture, Resource.DeploymentItemWithOutputDirectory, sourcePath, relativeOutputDirectory));
     }
 }

@@ -13,31 +13,21 @@ public class DataRowTests_Regular
     [DataRow(20)]
     [DataRow(30)]
     [DataRow(40)]
-    public void DataRow1(int i)
-    {
-        Assert.IsTrue(i != 0);
-    }
+    public void DataRow1(int i) => Assert.IsTrue(i != 0);
 
     [TestMethod]
     [DataRow(10, "String parameter", true, false)]
     [DataRow(20, "String parameter", true, false)]
     [DataRow(30, "String parameter", true, false)]
     [DataRow(40, "String parameter", true, false)]
-    public void DataRow2(int i, string s, bool b1, bool b2)
-    {
-        Assert.IsTrue(i != 200);
-    }
+    public void DataRow2(int i, string s, bool b1, bool b2) => Assert.IsTrue(i != 200);
 
     [TestCategory("DataRowOptionalInvalidArguments")]
     [TestMethod]
-    [ExpectedException(typeof(System.Reflection.TargetParameterCountException))]
     [DataRow]
     [DataRow(2)]
     [DataRow(2, "DerivedRequiredArgument", "DerivedOptionalArgument", "DerivedExtraArgument")]
-    public void DataRowTestMethodFailsWithInvalidArguments(int i1, string requiredString, string s1 = null)
-    {
-        Assert.Fail();
-    }
+    public void DataRowTestMethodFailsWithInvalidArguments(int i1, string requiredString, string? s1 = null) => Assert.Fail();
 
     [TestMethod]
     [DataRow(10.01d, 20.01d)]
@@ -74,17 +64,13 @@ public class DataRowTests_Regular
 
     [TestMethod]
     [DataRow(null)]
-    public void NullValue(object o)
-    {
-        Assert.IsNull(o);
-    }
+    public void NullValue(object o) => Assert.IsNull(o);
 
     [TestMethod]
-    [DataRow(new string[] { "" })]
-    public void OneStringArray(string[] lines)
-    {
-        Assert.AreEqual(1, lines.Length);
-    }
+#pragma warning disable SA1122 // Use string.Empty for empty strings
+    [DataRow([""])]
+#pragma warning restore SA1122 // Use string.Empty for empty strings
+    public void OneStringArray(string[] lines) => Assert.AreEqual(1, lines.Length);
 
     [TestMethod]
     [DataRow(new string[] { "" }, new string[] { "1.4", "message" })]
@@ -95,11 +81,10 @@ public class DataRowTests_Regular
     }
 
     [TestMethod]
-    [DataRow(new object[] { "", 1 })]
-    public void OneObjectArray(object[] objects)
-    {
-        Assert.AreEqual(2, objects.Length);
-    }
+#pragma warning disable SA1122 // Use string.Empty for empty strings
+    [DataRow(["", 1])]
+#pragma warning restore SA1122 // Use string.Empty for empty strings
+    public void OneObjectArray(object[] objects) => Assert.AreEqual(2, objects.Length);
 
     [TestMethod]
     [DataRow(new object[] { "", 1 }, new object[] { 3 })]
@@ -237,8 +222,23 @@ public class DataRowTests_Regular
 
     [TestMethod]
     [DataRow(1, 2, 3, 4, 5)]
-    public void MultipleIntegersWrappedWithParams(params int[] integers)
+    public void MultipleIntegersWrappedWithParams(params int[] integers) => Assert.AreEqual(5, integers.Length);
+
+    [TestMethod]
+    [DataRow("a")]
+    [DataRow("b")]
+    public void MethodWithOverload(string s)
     {
-        Assert.AreEqual(5, integers.Length);
     }
+
+    [TestMethod]
+    [DataRow(1)]
+    [DataRow(2)]
+    public void MethodWithOverload(int i)
+    {
+    }
+
+    [TestMethod]
+    [DataRow(null)]
+    public void NullValueOnObjectArray(object[] o) => Assert.IsNull(o);
 }

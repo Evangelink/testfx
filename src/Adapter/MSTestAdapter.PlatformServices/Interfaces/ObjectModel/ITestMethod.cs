@@ -1,7 +1,5 @@
-// Copyright (c) Microsoft Corporation. All rights reserved.
+﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
-
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 #pragma warning disable CA1716 // Do not use reserved keywords
 namespace Microsoft.VisualStudio.TestPlatform.MSTestAdapter.PlatformServices.Interface.ObjectModel;
@@ -10,7 +8,7 @@ namespace Microsoft.VisualStudio.TestPlatform.MSTestAdapter.PlatformServices.Int
 /// <summary>
 /// TestMethod structure that is shared between adapter and platform services only.
 /// </summary>
-public interface ITestMethod
+internal interface ITestMethod
 {
     /// <summary>
     /// Gets the name of the test method.
@@ -18,16 +16,9 @@ public interface ITestMethod
     string Name { get; }
 
     /// <summary>
-    /// Gets the full class name of the test method.
+    /// Gets the semantic full class name of the test method.
     /// </summary>
     string FullClassName { get; }
-
-    /// <summary>
-    /// Gets the declaring class full name. This will be used while getting navigation data.
-    /// This will be null if AssemblyName is same as DeclaringAssemblyName.
-    /// Reason to set to null in the above case is to minimize the transfer of data across appdomains and not have a performance hit.
-    /// </summary>
-    string? DeclaringClassFullName { get; }
 
     /// <summary>
     /// Gets the name of the test assembly.
@@ -35,16 +26,15 @@ public interface ITestMethod
     string AssemblyName { get; }
 
     /// <summary>
-    /// Gets a value indicating whether test method is async.
-    /// </summary>
-    bool IsAsync { get; }
-
-    /// <summary>
     /// Gets the fully specified type name metadata format.
     /// </summary>
     /// <example>
     ///     <c>NamespaceA.NamespaceB.ClassName`1+InnerClass`2</c>.
     /// </example>
+    /// <remarks>
+    /// This value is derived from <see cref="FullClassName"/>. Closed generic type arguments are omitted because
+    /// managed type metadata uses the open generic type definition.
+    /// </remarks>
     string? ManagedTypeName { get; }
 
     /// <summary>
@@ -56,12 +46,8 @@ public interface ITestMethod
     string? ManagedMethodName { get; }
 
     /// <summary>
-    /// Gets the <see cref="TestIdGenerationStrategy"/> used to generate <c>TestCase.Id</c>.
-    /// </summary>
-    TestIdGenerationStrategy TestIdGenerationStrategy { get; }
-
-    /// <summary>
-    /// Gets a value indicating whether both <see cref="ManagedTypeName"/> and <see cref="ManagedMethodName"/> are not null or whitespace.
+    /// Gets a value indicating whether the managed method metadata is available.
+    /// <see cref="ManagedTypeName"/> is derived from <see cref="FullClassName"/>.
     /// </summary>
     bool HasManagedMethodAndTypeProperties { get; }
 
@@ -71,5 +57,5 @@ public interface ITestMethod
     /// <remarks>
     /// Contains four items in order: Namespace, class name, test group, display name.
     /// </remarks>
-    IReadOnlyCollection<string?> Hierarchy { get; }
+    IReadOnlyCollection<string?>? Hierarchy { get; }
 }

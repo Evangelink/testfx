@@ -1,18 +1,14 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-#if NET471_OR_GREATER || NETCOREAPP
-using System.Collections;
-using System.Runtime.CompilerServices;
-#endif
-using System.Diagnostics.CodeAnalysis;
-using System.Globalization;
-using System.Reflection;
+using System.ComponentModel;
+
+using Microsoft.VisualStudio.TestTools.UnitTesting.Internal;
 
 namespace Microsoft.VisualStudio.TestTools.UnitTesting;
 
 /// <summary>
-/// Enum to specify whether the data is stored as property or in method.
+/// Enum to specify whether the data is stored as property, in method, or in field.
 /// </summary>
 public enum DynamicDataSourceType
 {
@@ -25,32 +21,71 @@ public enum DynamicDataSourceType
     /// Data is declared in method.
     /// </summary>
     Method = 1,
+
+    /// <summary>
+    /// The data source type is auto-detected.
+    /// </summary>
+    AutoDetect = 2,
+
+    /// <summary>
+    /// Data is declared as field.
+    /// </summary>
+    Field = 3,
 }
 
 /// <summary>
 /// Attribute to define dynamic data for a test method.
 /// </summary>
-[AttributeUsage(AttributeTargets.Method, AllowMultiple = true)]
-public sealed class DynamicDataAttribute : Attribute, ITestDataSource
+[AttributeUsage(AttributeTargets.Method, AllowMultiple = true, Inherited = false)]
+public sealed class DynamicDataAttribute : Attribute, ITestDataSource, ITestDataSourceEmptyDataSourceExceptionInfo, ITestDataSourceIgnoreCapability
 {
     private readonly string _dynamicDataSourceName;
     private readonly DynamicDataSourceType _dynamicDataSourceType;
-
-    private Type? _dynamicDataDeclaringType;
+    private readonly object?[] _dynamicDataSourceArguments = [];
+    private readonly Type? _dynamicDataDeclaringType;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="DynamicDataAttribute"/> class.
     /// </summary>
     /// <param name="dynamicDataSourceName">
-    /// The name of method or property having test data.
+    /// The name of method, property, or field having test data.
     /// </param>
     /// <param name="dynamicDataSourceType">
-    /// Specifies whether the data is stored as property or in method.
+    /// Specifies whether the data is stored as property, in method, or in field.
     /// </param>
-    public DynamicDataAttribute(string dynamicDataSourceName, DynamicDataSourceType dynamicDataSourceType = DynamicDataSourceType.Property)
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    public DynamicDataAttribute(string dynamicDataSourceName, DynamicDataSourceType dynamicDataSourceType)
     {
         _dynamicDataSourceName = dynamicDataSourceName;
         _dynamicDataSourceType = dynamicDataSourceType;
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="DynamicDataAttribute"/> class.
+    /// </summary>
+    /// <param name="dynamicDataSourceName">
+    /// The name of method, property, or field having test data.
+    /// </param>
+    public DynamicDataAttribute(string dynamicDataSourceName)
+    {
+        _dynamicDataSourceName = dynamicDataSourceName;
+        _dynamicDataSourceType = DynamicDataSourceType.AutoDetect;
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="DynamicDataAttribute"/> class.
+    /// </summary>
+    /// <param name="dynamicDataSourceName">
+    /// The name of method, property, or field having test data.
+    /// </param>
+    /// <param name="dynamicDataSourceArguments">
+    /// Arguments to be passed to method referred to by <paramref name="dynamicDataSourceName"/>.
+    /// </param>
+    public DynamicDataAttribute(string dynamicDataSourceName, params object?[] dynamicDataSourceArguments)
+    {
+        _dynamicDataSourceName = dynamicDataSourceName;
+        _dynamicDataSourceType = DynamicDataSourceType.AutoDetect;
+        _dynamicDataSourceArguments = dynamicDataSourceArguments;
     }
 
     /// <summary>
@@ -58,19 +93,52 @@ public sealed class DynamicDataAttribute : Attribute, ITestDataSource
     /// from test method's class.
     /// </summary>
     /// <param name="dynamicDataSourceName">
-    /// The name of method or property having test data.
+    /// The name of method, property, or field having test data.
     /// </param>
     /// <param name="dynamicDataDeclaringType">
-    /// The declaring type of property or method having data. Useful in cases when declaring type is present in a class different from
+    /// The declaring type of property, method, or field having data. Useful in cases when declaring type is present in a class different from
     /// test method's class. If null, declaring type defaults to test method's class type.
     /// </param>
     /// <param name="dynamicDataSourceType">
-    /// Specifies whether the data is stored as property or in method.
+    /// Specifies whether the data is stored as property, in method, or in field.
     /// </param>
-    public DynamicDataAttribute(string dynamicDataSourceName, Type dynamicDataDeclaringType, DynamicDataSourceType dynamicDataSourceType = DynamicDataSourceType.Property)
-        : this(dynamicDataSourceName, dynamicDataSourceType)
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    public DynamicDataAttribute(string dynamicDataSourceName, Type dynamicDataDeclaringType, DynamicDataSourceType dynamicDataSourceType)
+        : this(dynamicDataSourceName, dynamicDataSourceType) => _dynamicDataDeclaringType = dynamicDataDeclaringType;
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="DynamicDataAttribute"/> class when the test data is present in a class different
+    /// from test method's class.
+    /// </summary>
+    /// <param name="dynamicDataSourceName">
+    /// The name of method, property, or field having test data.
+    /// </param>
+    /// <param name="dynamicDataDeclaringType">
+    /// The declaring type of property, method, or field having data. Useful in cases when declaring type is present in a class different from
+    /// test method's class. If null, declaring type defaults to test method's class type.
+    /// </param>
+    public DynamicDataAttribute(string dynamicDataSourceName, Type dynamicDataDeclaringType)
+        : this(dynamicDataSourceName) => _dynamicDataDeclaringType = dynamicDataDeclaringType;
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="DynamicDataAttribute"/> class when the test data is present in a class different
+    /// from test method's class.
+    /// </summary>
+    /// <param name="dynamicDataSourceName">
+    /// The name of method, property, or field having test data.
+    /// </param>
+    /// <param name="dynamicDataDeclaringType">
+    /// The declaring type of property, method, or field having data. Useful in cases when declaring type is present in a class different from
+    /// test method's class. If null, declaring type defaults to test method's class type.
+    /// </param>
+    /// <param name="dynamicDataSourceArguments">
+    /// Arguments to be passed to method referred to by <paramref name="dynamicDataSourceName"/>.
+    /// </param>
+    public DynamicDataAttribute(string dynamicDataSourceName, Type dynamicDataDeclaringType, params object?[] dynamicDataSourceArguments)
+        : this(dynamicDataSourceName)
     {
         _dynamicDataDeclaringType = dynamicDataDeclaringType;
+        _dynamicDataSourceArguments = dynamicDataSourceArguments;
     }
 
     /// <summary>
@@ -83,160 +151,58 @@ public sealed class DynamicDataAttribute : Attribute, ITestDataSource
     /// </summary>
     public Type? DynamicDataDisplayNameDeclaringType { get; set; }
 
+    /// <summary>
+    /// Gets or sets a reason to ignore this dynamic data source. Setting the property to non-null value will ignore the dynamic data source.
+    /// </summary>
+    public string? IgnoreMessage { get; set; }
+
     /// <inheritdoc />
     public IEnumerable<object[]> GetData(MethodInfo methodInfo)
-    {
-        // Check if the declaring type of test data is passed in constructor. If not, default to test method's class type.
-        _dynamicDataDeclaringType ??= methodInfo.DeclaringType;
-        DebugEx.Assert(_dynamicDataDeclaringType is not null, "Declaring type of test data cannot be null.");
-
-        object? obj = null;
-
-        switch (_dynamicDataSourceType)
-        {
-            case DynamicDataSourceType.Property:
-                var property = _dynamicDataDeclaringType.GetTypeInfo().GetDeclaredProperty(_dynamicDataSourceName)
-                    ?? throw new ArgumentNullException($"{DynamicDataSourceType.Property} {_dynamicDataSourceName}");
-                if (property.GetGetMethod(true) is not { } getMethod
-                    || !getMethod.IsStatic)
-                {
-                    throw new NotSupportedException(
-                        string.Format(
-                            CultureInfo.InvariantCulture,
-                            FrameworkMessages.DynamicDataInvalidPropertyLayout,
-                            property.DeclaringType?.FullName is { } typeFullName ? $"{typeFullName}.{property.Name}" : property.Name));
-                }
-
-                obj = property.GetValue(null, null);
-                break;
-
-            case DynamicDataSourceType.Method:
-                var method = _dynamicDataDeclaringType.GetTypeInfo().GetDeclaredMethod(_dynamicDataSourceName)
-                    ?? throw new ArgumentNullException($"{DynamicDataSourceType.Method} {_dynamicDataSourceName}");
-                if (!method.IsStatic
-                    || method.ContainsGenericParameters
-                    || method.GetParameters().Length > 0)
-                {
-                    throw new NotSupportedException(
-                        string.Format(
-                            CultureInfo.InvariantCulture,
-                            FrameworkMessages.DynamicDataInvalidPropertyLayout,
-                            method.DeclaringType?.FullName is { } typeFullName ? $"{typeFullName}.{method.Name}" : method.Name));
-                }
-
-                obj = method.Invoke(null, null);
-                break;
-        }
-
-        if (obj == null)
-        {
-            throw new ArgumentNullException(
-                string.Format(
-                    CultureInfo.InvariantCulture,
-                    FrameworkMessages.DynamicDataValueNull,
-                    _dynamicDataSourceName,
-                    _dynamicDataDeclaringType.FullName));
-        }
-
-        if (!TryGetData(obj, out IEnumerable<object[]>? data))
-        {
-            throw new ArgumentNullException(
-                string.Format(
-                    CultureInfo.InvariantCulture,
-                    FrameworkMessages.DynamicDataIEnumerableNull,
-                    _dynamicDataSourceName,
-                    _dynamicDataDeclaringType.FullName));
-        }
-
-        if (!data.Any())
-        {
-            throw new ArgumentException(
-                string.Format(
-                    CultureInfo.InvariantCulture,
-                    FrameworkMessages.DynamicDataIEnumerableEmpty,
-                    _dynamicDataSourceName,
-                    _dynamicDataDeclaringType.FullName));
-        }
-
-        // Data is valid, return it.
-        return data;
-    }
+        => DynamicDataOperations.GetData(_dynamicDataDeclaringType, _dynamicDataSourceType, _dynamicDataSourceName, _dynamicDataSourceArguments, methodInfo);
 
     /// <inheritdoc />
     public string? GetDisplayName(MethodInfo methodInfo, object?[]? data)
     {
-        if (DynamicDataDisplayName != null)
+        if (DynamicDataDisplayName == null)
         {
-            var dynamicDisplayNameDeclaringType = DynamicDataDisplayNameDeclaringType ?? methodInfo.DeclaringType;
-            DebugEx.Assert(dynamicDisplayNameDeclaringType is not null, "Declaring type of test data cannot be null.");
-
-            var method = dynamicDisplayNameDeclaringType.GetTypeInfo().GetDeclaredMethod(DynamicDataDisplayName)
-                ?? throw new ArgumentNullException($"{DynamicDataSourceType.Method} {DynamicDataDisplayName}");
-            var parameters = method.GetParameters();
-            return parameters.Length != 2 ||
-                parameters[0].ParameterType != typeof(MethodInfo) ||
-                parameters[1].ParameterType != typeof(object[]) ||
-                method.ReturnType != typeof(string) ||
-                !method.IsStatic ||
-                !method.IsPublic
-                ? throw new ArgumentNullException(
-                    string.Format(
-                        CultureInfo.InvariantCulture,
-                        FrameworkMessages.DynamicDataDisplayName,
-                        DynamicDataDisplayName,
-                        nameof(String),
-                        string.Join(", ", nameof(MethodInfo), typeof(object[]).Name)))
-                : method.Invoke(null, [methodInfo, data]) as string;
+            return TestDataSourceUtilities.ComputeDefaultDisplayName(methodInfo, data);
         }
 
-        if (data != null)
+        Type? dynamicDisplayNameDeclaringType = DynamicDataDisplayNameDeclaringType ?? methodInfo.DeclaringType;
+        DebugEx.Assert(dynamicDisplayNameDeclaringType is not null, "Declaring type of test data cannot be null.");
+
+        MethodInfo method = dynamicDisplayNameDeclaringType.GetTypeInfo().GetDeclaredMethod(DynamicDataDisplayName)
+            ?? throw new ArgumentNullException($"{DynamicDataSourceType.Method} {DynamicDataDisplayName}");
+        ParameterInfo[] parameters = method.GetParameters();
+        if (parameters.Length != 2
+            || parameters[0].ParameterType != typeof(MethodInfo)
+            || parameters[1].ParameterType != typeof(object[])
+            || method.ReturnType != typeof(string)
+            || !method.IsStatic
+            || !method.IsPublic)
         {
-            // We want to force call to `data.AsEnumerable()` to ensure that objects are casted to strings (using ToString())
-            // so that null do appear as "null". If you remove the call, and do string.Join(",", new object[] { null, "a" }),
-            // you will get empty string while with the call you will get "null,a".
-            return string.Format(CultureInfo.CurrentCulture, FrameworkMessages.DataDrivenResultDisplayName, methodInfo.Name,
-                string.Join(",", data.AsEnumerable()));
+            throw new ArgumentNullException(
+                string.Format(
+                    CultureInfo.InvariantCulture,
+                    FrameworkMessages.DynamicDataDisplayName,
+                    DynamicDataDisplayName,
+                    nameof(String),
+                    string.Join(", ", nameof(MethodInfo), typeof(object[]).Name)));
         }
 
-        return null;
+        // Try to get the display name from the method.
+        return method.Invoke(null, [methodInfo, data]) as string;
     }
 
-    private static bool TryGetData(object dataSource, [NotNullWhen(true)] out IEnumerable<object[]>? data)
+    /// <inheritdoc />
+    string? ITestDataSourceEmptyDataSourceExceptionInfo.GetPropertyOrMethodNameForEmptyDataSourceException()
+        => _dynamicDataSourceName;
+
+    /// <inheritdoc />
+    string? ITestDataSourceEmptyDataSourceExceptionInfo.GetPropertyOrMethodContainerTypeNameForEmptyDataSourceException(MethodInfo testMethodInfo)
     {
-        if (dataSource is IEnumerable<object[]> enumerableObjectArray)
-        {
-            data = enumerableObjectArray;
-            return true;
-        }
-
-#if NETCOREAPP || NET471_OR_GREATER
-        if (dataSource is IEnumerable enumerable)
-        {
-            List<object[]> objects = new();
-            foreach (var entry in enumerable)
-            {
-                if (entry is not ITuple tuple
-                    || (objects.Count > 0 && objects[^1].Length != tuple.Length))
-                {
-                    data = null;
-                    return false;
-                }
-
-                object[] array = new object[tuple.Length];
-                for (int i = 0; i < tuple.Length; i++)
-                {
-                    array[i] = tuple[i]!;
-                }
-
-                objects.Add(array);
-            }
-
-            data = objects;
-            return true;
-        }
-#endif
-
-        data = null;
-        return false;
+        Type? type = _dynamicDataDeclaringType ?? testMethodInfo.DeclaringType;
+        DebugEx.Assert(type is not null, "Declaring type of test data cannot be null.");
+        return type.FullName;
     }
 }

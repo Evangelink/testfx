@@ -1,9 +1,6 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System.Globalization;
-
-using Microsoft.Testing.Platform.Configurations;
 using Microsoft.Testing.Platform.Extensions;
 using Microsoft.Testing.Platform.Extensions.TestHostControllers;
 using Microsoft.Testing.Platform.Helpers;
@@ -22,18 +19,45 @@ internal sealed class TestHostControllersManager : ITestHostControllersManager
     private readonly List<ICompositeExtensionFactory> _environmentVariableProviderCompositeFactories = [];
     private readonly List<ICompositeExtensionFactory> _lifetimeHandlerCompositeFactories = [];
     private readonly List<ICompositeExtensionFactory> _alreadyBuiltServices = [];
+    private readonly List<ICompositeExtensionFactory> _dataConsumersCompositeServiceFactories = [];
 
+    [UnsupportedOSPlatform("browser")]
     public void AddEnvironmentVariableProvider(Func<IServiceProvider, ITestHostEnvironmentVariableProvider> environmentVariableProviderFactory)
+        => AddEnvironmentVariableProvider(environmentVariableProviderFactory, insertAtStart: false);
+
+    [UnsupportedOSPlatform("browser")]
+    internal void AddEnvironmentVariableProviderFirst(Func<IServiceProvider, ITestHostEnvironmentVariableProvider> environmentVariableProviderFactory)
+        => AddEnvironmentVariableProvider(environmentVariableProviderFactory, insertAtStart: true);
+
+    private void AddEnvironmentVariableProvider(Func<IServiceProvider, ITestHostEnvironmentVariableProvider> environmentVariableProviderFactory, bool insertAtStart)
     {
-        ArgumentGuard.IsNotNull(environmentVariableProviderFactory);
+        if (OperatingSystem.IsBrowser())
+        {
+            throw new PlatformNotSupportedException(PlatformResources.TestHostControllerProcessRestartNotSupportedOnWebAssembly);
+        }
+
+        _ = environmentVariableProviderFactory ?? throw new ArgumentNullException(nameof(environmentVariableProviderFactory));
+        if (insertAtStart)
+        {
+            _environmentVariableProviderFactories.Insert(0, environmentVariableProviderFactory);
+            _factoryOrdering.Insert(0, environmentVariableProviderFactory);
+            return;
+        }
+
         _environmentVariableProviderFactories.Add(environmentVariableProviderFactory);
         _factoryOrdering.Add(environmentVariableProviderFactory);
     }
 
+    [UnsupportedOSPlatform("browser")]
     public void AddEnvironmentVariableProvider<T>(CompositeExtensionFactory<T> compositeServiceFactory)
         where T : class, ITestHostEnvironmentVariableProvider
     {
-        ArgumentGuard.IsNotNull(compositeServiceFactory);
+        if (OperatingSystem.IsBrowser())
+        {
+            throw new PlatformNotSupportedException(PlatformResources.TestHostControllerProcessRestartNotSupportedOnWebAssembly);
+        }
+
+        _ = compositeServiceFactory ?? throw new ArgumentNullException(nameof(compositeServiceFactory));
         if (_environmentVariableProviderCompositeFactories.Contains(compositeServiceFactory))
         {
             throw new ArgumentException(PlatformResources.CompositeServiceFactoryInstanceAlreadyRegistered);
@@ -43,17 +67,29 @@ internal sealed class TestHostControllersManager : ITestHostControllersManager
         _factoryOrdering.Add(compositeServiceFactory);
     }
 
+    [UnsupportedOSPlatform("browser")]
     public void AddProcessLifetimeHandler(Func<IServiceProvider, ITestHostProcessLifetimeHandler> lifetimeHandler)
     {
-        ArgumentGuard.IsNotNull(lifetimeHandler);
+        if (OperatingSystem.IsBrowser())
+        {
+            throw new PlatformNotSupportedException(PlatformResources.TestHostControllerProcessRestartNotSupportedOnWebAssembly);
+        }
+
+        _ = lifetimeHandler ?? throw new ArgumentNullException(nameof(lifetimeHandler));
         _lifetimeHandlerFactories.Add(lifetimeHandler);
         _factoryOrdering.Add(lifetimeHandler);
     }
 
+    [UnsupportedOSPlatform("browser")]
     public void AddProcessLifetimeHandler<T>(CompositeExtensionFactory<T> compositeServiceFactory)
         where T : class, ITestHostProcessLifetimeHandler
     {
-        ArgumentGuard.IsNotNull(compositeServiceFactory);
+        if (OperatingSystem.IsBrowser())
+        {
+            throw new PlatformNotSupportedException(PlatformResources.TestHostControllerProcessRestartNotSupportedOnWebAssembly);
+        }
+
+        _ = compositeServiceFactory ?? throw new ArgumentNullException(nameof(compositeServiceFactory));
         if (_lifetimeHandlerCompositeFactories.Contains(compositeServiceFactory))
         {
             throw new ArgumentException(PlatformResources.CompositeServiceFactoryInstanceAlreadyRegistered);
@@ -63,35 +99,39 @@ internal sealed class TestHostControllersManager : ITestHostControllersManager
         _factoryOrdering.Add(compositeServiceFactory);
     }
 
+    [UnsupportedOSPlatform("browser")]
+    public void AddDataConsumer<T>(CompositeExtensionFactory<T> compositeServiceFactory)
+        where T : class, IDataConsumer
+    {
+        if (OperatingSystem.IsBrowser())
+        {
+            throw new PlatformNotSupportedException(PlatformResources.TestHostControllerProcessRestartNotSupportedOnWebAssembly);
+        }
+
+        _ = compositeServiceFactory ?? throw new ArgumentNullException(nameof(compositeServiceFactory));
+        if (_dataConsumersCompositeServiceFactories.Contains(compositeServiceFactory))
+        {
+            throw new ArgumentException(PlatformResources.CompositeServiceFactoryInstanceAlreadyRegistered);
+        }
+
+        _dataConsumersCompositeServiceFactories.Add(compositeServiceFactory);
+        _factoryOrdering.Add(compositeServiceFactory);
+    }
+
     internal async Task<TestHostControllerConfiguration> BuildAsync(ServiceProvider serviceProvider)
     {
-        // For now the test host working directory and the current working directory are the same.
-        // In future we could move the test host in a different directory for instance in case of
-        // the need to rewrite binary files. If we don't move files are locked by ourself.
-        var aggregatedConfiguration = (AggregatedConfiguration)serviceProvider.GetConfiguration();
-        string? currentWorkingDirectory = aggregatedConfiguration[PlatformConfigurationConstants.PlatformCurrentWorkingDirectory];
-        ApplicationStateGuard.Ensure(currentWorkingDirectory is not null);
-        aggregatedConfiguration.SetTestHostWorkingDirectory(currentWorkingDirectory);
-
         List<(ITestHostEnvironmentVariableProvider TestHostEnvironmentVariableProvider, int RegistrationOrder)> environmentVariableProviders = [];
         foreach (Func<IServiceProvider, ITestHostEnvironmentVariableProvider> environmentVariableProviderFactory in _environmentVariableProviderFactories)
         {
             ITestHostEnvironmentVariableProvider envVarProvider = environmentVariableProviderFactory(serviceProvider);
 
             // Check if we have already extensions of the same type with same id registered
-            if (environmentVariableProviders.Any(x => x.TestHostEnvironmentVariableProvider.Uid == envVarProvider.Uid))
-            {
-                (ITestHostEnvironmentVariableProvider TestHostEnvironmentVariableProvider, int _) currentRegisteredExtension = environmentVariableProviders.Single(x => x.TestHostEnvironmentVariableProvider.Uid == envVarProvider.Uid);
-                throw new InvalidOperationException(string.Format(CultureInfo.InvariantCulture, PlatformResources.ExtensionWithSameUidAlreadyRegisteredErrorMessage, envVarProvider.Uid, currentRegisteredExtension.TestHostEnvironmentVariableProvider.GetType()));
-            }
+            environmentVariableProviders.ValidateUniqueExtension(envVarProvider, x => x.TestHostEnvironmentVariableProvider);
 
             // We initialize only if enabled
-            if (await envVarProvider.IsEnabledAsync())
+            if (await envVarProvider.IsEnabledAsync().ConfigureAwait(false))
             {
-                if (envVarProvider is IAsyncInitializableExtension async)
-                {
-                    await async.InitializeAsync();
-                }
+                await envVarProvider.TryInitializeAsync().ConfigureAwait(false);
 
                 // Register the extension for usage
                 environmentVariableProviders.Add((envVarProvider, _factoryOrdering.IndexOf(environmentVariableProviderFactory)));
@@ -101,37 +141,28 @@ internal sealed class TestHostControllersManager : ITestHostControllersManager
 
         foreach (ICompositeExtensionFactory compositeServiceFactory in _environmentVariableProviderCompositeFactories)
         {
+            // Get the singleton
+            var extension = (IExtension)compositeServiceFactory.GetInstance(serviceProvider);
+            bool isEnabledAsync = await extension.IsEnabledAsync().ConfigureAwait(false);
+
             // Check if we have already built the singleton for this composite factory
             if (!_alreadyBuiltServices.Contains(compositeServiceFactory))
             {
-                // Get the singleton for init
-                var instance = (IExtension)compositeServiceFactory.GetInstance(serviceProvider);
-
                 // Check if we have already extensions of the same type with same id registered
-                if (environmentVariableProviders.Any(x => x.TestHostEnvironmentVariableProvider.Uid == instance.Uid))
-                {
-                    (ITestHostEnvironmentVariableProvider TestHostEnvironmentVariableProvider, int _) currentRegisteredExtension = environmentVariableProviders.Single(x => x.TestHostEnvironmentVariableProvider.Uid == instance.Uid);
-                    throw new InvalidOperationException(string.Format(CultureInfo.InvariantCulture, PlatformResources.ExtensionWithSameUidAlreadyRegisteredErrorMessage, instance.Uid, currentRegisteredExtension.TestHostEnvironmentVariableProvider.GetType()));
-                }
+                environmentVariableProviders.ValidateUniqueExtension(extension, x => x.TestHostEnvironmentVariableProvider);
 
                 // We initialize only if enabled
-                if (await instance.IsEnabledAsync())
+                if (isEnabledAsync)
                 {
-                    if (instance is IAsyncInitializableExtension async)
-                    {
-                        await async.InitializeAsync();
-                    }
+                    await extension.TryInitializeAsync().ConfigureAwait(false);
                 }
 
                 // Add to the list of shared singletons
                 _alreadyBuiltServices.Add(compositeServiceFactory);
             }
 
-            // Get the singleton
-            var extension = (IExtension)compositeServiceFactory.GetInstance(serviceProvider);
-
             // We register the extension only if enabled
-            if (await extension.IsEnabledAsync())
+            if (isEnabledAsync)
             {
                 if (extension is ITestHostEnvironmentVariableProvider testHostEnvironmentVariableProvider)
                 {
@@ -152,19 +183,12 @@ internal sealed class TestHostControllersManager : ITestHostControllersManager
             ITestHostProcessLifetimeHandler lifetimeHandler = lifetimeHandlerFactory(serviceProvider);
 
             // Check if we have already extensions of the same type with same id registered
-            if (lifetimeHandlers.Any(x => x.TestHostProcessLifetimeHandler.Uid == lifetimeHandler.Uid))
-            {
-                (ITestHostProcessLifetimeHandler TestHostProcessLifetimeHandler, int _) currentRegisteredExtension = lifetimeHandlers.Single(x => x.TestHostProcessLifetimeHandler.Uid == lifetimeHandler.Uid);
-                throw new InvalidOperationException(string.Format(CultureInfo.InvariantCulture, PlatformResources.ExtensionWithSameUidAlreadyRegisteredErrorMessage, lifetimeHandler.Uid, currentRegisteredExtension.TestHostProcessLifetimeHandler.GetType()));
-            }
+            lifetimeHandlers.ValidateUniqueExtension(lifetimeHandler, x => x.TestHostProcessLifetimeHandler);
 
             // We initialize only if enabled
-            if (await lifetimeHandler.IsEnabledAsync())
+            if (await lifetimeHandler.IsEnabledAsync().ConfigureAwait(false))
             {
-                if (lifetimeHandler is IAsyncInitializableExtension async)
-                {
-                    await async.InitializeAsync();
-                }
+                await lifetimeHandler.TryInitializeAsync().ConfigureAwait(false);
 
                 // Register the extension for usage
                 lifetimeHandlers.Add((lifetimeHandler, _factoryOrdering.IndexOf(lifetimeHandlerFactory)));
@@ -174,36 +198,27 @@ internal sealed class TestHostControllersManager : ITestHostControllersManager
 
         foreach (ICompositeExtensionFactory compositeServiceFactory in _lifetimeHandlerCompositeFactories)
         {
+            // Get the singleton
+            var extension = (IExtension)compositeServiceFactory.GetInstance(serviceProvider);
+            bool isEnabledAsync = await extension.IsEnabledAsync().ConfigureAwait(false);
+
             // Check if we have already built the singleton for this composite factory
             if (!_alreadyBuiltServices.Contains(compositeServiceFactory))
             {
-                // Get the singleton for init
-                var instance = (IExtension)compositeServiceFactory.GetInstance(serviceProvider);
-
-                if (lifetimeHandlers.Any(x => x.TestHostProcessLifetimeHandler.Uid == instance.Uid))
-                {
-                    (ITestHostProcessLifetimeHandler TestHostProcessLifetimeHandler, int _) currentRegisteredExtension = lifetimeHandlers.Single(x => x.TestHostProcessLifetimeHandler.Uid == instance.Uid);
-                    throw new InvalidOperationException(string.Format(CultureInfo.InvariantCulture, PlatformResources.ExtensionWithSameUidAlreadyRegisteredErrorMessage, instance.Uid, currentRegisteredExtension.TestHostProcessLifetimeHandler.GetType()));
-                }
+                lifetimeHandlers.ValidateUniqueExtension(extension, x => x.TestHostProcessLifetimeHandler);
 
                 // We initialize only if enabled
-                if (await instance.IsEnabledAsync())
+                if (isEnabledAsync)
                 {
-                    if (instance is IAsyncInitializableExtension async)
-                    {
-                        await async.InitializeAsync();
-                    }
+                    await extension.TryInitializeAsync().ConfigureAwait(false);
                 }
 
                 // Add to the list of shared singletons
                 _alreadyBuiltServices.Add(compositeServiceFactory);
             }
 
-            // Get the singleton
-            var extension = (IExtension)compositeServiceFactory.GetInstance(serviceProvider);
-
             // We register the extension only if enabled
-            if (await extension.IsEnabledAsync())
+            if (isEnabledAsync)
             {
                 if (extension is ITestHostProcessLifetimeHandler testHostProcessLifetimeHandler)
                 {
@@ -218,10 +233,56 @@ internal sealed class TestHostControllersManager : ITestHostControllersManager
             }
         }
 
-        bool requireProcessRestart = environmentVariableProviders.Count > 0 || lifetimeHandlers.Count > 0;
+        List<(IDataConsumer Consumer, int RegistrationOrder)> dataConsumers = [];
+
+        foreach (ICompositeExtensionFactory compositeServiceFactory in _dataConsumersCompositeServiceFactories)
+        {
+            ICompositeExtensionFactory? compositeFactoryInstance;
+
+            // We check if the same service is already built in some other build phase
+            if ((compositeFactoryInstance = _alreadyBuiltServices.SingleOrDefault(x => x.GetType() == compositeServiceFactory.GetType())) is null)
+            {
+                // We clone the instance because we want to have fresh instance per BuildTestApplicationLifecycleCallbackAsync call
+                compositeFactoryInstance = (ICompositeExtensionFactory)compositeServiceFactory.Clone();
+
+                // Create the new fresh instance
+                var instance = (IExtension)compositeFactoryInstance.GetInstance(serviceProvider);
+
+                // Check if we have already extensions of the same type with same id registered
+                dataConsumers.ValidateUniqueExtension(instance, x => x.Consumer);
+
+                // We initialize only if enabled
+                if (await instance.IsEnabledAsync().ConfigureAwait(false))
+                {
+                    await instance.TryInitializeAsync().ConfigureAwait(false);
+                }
+
+                // Add to the list of shared singletons
+                _alreadyBuiltServices.Add(compositeFactoryInstance);
+            }
+
+            // Get the singleton
+            var extension = (IExtension)compositeFactoryInstance.GetInstance();
+
+            // We register the extension only if enabled
+            if (await extension.IsEnabledAsync().ConfigureAwait(false))
+            {
+                if (extension is IDataConsumer consumer)
+                {
+                    // Register the extension for usage
+                    dataConsumers.Add((consumer, _factoryOrdering.IndexOf(compositeServiceFactory)));
+                    continue;
+                }
+
+                throw new InvalidOperationException(string.Format(CultureInfo.InvariantCulture, PlatformResources.ExtensionDoesNotImplementGivenInterfaceErrorMessage, extension.GetType(), typeof(IDataConsumer)));
+            }
+        }
+
+        bool requireProcessRestart = environmentVariableProviders.Count > 0 || lifetimeHandlers.Count > 0 || dataConsumers.Count > 0;
         return new TestHostControllerConfiguration(
-            environmentVariableProviders.OrderBy(x => x.RegistrationOrder).Select(x => x.TestHostEnvironmentVariableProvider).ToArray(),
-            lifetimeHandlers.OrderBy(x => x.RegistrationOrder).Select(x => x.TestHostProcessLifetimeHandler).ToArray(),
+            [.. environmentVariableProviders.OrderBy(x => x.RegistrationOrder).Select(x => x.TestHostEnvironmentVariableProvider)],
+            [.. lifetimeHandlers.OrderBy(x => x.RegistrationOrder).Select(x => x.TestHostProcessLifetimeHandler)],
+            [.. dataConsumers.OrderBy(x => x.RegistrationOrder).Select(x => x.Consumer)],
             requireProcessRestart);
     }
 }

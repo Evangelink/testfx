@@ -1,13 +1,12 @@
-// Copyright (c) Microsoft Corporation. All rights reserved.
+﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System.Collections;
 #if NETFRAMEWORK
 using System.Data;
 using System.Data.Common;
 #endif
-using System.Diagnostics;
-using System.Globalization;
+
+using System.ComponentModel;
 
 namespace Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -16,42 +15,58 @@ namespace Microsoft.VisualStudio.TestTools.UnitTesting;
 /// </summary>
 public abstract class TestContext
 {
+    private static readonly AsyncLocal<TestContext?> CurrentContext = new();
+
+    /// <summary>
+    /// Gets the current <see cref="TestContext"/> instance.
+    /// </summary>
+    /// <remarks>
+    /// This property returns the context for the currently executing test. When accessed outside of a test execution,
+    /// it returns <see langword="null"/>.
+    /// </remarks>
+    [Experimental("MSTESTEXP", UrlFormat = "https://aka.ms/mstest/diagnostics#{0}")]
+    public static TestContext? Current
+    {
+        get => CurrentContext.Value;
+        internal set => CurrentContext.Value = value;
+    }
+
     internal static readonly string FullyQualifiedTestClassNameLabel = nameof(FullyQualifiedTestClassName);
-    internal static readonly string ManagedTypeLabel = nameof(ManagedType);
-    internal static readonly string ManagedMethodLabel = nameof(ManagedMethod);
     internal static readonly string TestNameLabel = nameof(TestName);
-#if WINDOWS_UWP || WIN_UI
-    internal static readonly string TestRunDirectoryLabel = "TestRunDirectory";
-    internal static readonly string DeploymentDirectoryLabel = "DeploymentDirectory";
-    internal static readonly string ResultsDirectoryLabel = "ResultsDirectory";
-    internal static readonly string TestRunResultsDirectoryLabel = "TestRunResultsDirectory";
-    internal static readonly string TestResultsDirectoryLabel = "TestResultsDirectory";
-    internal static readonly string TestDirLabel = "TestDir";
-    internal static readonly string TestDeploymentDirLabel = "TestDeploymentDir";
-    internal static readonly string TestLogsDirLabel = "TestLogsDir";
-#else
+#if !WINDOWS_UWP && !WIN_UI
     internal static readonly string TestRunDirectoryLabel = nameof(TestRunDirectory);
     internal static readonly string DeploymentDirectoryLabel = nameof(DeploymentDirectory);
     internal static readonly string ResultsDirectoryLabel = nameof(ResultsDirectory);
     internal static readonly string TestRunResultsDirectoryLabel = nameof(TestRunResultsDirectory);
     internal static readonly string TestResultsDirectoryLabel = nameof(TestResultsDirectory);
-    [Obsolete("Remove when related property is removed.")]
-    internal static readonly string TestDirLabel = nameof(TestDir);
-    [Obsolete("Remove when related property is removed.")]
-    internal static readonly string TestDeploymentDirLabel = nameof(TestDeploymentDir);
-    [Obsolete("Remove when related property is removed.")]
-    internal static readonly string TestLogsDirLabel = nameof(TestLogsDir);
 #endif
 
     /// <summary>
     /// Gets test properties for a test.
     /// </summary>
-    public abstract IDictionary Properties { get; }
+    public abstract IDictionary<string, object?> Properties { get; }
 
     /// <summary>
     /// Gets or sets the cancellation token source. This token source is canceled when test times out. Also when explicitly canceled the test will be aborted.
     /// </summary>
-    public virtual CancellationTokenSource CancellationTokenSource { get; protected set; } = new();
+    // Disposing isn't important per https://github.com/dotnet/runtime/issues/29970#issuecomment-717840778
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    public virtual CancellationTokenSource CancellationTokenSource { get; protected internal set; } = new();
+
+    /// <summary>
+    /// Gets the cancellation token. This token is canceled when test times out. Also when explicitly canceled the test will be aborted.
+    /// </summary>
+    public CancellationToken CancellationToken => CancellationTokenSource.Token;
+
+    /// <summary>
+    /// Gets or sets the test data for the test method being executed.
+    /// </summary>
+    public object?[]? TestData { get; protected set; }
+
+    /// <summary>
+    /// Gets or sets the test display name for the test method being executed.
+    /// </summary>
+    public string? TestDisplayName { get; protected set; }
 
 #if NETFRAMEWORK
     /// <summary>
@@ -95,65 +110,41 @@ public abstract class TestContext
     // because MSTest does not create the GUID directory.
     public virtual string? TestResultsDirectory => GetProperty<string>(TestResultsDirectoryLabel);
 
-    #region Old names, for backwards compatibility
-
-    /// <summary>
-    /// Gets base directory for the test run, under which deployed files and result files are stored.
-    /// Same as <see cref="TestRunDirectory"/>. Use that property instead.
-    /// </summary>
-    [Obsolete("This property is deprecated, use TestRunDirectory instead. It will be removed in next version.")]
-    public virtual string? TestDir => GetProperty<string>(TestDirLabel);
-
-    /// <summary>
-    /// Gets directory for files deployed for the test run. Typically a subdirectory of <see cref="TestRunDirectory"/>.
-    /// Same as <see cref="DeploymentDirectory"/>. Use that property instead.
-    /// </summary>
-    [Obsolete("This property is deprecated, use DeploymentDirectory instead. It will be removed in next version.")]
-    public virtual string? TestDeploymentDir => GetProperty<string>(TestDeploymentDirLabel);
-
-    /// <summary>
-    /// Gets directory for test run result files. Typically a subdirectory of <see cref="ResultsDirectory"/>.
-    /// Same as <see cref="TestRunResultsDirectory"/>. Use that property for test run result files, or
-    /// <see cref="TestResultsDirectory"/> for test-specific result files instead.
-    /// </summary>
-    [Obsolete("This property is deprecated, use TestRunResultsDirectory for test run result files or TestResultsDirectory for test-specific result files instead. It will be removed in next version.")]
-    public virtual string? TestLogsDir => GetProperty<string>(TestLogsDirLabel);
-
-    #endregion
-
     #endregion
 #endif
 
     /// <summary>
     /// Gets the Fully-qualified name of the class containing the test method currently being executed.
     /// </summary>
-    /// <remarks>
-    /// This property can be useful in attributes derived from ExpectedExceptionBaseAttribute.
-    /// Those attributes have access to the test context, and provide messages that are included
-    /// in the test results. Users can benefit from messages that include the fully-qualified
-    /// class name in addition to the name of the test method currently being executed.
-    /// </remarks>
-    public virtual string? FullyQualifiedTestClassName => GetProperty<string>(FullyQualifiedTestClassNameLabel);
-
-    /// <summary>
-    /// Gets the fully specified type name metadata format.
-    /// </summary>
-    public virtual string? ManagedType => GetProperty<string>(ManagedTypeLabel);
-
-    /// <summary>
-    /// Gets the fully specified method name metadata format.
-    /// </summary>
-    public virtual string? ManagedMethod => GetProperty<string>(ManagedMethodLabel);
+    public virtual string FullyQualifiedTestClassName => GetProperty<string>(FullyQualifiedTestClassNameLabel)
+        ?? throw new InvalidOperationException(string.Format(CultureInfo.InvariantCulture, FrameworkMessages.InvalidAccessToTestContextProperty, nameof(FullyQualifiedTestClassName)));
 
     /// <summary>
     /// Gets the name of the test method currently being executed.
     /// </summary>
-    public virtual string? TestName => GetProperty<string>(TestNameLabel);
+    public virtual string TestName => GetProperty<string>(TestNameLabel)
+        ?? throw new InvalidOperationException(string.Format(CultureInfo.InvariantCulture, FrameworkMessages.InvalidAccessToTestContextProperty, nameof(TestName)));
 
     /// <summary>
     /// Gets the current test outcome.
     /// </summary>
     public virtual UnitTestOutcome CurrentTestOutcome => UnitTestOutcome.Unknown;
+
+    /// <summary>
+    /// Gets or sets the exception that occurred in the TestInitialize or TestMethod steps.
+    /// </summary>
+    /// <remarks>
+    /// The property is always <c>null</c> when accessed during the TestInitialize or TestMethod steps.
+    /// </remarks>
+    public Exception? TestException { get; protected set; }
+
+    /// <summary>
+    /// Gets the current attempt of the test run. This property is relevant when
+    /// using <see cref="RetryAttribute"/> (or any implementation of <see cref="RetryBaseAttribute"/>).
+    /// On the first run, this property is set to 1.
+    /// On subsequent retries, the value is incremented.
+    /// </summary>
+    public int TestRunCount { get; internal set; }
 
     /// <summary>
     /// Adds a file name to the list in TestResult.ResultFileNames.
@@ -189,12 +180,19 @@ public abstract class TestContext
     /// <param name="args">the arguments.</param>
     public abstract void WriteLine(string format, params object?[] args);
 
+    /// <summary>
+    /// Used to write trace messages while the test is running.
+    /// </summary>
+    /// <param name="messageLevel">The message level.</param>
+    /// <param name="message">The message.</param>
+    public abstract void DisplayMessage(MessageLevel messageLevel, string message);
+
     private T? GetProperty<T>(string name)
         where T : class
     {
         DebugEx.Assert(Properties is not null, "Properties is null");
 #if WINDOWS_UWP || WIN_UI
-        if (!((System.Collections.Generic.IDictionary<string, object>)Properties).TryGetValue(name, out object? propertyValue))
+        if (!Properties.TryGetValue(name, out object? propertyValue))
         {
             return null;
         }

@@ -1,17 +1,15 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System.Collections;
-using System.Diagnostics;
-
-using Microsoft.Testing.Platform.Helpers;
-
 namespace Microsoft.Testing.Platform.Extensions.Messages;
 
+/// <summary>
+/// A class that holds properties.
+/// </summary>
 public sealed partial class PropertyBag
 {
     [DebuggerTypeProxy(typeof(PropertyDebugView))]
-    internal /* for testing */ class Property(IProperty current, Property? next = null) : IEnumerable<IProperty>
+    internal /* for testing */ sealed class Property(IProperty current, Property? next = null) : IEnumerable<IProperty>
     {
         public int Count
         {
@@ -143,12 +141,9 @@ public sealed partial class PropertyBag
         private readonly Property _property;
 
         public PropertyDebugView(Property property)
-        {
-            ArgumentGuard.IsNotNull(property);
-            _property = property;
-        }
+            => _property = property ?? throw new ArgumentNullException(nameof(property));
 
         [DebuggerBrowsable(DebuggerBrowsableState.RootHidden)]
-        public IProperty[] Items => _property.AsEnumerable().ToArray();
+        public IProperty[] Items => [.. _property.AsEnumerable()];
     }
 }

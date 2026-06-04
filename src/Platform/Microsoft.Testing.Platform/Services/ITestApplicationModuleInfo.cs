@@ -7,17 +7,19 @@ internal interface ITestApplicationModuleInfo
 {
     bool IsCurrentTestApplicationHostDotnetMuxer { get; }
 
-    bool IsCurrentTestApplicationModuleExecutable { get; }
-
     bool IsAppHostOrSingleFileOrNativeAot { get; }
-
-    string GetCommandLineArguments();
 
     string GetCurrentTestApplicationFullPath();
 
-    string GetProcessPath();
+    string? TryGetCurrentTestApplicationFullPath();
 
-    string[] GetCommandLineArgs();
+    string? TryGetAssemblyName();
+
+    string GetCurrentTestApplicationDirectory();
+
+    string GetDisplayName();
+
+    string GetProcessPath();
 
     ExecutableInfo GetCurrentExecutableInfo();
 }

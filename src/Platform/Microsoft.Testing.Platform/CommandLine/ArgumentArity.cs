@@ -68,17 +68,16 @@ public readonly struct ArgumentArity(int min, int max) : IEquatable<ArgumentArit
     public bool Equals(ArgumentArity other)
         => Min == other.Min && Max == other.Max;
 
-    /// <inheritdoc/>
+    /// <inheritdoc />
     public override bool Equals(object? obj)
         => obj is ArgumentArity argumentArity && Equals(argumentArity);
 
-    /// <inheritdoc/>
-    public override int GetHashCode()
-    {
+    /// <inheritdoc />
+    public override int GetHashCode() =>
 #if NET
-        return HashCode.Combine(Min, Max);
+        HashCode.Combine(Min, Max);
 #else
-        return Min.GetHashCode() ^ Max.GetHashCode();
+        Min.GetHashCode() ^ Max.GetHashCode();
 #endif
-    }
+
 }

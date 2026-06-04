@@ -1,15 +1,10 @@
-// Copyright (c) Microsoft Corporation. All rights reserved.
+﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 #if NETFRAMEWORK
-using System.Collections;
 using System.Data;
-using System.Diagnostics.CodeAnalysis;
-using System.Globalization;
-using System.Security;
-using System.Xml;
 
-using Microsoft.VisualStudio.TestPlatform.ObjectModel;
+using Microsoft.VisualStudio.TestPlatform.MSTest.TestAdapter;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace Microsoft.VisualStudio.TestPlatform.MSTestAdapter.PlatformServices.Data;
@@ -51,12 +46,8 @@ internal sealed class XmlDataConnection : TestDataConnection
     public override List<string>? GetColumns(string tableName)
     {
         DataSet? dataSet = LoadDataSet(true);
-        if (dataSet == null)
-        {
-            return null;
-        }
 
-        DataTable table = dataSet.Tables[tableName];
+        DataTable? table = dataSet?.Tables[tableName];
         if (table == null)
         {
             return null;
@@ -100,29 +91,27 @@ internal sealed class XmlDataConnection : TestDataConnection
                 Locale = CultureInfo.CurrentCulture,
             };
             string path = FixPath(_fileName) ?? Path.GetFullPath(_fileName);
+
+            // ReadXmlSchema and ReadXml should use the overload with XmlReader to avoid DTD processing
             if (schemaOnly)
             {
-                dataSet.ReadXmlSchema(path);
+                dataSet.ReadXmlSchema(new XmlTextReader(path));
             }
             else
             {
-                dataSet.ReadXml(path);
+                dataSet.ReadXml(new XmlTextReader(path));
             }
 
             return dataSet;
         }
-        catch (SecurityException securityException)
-        {
-            EqtTrace.ErrorIf(EqtTrace.IsErrorEnabled, securityException.Message + " for XML data source " + _fileName);
-        }
-        catch (XmlException xmlException)
-        {
-            EqtTrace.ErrorIf(EqtTrace.IsErrorEnabled, xmlException.Message + " for XML data source " + _fileName);
-        }
         catch (Exception exception)
         {
-            // Yes, we get other exceptions too!
-            EqtTrace.ErrorIf(EqtTrace.IsErrorEnabled, exception.Message + " for XML data source " + _fileName);
+            // Yes, we get exceptions other than SecurityException and XmlException too!
+            // So we handle all exceptions!
+            if (PlatformServiceProvider.Instance.AdapterTraceLogger.IsErrorEnabled)
+            {
+                PlatformServiceProvider.Instance.AdapterTraceLogger.Error(exception.Message + " for XML data source " + _fileName);
+            }
         }
 
         return null;

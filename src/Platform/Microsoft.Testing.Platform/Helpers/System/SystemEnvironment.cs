@@ -1,9 +1,6 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System.Collections;
-using System.Diagnostics.CodeAnalysis;
-
 namespace Microsoft.Testing.Platform.Helpers;
 
 [SuppressMessage("ApiDesign", "RS0030:Do not use banned APIs", Justification = "This is the wrapper for Environment type.")]
@@ -14,6 +11,32 @@ internal sealed class SystemEnvironment : IEnvironment
     public string MachineName => Environment.MachineName;
 
     public string NewLine => Environment.NewLine;
+
+#if !NETCOREAPP
+    public int ProcessId
+    {
+        get
+        {
+            int processId = field;
+            if (processId == 0)
+            {
+                field = processId = GetProcessId();
+                // Assume that process Id zero is invalid for user processes. It holds for all mainstream operating systems.
+                Debug.Assert(processId != 0, "processId is expected to be non-zero.");
+            }
+
+            return processId;
+
+            static int GetProcessId()
+            {
+                using var process = Process.GetCurrentProcess();
+                return process.Id;
+            }
+        }
+    }
+#else
+    public int ProcessId => Environment.ProcessId;
+#endif
 
     public string OsVersion => Environment.OSVersion.ToString();
 

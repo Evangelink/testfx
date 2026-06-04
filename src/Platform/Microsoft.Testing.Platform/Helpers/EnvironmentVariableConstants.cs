@@ -1,10 +1,11 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System.Diagnostics.CodeAnalysis;
+using Microsoft.CodeAnalysis;
 
 namespace Microsoft.Testing.Platform.Helpers;
 
+[Embedded]
 [SuppressMessage("StyleCop.CSharp.NamingRules", "SA1310:Field names should not contain underscore", Justification = "Use nameof pattern")]
 internal static class EnvironmentVariableConstants
 {
@@ -22,8 +23,14 @@ internal static class EnvironmentVariableConstants
     public const string TESTINGPLATFORM_DIAGNOSTIC = nameof(TESTINGPLATFORM_DIAGNOSTIC);
     public const string TESTINGPLATFORM_DIAGNOSTIC_VERBOSITY = nameof(TESTINGPLATFORM_DIAGNOSTIC_VERBOSITY);
     public const string TESTINGPLATFORM_DIAGNOSTIC_OUTPUT_DIRECTORY = nameof(TESTINGPLATFORM_DIAGNOSTIC_OUTPUT_DIRECTORY);
+
+    [Obsolete("Use " + nameof(TESTINGPLATFORM_DIAGNOSTIC_FILE_PREFIX) + " instead. This name matches the renamed --diagnostic-file-prefix CLI option (see https://github.com/microsoft/testfx/issues/7159). Kept for backward compatibility and may be removed in a future major version.", error: false)]
     public const string TESTINGPLATFORM_DIAGNOSTIC_OUTPUT_FILEPREFIX = nameof(TESTINGPLATFORM_DIAGNOSTIC_OUTPUT_FILEPREFIX);
+    public const string TESTINGPLATFORM_DIAGNOSTIC_FILE_PREFIX = nameof(TESTINGPLATFORM_DIAGNOSTIC_FILE_PREFIX);
+
+    [Obsolete("Use " + nameof(TESTINGPLATFORM_DIAGNOSTIC_SYNCHRONOUS_WRITE) + " instead. This name matches the renamed --diagnostic-synchronous-write CLI option (see https://github.com/microsoft/testfx/issues/7159). Kept for backward compatibility and may be removed in a future major version.", error: false)]
     public const string TESTINGPLATFORM_DIAGNOSTIC_FILELOGGER_SYNCHRONOUSWRITE = nameof(TESTINGPLATFORM_DIAGNOSTIC_FILELOGGER_SYNCHRONOUSWRITE);
+    public const string TESTINGPLATFORM_DIAGNOSTIC_SYNCHRONOUS_WRITE = nameof(TESTINGPLATFORM_DIAGNOSTIC_SYNCHRONOUS_WRITE);
     public const string TESTINGPLATFORM_NOBANNER = nameof(TESTINGPLATFORM_NOBANNER);
     public const string TESTINGPLATFORM_EXITCODE_IGNORE = nameof(TESTINGPLATFORM_EXITCODE_IGNORE);
 
@@ -34,7 +41,15 @@ internal static class EnvironmentVariableConstants
 
     // Debugging
     public const string TESTINGPLATFORM_LAUNCH_ATTACH_DEBUGGER = nameof(TESTINGPLATFORM_LAUNCH_ATTACH_DEBUGGER);
+    public const string TESTINGPLATFORM_WAIT_ATTACH_DEBUGGER = nameof(TESTINGPLATFORM_WAIT_ATTACH_DEBUGGER);
+
+    // dotnet test
+    public const string TESTINGPLATFORM_DOTNETTEST_EXECUTIONID = nameof(TESTINGPLATFORM_DOTNETTEST_EXECUTIONID);
+    public const string DOTNET_CLI_TEST_COMMAND_WORKING_DIRECTORY = nameof(DOTNET_CLI_TEST_COMMAND_WORKING_DIRECTORY);
 
     // Unhandled Exception
     public const string TESTINGPLATFORM_EXIT_PROCESS_ON_UNHANDLED_EXCEPTION = nameof(TESTINGPLATFORM_EXIT_PROCESS_ON_UNHANDLED_EXCEPTION);
+
+    // Trx
+    public const string TESTINGPLATFORM_TRX_TESTRUN_ID = nameof(TESTINGPLATFORM_TRX_TESTRUN_ID);
 }

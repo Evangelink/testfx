@@ -1,9 +1,7 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System.Diagnostics;
 using System.IO.Compression;
-using System.Runtime.InteropServices;
 
 using Microsoft.Testing.TestInfrastructure;
 
@@ -26,8 +24,7 @@ internal class DotnetTrace : IStep<BuildArtifact, Files>
 
     public async Task<Files> ExecuteAsync(BuildArtifact payload, IContext context)
     {
-        string nugetRestoreFolder = Path.Combine(payload.TestAsset.TargetAssetPath, ".packages");
-        await DotnetCli.RunAsync($"tool install --tool-path \"{payload.TestAsset.TargetAssetPath}\" dotnet-trace", nugetRestoreFolder);
+        await DotnetCli.RunAsync($"tool install --tool-path \"{payload.TestAsset.TargetAssetPath}\" dotnet-trace");
 
         string dotnetTrace = Path.Combine(payload.TestAsset.TargetAssetPath, "dotnet-trace" + (RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? ".exe" : string.Empty));
 
@@ -43,13 +40,10 @@ internal class DotnetTrace : IStep<BuildArtifact, Files>
 
         Console.WriteLine($"dotnet-trace command: '{processStartInfo.FileName} {processStartInfo.Arguments}'");
 
-        Process process = Process.Start(processStartInfo)!;
+        using Process process = Process.Start(processStartInfo)!;
         process.EnableRaisingEvents = true;
         process.BeginOutputReadLine();
-        process.OutputDataReceived += (sender, args) =>
-        {
-            Console.WriteLine(args.Data);
-        };
+        process.OutputDataReceived += (sender, args) => Console.WriteLine(args.Data);
 
         process.WaitForExit();
 
@@ -58,6 +52,6 @@ internal class DotnetTrace : IStep<BuildArtifact, Files>
         Console.WriteLine($"Compressing to '{sample}'");
         ZipFile.CreateFromDirectory(payload.TestAsset.TargetAssetPath, sample, _compressionLevel, includeBaseDirectory: true);
 
-        return new Files(new[] { sample });
+        return new Files([sample]);
     }
 }

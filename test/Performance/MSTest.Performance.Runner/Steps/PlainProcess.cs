@@ -1,7 +1,6 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System.Diagnostics;
 using System.IO.Compression;
 using System.Text.Json;
 
@@ -37,17 +36,17 @@ internal class PlainProcess : IStep<BuildArtifact, Files>
 
         Console.WriteLine($"Process command: '{processStartInfo.FileName} {processStartInfo.Arguments.Trim()}' for {_numberOfRun} times");
 
-        List<object> results = new();
+        List<object> results = [];
         for (int i = 0; i < _numberOfRun; i++)
         {
-            Process process = Process.Start(processStartInfo)!;
+            using Process process = Process.Start(processStartInfo)!;
             await process.WaitForExitAsync();
             var result = new
             {
                 ElapsedTime = process.ExitTime - process.StartTime,
-                TotalProcessorTime = process.TotalProcessorTime,
-                ProcessorCount = Environment.ProcessorCount,
-                TotalAvailableMemoryBytes = GC.GetGCMemoryInfo().TotalAvailableMemoryBytes,
+                process.TotalProcessorTime,
+                Environment.ProcessorCount,
+                GC.GetGCMemoryInfo().TotalAvailableMemoryBytes,
             };
 
             results.Add(result);
@@ -56,7 +55,7 @@ internal class PlainProcess : IStep<BuildArtifact, Files>
 #pragma warning disable CA1869 // Cache and reuse 'JsonSerializerOptions' instances
         await File.AppendAllTextAsync(Path.Combine(Path.GetDirectoryName(payload.TestHost.FullName)!, "Result.json"), JsonSerializer.Serialize(
             results,
-            new JsonSerializerOptions() { WriteIndented = true }));
+            new JsonSerializerOptions { WriteIndented = true }));
 #pragma warning restore CA1869 // Cache and reuse 'JsonSerializerOptions' instances
 
         string sample = Path.Combine(Path.GetTempPath(), _reportFileName);
@@ -65,6 +64,6 @@ internal class PlainProcess : IStep<BuildArtifact, Files>
 
         ZipFile.CreateFromDirectory(payload.TestAsset.TargetAssetPath, sample, _compressionLevel, includeBaseDirectory: true);
 
-        return new Files(new[] { sample });
+        return new Files([sample]);
     }
 }

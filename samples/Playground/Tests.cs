@@ -5,6 +5,8 @@
 
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
+using ExecutionScope = Microsoft.VisualStudio.TestTools.UnitTesting.ExecutionScope;
+
 [assembly: Parallelize(Scope = ExecutionScope.MethodLevel, Workers = 0)]
 
 namespace Playground;
@@ -13,7 +15,9 @@ namespace Playground;
 public class TestClass
 {
     [TestMethod]
-    public void Test()
+    public void Test1()
     {
+        Thread.Sleep(5000);
+        Assert.IsPositive(1);
     }
 }

@@ -1,4 +1,4 @@
-// Copyright (c) Microsoft Corporation. All rights reserved.
+﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 namespace Microsoft.VisualStudio.TestPlatform.MSTestAdapter.PlatformServices.Interface;
@@ -6,7 +6,7 @@ namespace Microsoft.VisualStudio.TestPlatform.MSTestAdapter.PlatformServices.Int
 /// <summary>
 /// A host that loads the test source.This can be in isolation for desktop using an AppDomain or just loading the source in the current context.
 /// </summary>
-public interface ITestSourceHost : IDisposable
+internal interface ITestSourceHost : IDisposable
 {
     /// <summary>
     /// Sets up the isolation host.
@@ -23,5 +23,5 @@ public interface ITestSourceHost : IDisposable
     /// </param>
     /// <returns> An instance of the type created in the host. </returns>
     /// <remarks> If a type is to be created in isolation then it needs to be a MarshalByRefObject. </remarks>
-    object? CreateInstanceForType(Type type, object?[]? args);
+    object? CreateInstanceForType([DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] Type type, object?[]? args);
 }

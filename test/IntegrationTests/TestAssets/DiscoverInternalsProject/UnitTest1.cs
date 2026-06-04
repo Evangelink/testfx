@@ -1,4 +1,4 @@
-// Copyright (c) Microsoft Corporation. All rights reserved.
+﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System.Runtime.Serialization;
@@ -27,9 +27,7 @@ internal class TopLevelInternalClass
     }
 }
 
-internal class FancyString
-{
-}
+internal class FancyString;
 
 public abstract class CaseInsensitivityTests<T>
 {
@@ -38,7 +36,7 @@ public abstract class CaseInsensitivityTests<T>
     [TestMethod]
     public void EqualityIsCaseInsensitive()
     {
-        var tuple = EquivalentInstancesDistinctInCase;
+        Tuple<T, T> tuple = EquivalentInstancesDistinctInCase;
 
         Assert.AreEqual(tuple.Item1, tuple.Item2);
     }
@@ -52,21 +50,19 @@ internal class FancyStringsAreCaseInsensitive : CaseInsensitivityTests<FancyStri
 }
 
 [DataContract]
-internal sealed class SerializableInternalType
-{
-}
+internal sealed class SerializableInternalType;
 
 [TestClass]
 internal class DynamicDataTest
 {
     [DataTestMethod]
-    [DynamicData(nameof(DynamicData), DynamicDataSourceType.Property)]
+    [DynamicData(nameof(DynamicData))]
     internal void DynamicDataTestMethod(SerializableInternalType serializableInternalType)
     {
     }
 
-    public static IEnumerable<object[]> DynamicData => new[]
-    {
-        new object[] { new SerializableInternalType() },
-    };
+    public static IEnumerable<object[]> DynamicData =>
+    [
+        [new SerializableInternalType()]
+    ];
 }

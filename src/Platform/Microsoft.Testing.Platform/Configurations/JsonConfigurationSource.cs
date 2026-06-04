@@ -1,6 +1,7 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Microsoft.Testing.Platform.CommandLine;
 using Microsoft.Testing.Platform.Helpers;
 using Microsoft.Testing.Platform.Logging;
 using Microsoft.Testing.Platform.Services;
@@ -14,22 +15,24 @@ internal sealed partial class JsonConfigurationSource(ITestApplicationModuleInfo
     private readonly FileLoggerProvider? _fileLoggerProvider = fileLoggerProvider;
 
     /// <inheritdoc />
-    public string Uid { get; } = nameof(JsonConfigurationSource);
+    public string Uid => nameof(JsonConfigurationSource);
 
     /// <inheritdoc />
-    public string Version { get; } = AppVersion.DefaultSemVer;
-
-    /// <inheritdoc />
-    // Can be empty string because it's not used in the UI
-    public string DisplayName { get; } = string.Empty;
+    public string Version => PlatformVersion.Version;
 
     /// <inheritdoc />
     // Can be empty string because it's not used in the UI
-    public string Description { get; } = string.Empty;
+    public string DisplayName => string.Empty;
+
+    /// <inheritdoc />
+    // Can be empty string because it's not used in the UI
+    public string Description => string.Empty;
+
+    public int Order => 3;
 
     /// <inheritdoc />
     public Task<bool> IsEnabledAsync() => Task.FromResult(true);
 
-    public IConfigurationProvider Build()
-        => new JsonConfigurationProvider(_testApplicationModuleInfo, _fileSystem, _fileLoggerProvider?.CreateLogger(typeof(JsonConfigurationProvider).ToString()));
+    public Task<IConfigurationProvider> BuildAsync(CommandLineParseResult commandLineParseResult)
+        => Task.FromResult((IConfigurationProvider)new JsonConfigurationProvider(_testApplicationModuleInfo, _fileSystem, commandLineParseResult, _fileLoggerProvider?.CreateLogger(typeof(JsonConfigurationProvider).ToString())));
 }

@@ -1,10 +1,6 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System.Diagnostics.CodeAnalysis;
-using System.Globalization;
-using System.Text;
-
 using Microsoft.Testing.Platform.CommandLine;
 using Microsoft.Testing.Platform.Extensions;
 using Microsoft.Testing.Platform.Extensions.CommandLine;
@@ -16,26 +12,22 @@ using Microsoft.Testing.Platform.Tools;
 
 namespace Microsoft.Testing.Platform.Hosts;
 
-internal sealed class ToolsTestHost(
-    ToolsInformation toolsInformation,
+internal sealed class ToolsHost(
+    IReadOnlyList<ITool> toolsInformation,
     ServiceProvider serviceProvider,
-    CommandLineParseResult parseResult,
-    ICommandLineOptionsProvider[] extensionsCommandLineOptionsProviders,
-    ICommandLineHandler commandLineHandler,
-    IPlatformOutputDevice platformOutputDevice) : ITestHost, IOutputDeviceDataProducer
+    CommandLineHandler commandLineHandler,
+    IOutputDevice outputDevice) : IHost, IOutputDeviceDataProducer
 {
-    private readonly ToolsInformation _toolsInformation = toolsInformation;
+    private readonly IReadOnlyList<ITool> _toolsInformation = toolsInformation;
     private readonly ServiceProvider _serviceProvider = serviceProvider;
-    private readonly CommandLineParseResult _parseResult = parseResult;
-    private readonly ICommandLineOptionsProvider[] _extensionsCommandLineOptionsProviders = extensionsCommandLineOptionsProviders;
-    private readonly ICommandLineHandler _commandLineHandler = commandLineHandler;
-    private readonly IPlatformOutputDevice _platformOutputDevice = platformOutputDevice;
+    private readonly CommandLineHandler _commandLineHandler = commandLineHandler;
+    private readonly IOutputDevice _outputDevice = outputDevice;
 
     /// <inheritdoc />
-    public string Uid => nameof(ToolsTestHost);
+    public string Uid => nameof(ToolsHost);
 
     /// <inheritdoc />
-    public string Version => AppVersion.DefaultSemVer;
+    public string Version => PlatformVersion.Version;
 
     /// <inheritdoc />
     public string DisplayName => string.Empty;
@@ -48,51 +40,52 @@ internal sealed class ToolsTestHost(
 
     public async Task<int> RunAsync()
     {
+        CancellationToken cancellationToken = _serviceProvider.GetTestApplicationCancellationTokenSource().CancellationToken;
         IConsole console = _serviceProvider.GetConsole();
 
-        if (_parseResult.ToolName is null)
+        if (_commandLineHandler.ParseResult.ToolName is null)
         {
             throw new InvalidOperationException("Tool name is null.");
         }
 
-        string toolNameToRun = _parseResult.ToolName;
+        string toolNameToRun = _commandLineHandler.ParseResult.ToolName;
 
         // TODO: Apply the override or do not support it for Tools?
         // TODO: Verify reserved tool names?
-        _toolsInformation.Tools.GroupBy(x => x.Name).Where(x => x.Count() > 1).ToList()
+        _toolsInformation.GroupBy(x => x.Name).Where(x => x.Count() > 1).ToList()
             .ForEach(x => throw new InvalidOperationException($"Tool '{x.Key}' is registered more than once."));
 
-        foreach (ITool tool in _toolsInformation.Tools)
+        foreach (ITool tool in _toolsInformation)
         {
             if (tool.Name == toolNameToRun)
             {
                 if (UnknownOptions(out string? unknownOptionsError, tool))
                 {
-                    await _platformOutputDevice.DisplayAsync(this, FormattedTextOutputDeviceDataBuilder.CreateRedConsoleColorText(unknownOptionsError));
+                    await _outputDevice.DisplayAsync(this, new ErrorMessageOutputDeviceData(unknownOptionsError), cancellationToken).ConfigureAwait(false);
                     console.WriteLine();
-                    return ExitCodes.InvalidCommandLine;
+                    return (int)ExitCode.InvalidCommandLine;
                 }
 
                 if (ExtensionArgumentArityAreInvalid(out string? arityErrors, tool))
                 {
-                    await _platformOutputDevice.DisplayAsync(this, FormattedTextOutputDeviceDataBuilder.CreateRedConsoleColorText(arityErrors));
-                    return ExitCodes.InvalidCommandLine;
+                    await _outputDevice.DisplayAsync(this, new ErrorMessageOutputDeviceData(arityErrors), cancellationToken).ConfigureAwait(false);
+                    return (int)ExitCode.InvalidCommandLine;
                 }
 
-                ValidationResult optionsArgumentsValidationResult = await ValidateOptionsArgumentsAsync(tool);
+                ValidationResult optionsArgumentsValidationResult = await ValidateOptionsArgumentsAsync(tool).ConfigureAwait(false);
                 if (!optionsArgumentsValidationResult.IsValid)
                 {
-                    await _platformOutputDevice.DisplayAsync(this, FormattedTextOutputDeviceDataBuilder.CreateRedConsoleColorText(optionsArgumentsValidationResult.ErrorMessage));
-                    return ExitCodes.InvalidCommandLine;
+                    await _outputDevice.DisplayAsync(this, new ErrorMessageOutputDeviceData(optionsArgumentsValidationResult.ErrorMessage), cancellationToken).ConfigureAwait(false);
+                    return (int)ExitCode.InvalidCommandLine;
                 }
 
-                return await tool.RunAsync();
+                return await tool.RunAsync(cancellationToken).ConfigureAwait(false);
             }
         }
 
-        await _platformOutputDevice.DisplayAsync(this, FormattedTextOutputDeviceDataBuilder.CreateRedConsoleColorText($"Tool '{toolNameToRun}' not found in the list of registered tools."));
-        await _commandLineHandler.PrintHelpAsync();
-        return ExitCodes.InvalidCommandLine;
+        await _outputDevice.DisplayAsync(this, new ErrorMessageOutputDeviceData($"Tool '{toolNameToRun}' not found in the list of registered tools."), cancellationToken).ConfigureAwait(false);
+        await _commandLineHandler.PrintHelpAsync(_outputDevice, null, cancellationToken).ConfigureAwait(false);
+        return (int)ExitCode.InvalidCommandLine;
     }
 
     private bool UnknownOptions([NotNullWhen(true)] out string? error, ITool tool)
@@ -100,19 +93,19 @@ internal sealed class ToolsTestHost(
         error = null;
 
         // This is unexpected
-        if (_parseResult is null)
+        if (_commandLineHandler.ParseResult is null)
         {
             return false;
         }
 
         StringBuilder stringBuilder = new();
-        foreach (OptionRecord optionRecord in _parseResult.Options)
+        foreach (CommandLineParseOption optionRecord in _commandLineHandler.ParseResult.Options)
         {
-            if (!GetAllCommandLineOptionsProviderByOptionName(optionRecord.Option).Any())
+            if (!GetAllCommandLineOptionsProviderByOptionName(optionRecord.Name).Any())
             {
                 stringBuilder.AppendLine(
                     CultureInfo.InvariantCulture,
-                    $"Unknown option '{optionRecord.Option}' for tool '{tool.DisplayName}'.");
+                    $"Unknown option '{optionRecord.Name}' for tool '{tool.DisplayName}'.");
             }
         }
 
@@ -129,14 +122,8 @@ internal sealed class ToolsTestHost(
     {
         error = null;
 
-        // This is unexpected
-        if (_parseResult is null)
-        {
-            return false;
-        }
-
         StringBuilder stringBuilder = new();
-        foreach (IGrouping<string, OptionRecord> optionRecord in _parseResult.Options.GroupBy(x => x.Option))
+        foreach (IGrouping<string, CommandLineParseOption> optionRecord in _commandLineHandler.ParseResult.Options.GroupBy(x => x.Name))
         {
             string optionName = optionRecord.Key;
             int arity = optionRecord.Count();
@@ -150,11 +137,11 @@ internal sealed class ToolsTestHost(
             }
         }
 
-        foreach (ICommandLineOptionsProvider extension in _extensionsCommandLineOptionsProviders)
+        foreach (ICommandLineOptionsProvider extension in _commandLineHandler.ExtensionsCommandLineOptionsProviders)
         {
             foreach (CommandLineOption option in extension.GetCommandLineOptions())
             {
-                if (_parseResult.Options.Count(x => x.Option == option.Name) < option.Arity.Min)
+                if (_commandLineHandler.ParseResult.Options.Count(x => x.Name == option.Name) < option.Arity.Min)
                 {
                     stringBuilder.AppendLine(
                         CultureInfo.InvariantCulture,
@@ -174,20 +161,14 @@ internal sealed class ToolsTestHost(
 
     private async Task<ValidationResult> ValidateOptionsArgumentsAsync(ITool tool)
     {
-        // This is unexpected
-        if (_parseResult is null)
-        {
-            return ValidationResult.Invalid("Parse result should not be null");
-        }
-
         StringBuilder stringBuilder = new();
-        foreach (OptionRecord optionRecord in _parseResult.Options)
+        foreach (CommandLineParseOption optionRecord in _commandLineHandler.ParseResult.Options)
         {
-            ICommandLineOptionsProvider extension = GetAllCommandLineOptionsProviderByOptionName(optionRecord.Option).Single();
-            var result = await extension.ValidateOptionArgumentsAsync(extension.GetCommandLineOptions().Single(x => x.Name == optionRecord.Option), optionRecord.Arguments);
+            ICommandLineOptionsProvider extension = GetAllCommandLineOptionsProviderByOptionName(optionRecord.Name).Single();
+            ValidationResult result = await extension.ValidateOptionArgumentsAsync(extension.GetCommandLineOptions().Single(x => x.Name == optionRecord.Name), optionRecord.Arguments).ConfigureAwait(false);
             if (!result.IsValid)
             {
-                stringBuilder.AppendLine(CultureInfo.InvariantCulture, $"Invalid arguments for option '--{optionRecord.Option}': {result.ErrorMessage}, tool {tool.DisplayName}");
+                stringBuilder.AppendLine(CultureInfo.InvariantCulture, $"Invalid arguments for option '--{optionRecord.Name}': {result.ErrorMessage}, tool {tool.DisplayName}");
             }
         }
 
@@ -198,7 +179,7 @@ internal sealed class ToolsTestHost(
 
     private IEnumerable<ICommandLineOptionsProvider> GetAllCommandLineOptionsProviderByOptionName(string optionName)
     {
-        foreach (ICommandLineOptionsProvider commandLineOptionsProvider in _extensionsCommandLineOptionsProviders)
+        foreach (ICommandLineOptionsProvider commandLineOptionsProvider in _commandLineHandler.ExtensionsCommandLineOptionsProviders)
         {
             if (commandLineOptionsProvider.GetCommandLineOptions().Any(option => option.Name == optionName))
             {

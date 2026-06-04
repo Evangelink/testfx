@@ -1,7 +1,7 @@
-# 001 - MSTest Runner Protocol
+# 001 - Microsoft.Testing.Platform JSON-RPC Protocol (formerly MSTest Runner Protocol)
 
-MSTest Runner projects builds into a self-contained executable that can be invoked to run tests.
-The protocol describes the communication between the client (IDE/CLI/CI) any the MSTest Runner executable (also refered to as the server).
+Microsoft.Testing.Platform projects builds into a self-sufficient executable that can be invoked to run tests.
+The protocol describes the communication between the client (IDE/CLI/CI) and a test runner executable (also referred to as the server).
 
 The communication is based on JSON-RPC and describes the RPC messages sent in order to support running of tests.
 
@@ -18,6 +18,7 @@ Here's the current list of APIs that supported by the client.
   - [testing/discoverTests](#discovery-of-tests) - Requests a server to discover tests without executing them
   - [testing/runTests](#execution-of-tests) - Requests a server to execute tests and report their results
   - [testing/testUpdates/tests](#discovery-of-tests) - Notifies client about test updates (test cases and test results)
+  - [testing/testUpdates/attachments](#execution-of-tests) - Notifies client about additional attachments (trx/coverage)
 - Client notifications updates
   - [client/launchDebugger](#launch-debugger) - Requests a client to launch a process with debugger attached to it
   - [client/attachDebugger](#attach-debugger) - Requests a client to attach a debugger to a process by pid
@@ -32,7 +33,7 @@ Here's the current list of APIs that supported by the client.
 The protocol is extensible, where the client and the server handshake the capabilities they support.
 
 For instance not all servers need to support [IDE integration](./003-protocol-ide-integration-extensions.md) or new versions
-of the MSTest runner, might support additional RPC requests/responses or add additional properties to the payloads.
+of the Microsoft.Testing.Platform, might support additional RPC requests/responses or add additional properties to the payloads.
 
 [IDE integration](./003-protocol-ide-integration-extensions.md) describes the protocol extensions used to support features like run from editor and how to control the values shown in the test explorer.
 
@@ -179,7 +180,7 @@ what the client supports and limit functionality based on unsupported features.
 ### Determine capabilities during test runner initialization
 
 > [!NOTE]
-> Capabilities initialiation is based on the `initialize` request from LSP.
+> Capabilities initialization is based on the `initialize` request from LSP.
 > In theory this allows any LSP server to also act as a test runner server, as long as it handles the additional RPC requests.
 
 Request:
@@ -217,6 +218,22 @@ interface InitializeParams {
         testing: {
             // If true, the client supports the client/attachDebugger and client/launchDebugger requests.
             debuggerProvider: true,
+
+            // If true, the client can receive a batch of log messages under client/log request.
+            batchLoggingSupport: true,
+
+            // If true, the client supports the testing/testUpdates/attachments request.
+            attachmentsSupport: true,
+
+            // If true, the client support a port to which child processes
+            // can connect to.
+            // Note: The test runner is expected to ensure the synchronization of messages
+            // for instance if additional processes are sending test updates
+            // or attachment updates, these must complete before the
+            // test runner sends the completion notification.
+            callbackProvider: {
+                port: integer
+            }
         },
     }
 }
@@ -242,6 +259,12 @@ interface InitializeResponse {
             // This has a potential performance benefit, where startup time and time to load test assemblies/sources
             // only needs to occur once.
             experimental_multiRequestSupport: boolean;
+
+            // If true, the server will send attachments, on top
+            // of test updates during test runs.
+            // The client will then wait on both to complete,
+            // before it marks a test run as completed.
+            attachmentsProvider?: boolean;
         },
     }
 }
@@ -249,7 +272,7 @@ interface InitializeResponse {
 
 #### Versioning capabilities
 
-Any behaviour changes should be announced via capabilities, where the client/server
+Any behavior changes should be announced via capabilities, where the client/server
 should announce what kinds of additional RPC requests and responses they can handle.
 
 For instance, let's say the server would like to be make the file/line location lazy.
@@ -259,13 +282,22 @@ If the capability is missing/or false the server should assume that the client w
 lazy locations and send the full location.
 
 > [!NOTE]
-> Discovery/Run requests, as well as TestNode format specified in the intial release of the protocol
+> Discovery/Run requests, as well as TestNode format specified in the initial release of the protocol
 > should be supported by all clients/servers.
 > As such, they're not expressed via capabilities.
 
+## Callback provider
+
+In some cases the test runner might want to start additional child processes. If client has the `testing.callbackProvider` capability, the client
+will provide a port for multiple connections.
+
+This allows for instance for the test runner to start multiple child processes that it distributes test run over, while each of these child processes can directly send callbacks to the client with test node updates, rather than have to relay all information via the main test runner node.
+
+Another use case is the collection of hang dumps, crash dumps, in which case the test runner node might crash, while the hang dump watcher process can still send back the hang dump/crash dump attachment, even after the crash.
+
 ## Discovery and run requests
 
-The two most basic features that the MSTest runner should provide is the capability to discover and run tests.
+The two most basic features that the a test runner should provide is the capability to discover and run tests.
 
 Since, in most cases the runner loads and runs user code in the runner's process, the expected lifetime of
 the test runner is a single run.
@@ -337,6 +369,12 @@ interface TestNode {
     // Example: "location.line-end": 9,
     'location.line-end'?: number;
 
+    // Standard output associated with the test node
+    'standardOutput'?: string;
+
+    // Standard error associated with the test node
+    'standardError'?: string;
+
     // Result properties:
 
     // Example: "execution-state": "failed",
@@ -355,12 +393,6 @@ interface TestNode {
 
     // Example: "time.duration-ms": 45.8143,
     'time.duration-ms'?: number;
-
-    // Example: "time.start-utc": "2023-06-20T11:09:41.6882661+00:00"
-    'time.start-utc'?: string;
-
-    // Example: "time.stop-utc": "2023-06-20T11:09:41.6882661+00:00"
-    'time.stop-utc'?: string;
 
     // Note: The error consists of the stacktrace, error message and also the assertion properties.
     // If assertion properties are missing the exception would show in the UI as:
@@ -530,7 +562,21 @@ Notifications:
       As soon as the client processes this notification it is guaranteed to be done
       processing all node update notifications.
   - method: `testing/testUpdates/tests`
-  - params: `TestUpdateNotificationParams` where `params.children == null`.
+  - params: `TestUpdateNotificationParams` where `params.testCases == null`.
+- Attachment updates
+  - method: `testing/testUpdates/attachments`
+  - params: `AttachmentUpdatesParams` defined as follows:
+
+    ```typescript
+    interface AttachmentUpdatesParams {
+        attachments?: Attachment[],
+        runId: GUID
+    }
+    ```
+
+- Attachment updates completes
+    method: `testing/testUpdates/attachments`
+    params: `AttachmentUpdatesParams` where `params.attachments == null`
 
 Response:
 
@@ -621,7 +667,7 @@ There should be a generic way of cancelling requests,
 whether it's a discovery request or a run request.
 
 This would make it possible to cancel discovery/run requests,
-or request the client to cancel launching of a debugger process if necesary.
+or request the client to cancel launching of a debugger process if necessary.
 
 Notification:
 
@@ -707,11 +753,37 @@ Messages are logged to the output window.
 Notification:
 
 - method: `client/log`
-- params: `LogMessageParams` defined as follows:
+- params: `LogMessageParams | BatchLogMessageParams` defined as follows:
+- capability: If `testing.batchLoggingSupport` is true, the server can send BatchLogMessageParams instead.
+  The client will check the existence of `messages` property to determine if a batch was sent instead of a single
+  message. If `testing.batchLoggingSupport` is false, the server cannot send `BatchLogMessageParams` messages to the client.
 
 ```typescript
 interface LogMessageParams {
     level: TestingPlatformLogLevel;
+    message: string;
+}
+```
+
+```typescript
+interface BatchLogMessageParams {
+    // If specified the message batch should be attributed to a specific run.
+    // Specifically, combined with the nodeUid, property the client should attribute
+    // the messages to a specific TestNode, rather than render them globally.
+    runId?: GUID;
+
+    // List of messages to log.
+    messages: LogMessage[];
+}
+
+interface LogMessage {
+    // If a log message should be attributed to a single node, rather than be global.
+    nodeUid?: GUID;
+
+    // The level of a single log message.
+    // Messages can have different log levels within a batch.
+    level: TestingPlatformLogLevel;
+
     message: string;
 }
 ```

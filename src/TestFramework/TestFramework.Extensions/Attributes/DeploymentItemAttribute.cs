@@ -1,7 +1,9 @@
-// Copyright (c) Microsoft Corporation. All rights reserved.
+﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 namespace Microsoft.VisualStudio.TestTools.UnitTesting;
+
+#if !WINDOWS_UWP && !WIN_UI
 
 /// <summary>
 /// Used to specify deployment item (file or directory) per-test deployment for copying files or folders specified as deployment items to the <see cref="TestContext"/>.DeploymentDirectory.
@@ -21,14 +23,9 @@ namespace Microsoft.VisualStudio.TestTools.UnitTesting;
 /// [DeploymentItem("bin\Debug")].
 /// </example>
 [AttributeUsage(AttributeTargets.Method | AttributeTargets.Class, AllowMultiple = true)]
-#if WINDOWS_UWP || WIN_UI
-// Putting this in here so that UWP discovery works. We still do not want users to be using DeploymentItem in the UWP world - Hence making it internal.
-// We should separate out DeploymentItem logic in the adapter via a Framework extensibility point.
-// Filed https://github.com/Microsoft/testfx/issues/100 to track this.
-internal sealed class DeploymentItemAttribute : Attribute
-#else
+// TODO: This API should not exist in the netstandard2.0 build, because it's not available in UWP/WinUI.
+// This is a binary breaking change, however.
 public sealed class DeploymentItemAttribute : Attribute
-#endif
 {
     /// <summary>
     /// Initializes a new instance of the <see cref="DeploymentItemAttribute"/> class.
@@ -61,3 +58,4 @@ public sealed class DeploymentItemAttribute : Attribute
     /// </summary>
     public string? OutputDirectory { get; }
 }
+#endif

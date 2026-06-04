@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
@@ -11,12 +11,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\MSTest.Analyzers\MSTest.Analyzers.csproj" />
+    <Compile Include="$(RepoRoot)src/Polyfills/**/*.cs" Link="Polyfills\%(RecursiveDir)%(Filename)%(Extension)" />
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Update="CodeFixResources.Designer.cs" DesignTime="True" AutoGen="True" DependentUpon="CodeFixResources.resx" />
-    <EmbeddedResource Update="CodeFixResources.resx" Generator="ResXFileCodeGenerator" LastGenOutput="CodeFixResources.Designer.cs" />
+    <ProjectReference Include="$(RepoRoot)src\Analyzers\MSTest.Analyzers\MSTest.Analyzers.csproj" />
   </ItemGroup>
 
 </Project>

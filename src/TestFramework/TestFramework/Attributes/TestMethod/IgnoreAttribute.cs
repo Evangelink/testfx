@@ -4,13 +4,16 @@
 namespace Microsoft.VisualStudio.TestTools.UnitTesting;
 
 /// <summary>
-/// The ignore attribute.
+/// This attribute is used to ignore a test class or a test method, with an optional message.
 /// </summary>
-[AttributeUsage(AttributeTargets.Class | AttributeTargets.Method, AllowMultiple = false)]
-public sealed class IgnoreAttribute : Attribute
+/// <remarks>
+/// This attribute isn't inherited. Applying it to a base class will not cause derived classes to be ignored.
+/// </remarks>
+[AttributeUsage(AttributeTargets.Class | AttributeTargets.Method, Inherited = false)]
+public sealed class IgnoreAttribute : ConditionBaseAttribute
 {
     /// <summary>
-    /// Initializes a new instance of the <see cref="IgnoreAttribute"/> class.
+    /// Initializes a new instance of the <see cref="IgnoreAttribute"/> class with an empty message.
     /// </summary>
     public IgnoreAttribute()
         : this(string.Empty)
@@ -24,12 +27,12 @@ public sealed class IgnoreAttribute : Attribute
     /// Message specifies reason for ignoring.
     /// </param>
     public IgnoreAttribute(string? message)
-    {
-        IgnoreMessage = message;
-    }
+        : base(ConditionMode.Include)
+        => IgnoreMessage = message;
 
-    /// <summary>
-    /// Gets the owner.
-    /// </summary>
-    public string? IgnoreMessage { get; }
+    /// <inheritdoc />
+    public override bool IsConditionMet => false;
+
+    /// <inheritdoc />
+    public override string GroupName => "Ignore";
 }

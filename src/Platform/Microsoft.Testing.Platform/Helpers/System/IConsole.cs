@@ -8,33 +8,67 @@ namespace Microsoft.Testing.Platform.Helpers;
 /// </summary>
 internal interface IConsole
 {
+    [UnsupportedOSPlatform("android")]
+    [UnsupportedOSPlatform("ios")]
+    [UnsupportedOSPlatform("tvos")]
+    [UnsupportedOSPlatform("browser")]
+    [UnsupportedOSPlatform("wasi")]
     event ConsoleCancelEventHandler? CancelKeyPress;
 
+    [UnsupportedOSPlatform("android")]
+    [UnsupportedOSPlatform("browser")]
+    [UnsupportedOSPlatform("ios")]
+    [UnsupportedOSPlatform("tvos")]
+    [UnsupportedOSPlatform("wasi")]
+    int BufferHeight { get; }
+
+    [UnsupportedOSPlatform("android")]
+    [UnsupportedOSPlatform("browser")]
+    [UnsupportedOSPlatform("ios")]
+    [UnsupportedOSPlatform("tvos")]
+    [UnsupportedOSPlatform("wasi")]
+    int BufferWidth { get; }
+
+    [UnsupportedOSPlatform("android")]
+    [UnsupportedOSPlatform("browser")]
+    [UnsupportedOSPlatform("ios")]
+    [UnsupportedOSPlatform("tvos")]
+    [UnsupportedOSPlatform("wasi")]
+    int WindowHeight { get; }
+
+    [UnsupportedOSPlatform("android")]
+    [UnsupportedOSPlatform("browser")]
+    [UnsupportedOSPlatform("ios")]
+    [UnsupportedOSPlatform("tvos")]
+    [UnsupportedOSPlatform("wasi")]
+    int WindowWidth { get; }
+
+    bool IsOutputRedirected { get; }
+
+    [UnsupportedOSPlatform("android")]
+    [UnsupportedOSPlatform("ios")]
+    [UnsupportedOSPlatform("tvos")]
+    [UnsupportedOSPlatform("browser")]
+    [UnsupportedOSPlatform("wasi")]
     void SetForegroundColor(ConsoleColor color);
 
-    void SetBackgroundColor(ConsoleColor color);
-
+    [UnsupportedOSPlatform("android")]
+    [UnsupportedOSPlatform("ios")]
+    [UnsupportedOSPlatform("tvos")]
+    [UnsupportedOSPlatform("browser")]
+    [UnsupportedOSPlatform("wasi")]
     ConsoleColor GetForegroundColor();
-
-    ConsoleColor GetBackgroundColor();
 
     void WriteLine();
 
     void WriteLine(string? value);
 
-    void WriteLine(object? value);
-
-    void WriteLine(string format, object? arg0);
-
-    void WriteLine(string format, object? arg0, object? arg1);
-
-    void WriteLine(string format, object? arg0, object? arg1, object? arg2);
-
-    void WriteLine(string format, object?[]? args);
-
-    void Write(string format, object?[]? args);
-
     void Write(string? value);
 
+    void Write(char value);
+
+    [UnsupportedOSPlatform("android")]
+    [UnsupportedOSPlatform("ios")]
+    [UnsupportedOSPlatform("tvos")]
     void Clear();
 }

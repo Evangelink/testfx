@@ -2,68 +2,46 @@
 
   <PropertyGroup>
     <TargetFrameworks>$(NetCurrent)</TargetFrameworks>
-    <UseVSTestRunner>false</UseVSTestRunner>
-    <ImplicitUsings>true</ImplicitUsings>
-    <Nullable>enable</Nullable>
-    <GenerateProgramFile>false</GenerateProgramFile>
     <TestRunnerAdditionalArguments>$(TestRunnerAdditionalArguments) --retry-failed-tests 3</TestRunnerAdditionalArguments>
+    <EnableMSTestRunner>true</EnableMSTestRunner>
     <OutputType>Exe</OutputType>
+    <DefineConstants Condition=" '$(FastAcceptanceTest)' == 'true'">$(DefineConstants);SKIP_INTERMEDIATE_TARGET_FRAMEWORKS</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Embedded helpers from Microsoft.Testing.Platform -->
+    <Compile Include="$(RepoRoot)src\Platform\Microsoft.Testing.Platform\Helpers\ApplicationStateGuard.cs" Link="Helpers\ApplicationStateGuard.cs" />
+    <Compile Include="$(RepoRoot)src\Platform\Microsoft.Testing.Platform\Helpers\EnvironmentVariableConstants.cs" Link="Helpers\EnvironmentVariableConstants.cs" />
+    <Compile Include="$(RepoRoot)src\Platform\Microsoft.Testing.Platform\Helpers\ExitCodes.cs" Link="Helpers\ExitCodes.cs" />
+    <Compile Include="$(RepoRoot)src\Platform\Microsoft.Testing.Platform\Resources\PlatformResources.cs" Link="Resources\PlatformResources.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="MSBuild.StructuredLogger" />
-    <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" />
-    <PackageReference Include="Microsoft.Testing.Extensions.Retry" />
-    <PackageReference Include="Microsoft.Testing.Extensions.CrashDump" GeneratePathProperty="True" />
-    <PackageReference Include="Microsoft.Testing.Extensions.TrxReport" GeneratePathProperty="True" />
-    <PackageReference Include="Microsoft.Testing.Internal.Framework" GeneratePathProperty="True" />
-    <PackageReference Include="Microsoft.Testing.Internal.Framework.SourceGeneration" GeneratePathProperty="True" />
-  </ItemGroup>
-
-  <!-- Packages needed for the test assets but that we don't want to reference -->
-  <ItemGroup>
-    <PackageDownload Include="Microsoft.Testing.Extensions.HangDump" Version="[$(MicrosoftTestingPlatformVersion)]" />
-    <PackageDownload Include="Microsoft.Testing.Extensions.Telemetry" Version="[$(MicrosoftTestingPlatformVersion)]" />
-    <PackageDownload Include="Microsoft.Testing.Extensions.TrxReport.Abstractions" Version="[$(MicrosoftTestingPlatformVersion)]" />
-    <PackageDownload Include="Microsoft.Testing.Extensions.VSTestBridge" Version="[$(MicrosoftTestingPlatformVersion)]" />
-    <PackageDownload Include="Microsoft.Testing.Platform.MSBuild" Version="[$(MicrosoftTestingPlatformVersion)]" />
+    <!-- Transitive dependency of StreamJsonRpc, pinned to fix a security vulnerability -->
+    <PackageReference Include="Nerdbank.MessagePack" />
+    <PackageReference Include="StreamJsonRpc" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="$(RepoRoot)src\Platform\Microsoft.Testing.Platform\Microsoft.Testing.Platform.csproj" />
+    <Compile Include="$(RepoRoot)src/Polyfills/**/*.cs" Link="Polyfills\%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="$(RepoRoot)test\Utilities\Microsoft.Testing.TestInfrastructure\Microsoft.Testing.TestInfrastructure.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="Microsoft.Testing.Platform.Acceptance.IntegrationTests.launcher.config.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="Microsoft.Testing.Platform.Acceptance.IntegrationTests.testingplatformconfig.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="testsbaseline.txt">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
+    <Compile Include="$(RepoRoot)\test\Utilities\Microsoft.Testing.TestInfrastructure\RootFinder.cs" Link="RootFinder.cs" />
   </ItemGroup>
 
-  <Target Name="CopyNuGetPackagesForTestAssets" BeforeTargets="BeforeBuild">
-    <ItemGroup>
-      <MicrosoftTestingExtensionsCrashDumpPackage Include="$(PkgMicrosoft_Testing_Extensions_CrashDump)\microsoft.testing.extensions.crashdump.*.nupkg" />
-      <MicrosoftTestingExtensionsTrxReportPackage Include="$(PkgMicrosoft_Testing_Extensions_TrxReport)\microsoft.testing.extensions.trxreport.*.nupkg" />
-      <MicrosoftTestingInternalFrameworkPackage Include="$(PkgMicrosoft_Testing_Internal_Framework)\microsoft.testing.internal.framework.*.nupkg" />
-      <MicrosoftTestingInternalFrameworkSourceGenerationPackage Include="$(PkgMicrosoft_Testing_Internal_Framework_SourceGeneration)\microsoft.testing.internal.framework.sourcegeneration.*.nupkg" />
-    </ItemGroup>
-
-    <Copy SourceFiles="@(MicrosoftTestingExtensionsCrashDumpPackage)" DestinationFiles="$(ArtifactsTmpDir)/packages/%(Filename)%(Extension)" />
-    <Copy SourceFiles="@(MicrosoftTestingExtensionsTrxReportPackage)" DestinationFiles="$(ArtifactsTmpDir)/packages/%(Filename)%(Extension)" />
-    <Copy SourceFiles="@(MicrosoftTestingInternalFrameworkPackage)" DestinationFiles="$(ArtifactsTmpDir)/packages/%(Filename)%(Extension)" />
-    <Copy SourceFiles="@(MicrosoftTestingInternalFrameworkSourceGenerationPackage)" DestinationFiles="$(ArtifactsTmpDir)/packages/%(Filename)%(Extension)" />
-
-    <Copy SourceFiles="$(NuGetPackageRoot)microsoft.testing.extensions.hangdump\$(MicrosoftTestingPlatformVersion)\microsoft.testing.extensions.hangdump.$(MicrosoftTestingPlatformVersion).nupkg" DestinationFiles="$(ArtifactsTmpDir)/packages/microsoft.testing.extensions.hangdump.$(MicrosoftTestingPlatformVersion).nupkg" />
-    <Copy SourceFiles="$(NuGetPackageRoot)microsoft.testing.extensions.telemetry\$(MicrosoftTestingPlatformVersion)\microsoft.testing.extensions.telemetry.$(MicrosoftTestingPlatformVersion).nupkg" DestinationFiles="$(ArtifactsTmpDir)/packages/microsoft.testing.extensions.telemetry.$(MicrosoftTestingPlatformVersion).nupkg" />
-    <Copy SourceFiles="$(NuGetPackageRoot)microsoft.testing.extensions.trxreport.abstractions\$(MicrosoftTestingPlatformVersion)\microsoft.testing.extensions.trxreport.abstractions.$(microsofttestingplatformversion).nupkg" DestinationFiles="$(ArtifactsTmpDir)/packages/microsoft.testing.extensions.trxreport.abstractions.$(MicrosoftTestingPlatformVersion).nupkg" />
-    <Copy SourceFiles="$(NuGetPackageRoot)microsoft.testing.extensions.vstestbridge\$(MicrosoftTestingPlatformVersion)\microsoft.testing.extensions.vstestbridge.$(MicrosoftTestingPlatformVersion).nupkg" DestinationFiles="$(ArtifactsTmpDir)/packages/microsoft.testing.extensions.vstestbridge.$(MicrosoftTestingPlatformVersion).nupkg" />
-    <Copy SourceFiles="$(NuGetPackageRoot)microsoft.testing.platform.msbuild\$(MicrosoftTestingPlatformVersion)\microsoft.testing.platform.msbuild.$(MicrosoftTestingPlatformVersion).nupkg" DestinationFiles="$(ArtifactsTmpDir)/packages/microsoft.testing.platform.msbuild.$(MicrosoftTestingPlatformVersion).nupkg" />
-  </Target>
+  <ItemGroup>
+    <Using Include="Microsoft.Testing.Platform.Acceptance.IntegrationTests.Helpers" />
+    <Using Include="Microsoft.Testing.Platform.Builder" />
+    <Using Include="Microsoft.Testing.Platform.Extensions" />
+    <Using Include="Microsoft.Testing.Platform.Helpers" />
+    <Using Include="Microsoft.Testing.TestInfrastructure" />
+    <Using Include="Microsoft.VisualStudio.TestTools.UnitTesting" />
+  </ItemGroup>
 
 </Project>

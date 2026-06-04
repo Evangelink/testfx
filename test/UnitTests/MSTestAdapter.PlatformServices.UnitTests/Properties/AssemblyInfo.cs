@@ -1,9 +1,7 @@
-// Copyright (c) Microsoft Corporation. All rights reserved.
+﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System.Runtime.InteropServices;
-
-#if NET462
+#if NETFRAMEWORK
 using MSTestAdapter.PlatformServices.UnitTests.Utilities;
 
 // Custom attributes for tests.
@@ -12,8 +10,8 @@ using MSTestAdapter.PlatformServices.UnitTests.Utilities;
 #endif
 
 #if NETCOREAPP
-using MSTestAdapter.PlatformServices.Tests.Services;
-using MSTestAdapter.PlatformServices.Tests.Utilities;
+using MSTestAdapter.PlatformServices.UnitTests.Services;
+using MSTestAdapter.PlatformServices.UnitTests.Utilities;
 
 [assembly: ReflectionUtilityTests.DummyA("a1")]
 [assembly: ReflectionUtilityTests.DummyA("a2")]

@@ -1,8 +1,6 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System.Globalization;
-
 using Microsoft.Testing.Platform.Capabilities.TestFramework;
 using Microsoft.Testing.Platform.CommandLine;
 using Microsoft.Testing.Platform.Configurations;
@@ -34,9 +32,9 @@ public static class ServiceProviderExtensions
     public static TService GetRequiredService<TService>(this IServiceProvider provider)
         where TService : notnull
     {
-        ArgumentGuard.IsNotNull(provider);
+        _ = provider ?? throw new ArgumentNullException(nameof(provider));
 
-        object? service = ((ServiceProvider)provider).GetService(typeof(TService));
+        object? service = provider.GetService(typeof(TService));
         ApplicationStateGuard.Ensure(service is not null, string.Format(CultureInfo.InvariantCulture, PlatformResources.ServiceProviderCannotFindServiceErrorMessage, typeof(TService)));
 
         return (TService)service;
@@ -52,9 +50,9 @@ public static class ServiceProviderExtensions
     public static TService? GetService<TService>(this IServiceProvider provider)
         where TService : class
     {
-        ArgumentGuard.IsNotNull(provider);
+        _ = provider ?? throw new ArgumentNullException(nameof(provider));
 
-        return ((ServiceProvider)provider).GetService(typeof(TService)) as TService;
+        return provider.GetService(typeof(TService)) as TService;
     }
 
     /// <summary>
@@ -97,11 +95,20 @@ public static class ServiceProviderExtensions
     public static IOutputDevice GetOutputDevice(this IServiceProvider serviceProvider)
         => serviceProvider.GetRequiredServiceInternal<IOutputDevice>();
 
+    /// <summary>
+    /// Gets the IClientInfo from the <see cref="IServiceProvider"/>.
+    /// </summary>
+    /// <param name="serviceProvider">The service provider.</param>
+    /// <returns>The IClientInfo object.</returns>
+    [Experimental("TPEXP", UrlFormat = "https://aka.ms/testingplatform/diagnostics#{0}")]
+    public static IClientInfo GetClientInfo(this IServiceProvider serviceProvider)
+        => serviceProvider.GetRequiredServiceInternal<IClientInfo>();
+
     // Internals extensions
     internal static TService GetRequiredServiceInternal<TService>(this IServiceProvider provider)
         where TService : notnull
     {
-        ArgumentGuard.IsNotNull(provider);
+        _ = provider ?? throw new ArgumentNullException(nameof(provider));
 
         object? service = ((ServiceProvider)provider).GetServiceInternal(typeof(TService));
         ApplicationStateGuard.Ensure(service is not null, string.Format(CultureInfo.InvariantCulture, PlatformResources.ServiceProviderCannotFindServiceErrorMessage, typeof(TService)));
@@ -112,7 +119,7 @@ public static class ServiceProviderExtensions
     internal static TService? GetServiceInternal<TService>(this IServiceProvider provider)
         where TService : class
     {
-        ArgumentGuard.IsNotNull(provider);
+        _ = provider ?? throw new ArgumentNullException(nameof(provider));
 
         return ((ServiceProvider)provider).GetServiceInternal(typeof(TService)) as TService;
     }
@@ -120,7 +127,7 @@ public static class ServiceProviderExtensions
     internal static IEnumerable<TService> GetServicesInternal<TService>(this IServiceProvider provider)
         where TService : notnull
     {
-        ArgumentGuard.IsNotNull(provider);
+        _ = provider ?? throw new ArgumentNullException(nameof(provider));
 
         return ((ServiceProvider)provider).GetServicesInternal(typeof(TService)).Cast<TService>();
     }
@@ -167,9 +174,6 @@ public static class ServiceProviderExtensions
     internal static ITestApplicationProcessExitCode GetTestApplicationProcessExitCode(this IServiceProvider serviceProvider)
         => serviceProvider.GetRequiredServiceInternal<ITestApplicationProcessExitCode>();
 
-    internal static IMonitor GetMonitor(this IServiceProvider serviceProvider)
-        => serviceProvider.GetRequiredServiceInternal<IMonitor>();
-
     internal static ITestApplicationCancellationTokenSource GetTestApplicationCancellationTokenSource(this IServiceProvider serviceProvider)
         => serviceProvider.GetRequiredServiceInternal<ITestApplicationCancellationTokenSource>();
 
@@ -182,7 +186,7 @@ public static class ServiceProviderExtensions
     internal static ITestFramework GetTestFramework(this IServiceProvider serviceProvider)
         => serviceProvider.GetRequiredServiceInternal<ITestFramework>();
 
-    internal static ITestFrameworkInvoker GetTestAdapterInvoker(this IServiceProvider serviceProvider)
+    internal static ITestFrameworkInvoker GetTestFrameworkInvoker(this IServiceProvider serviceProvider)
         => serviceProvider.GetRequiredServiceInternal<ITestFrameworkInvoker>();
 
     internal static IUnhandledExceptionsPolicy GetUnhandledExceptionsPolicy(this IServiceProvider serviceProvider)
@@ -197,6 +201,12 @@ public static class ServiceProviderExtensions
     internal static ITestFrameworkCapabilities GetTestFrameworkCapabilities(this IServiceProvider serviceProvider)
         => serviceProvider.GetRequiredServiceInternal<ITestFrameworkCapabilities>();
 
-    internal static CommandLineParseResult GetCommandLineParseResult(this IServiceProvider serviceProvider)
-        => serviceProvider.GetRequiredServiceInternal<ApplicationLoggingState>().CommandLineParseResult;
+    internal static IPlatformInformation GetPlatformInformation(this IServiceProvider serviceProvider)
+        => serviceProvider.GetRequiredServiceInternal<IPlatformInformation>();
+
+    internal static IFileLoggerInformation? GetFileLoggerInformation(this IServiceProvider serviceProvider)
+        => serviceProvider.GetServiceInternal<IFileLoggerInformation>();
+
+    internal static IPlatformOpenTelemetryService? GetPlatformOTelService(this IServiceProvider serviceProvider)
+        => serviceProvider.GetServiceInternal<IPlatformOpenTelemetryService>();
 }

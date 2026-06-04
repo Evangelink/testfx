@@ -1,9 +1,11 @@
-// Copyright (c) Microsoft Corporation. All rights reserved.
+﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System.Globalization;
+using System.ComponentModel;
 
 namespace Microsoft.VisualStudio.TestTools.UnitTesting;
+
+#pragma warning disable RS0026 // Do not add multiple public overloads with optional parameters
 
 /// <summary>
 /// A collection of helper classes to test various conditions within
@@ -12,98 +14,218 @@ namespace Microsoft.VisualStudio.TestTools.UnitTesting;
 /// </summary>
 public sealed partial class Assert
 {
-    /// <summary>
-    /// Tests whether the specified objects both refer to the same object and
-    /// throws an exception if the two inputs do not refer to the same object.
-    /// </summary>
-    /// <typeparam name="T">
-    /// The type of values to compare.
-    /// </typeparam>
-    /// <param name="expected">
-    /// The first object to compare. This is the value the test expects.
-    /// </param>
-    /// <param name="actual">
-    /// The second object to compare. This is the value produced by the code under test.
-    /// </param>
-    /// <exception cref="AssertFailedException">
-    /// Thrown if <paramref name="expected"/> does not refer to the same object
-    /// as <paramref name="actual"/>.
-    /// </exception>
-    public static void AreSame<T>(T? expected, T? actual)
-        => AreSame(expected, actual, string.Empty, null);
-
-    /// <summary>
-    /// Tests whether the specified objects both refer to the same object and
-    /// throws an exception if the two inputs do not refer to the same object.
-    /// </summary>
-    /// <typeparam name="T">
-    /// The type of values to compare.
-    /// </typeparam>
-    /// <param name="expected">
-    /// The first object to compare. This is the value the test expects.
-    /// </param>
-    /// <param name="actual">
-    /// The second object to compare. This is the value produced by the code under test.
-    /// </param>
-    /// <param name="message">
-    /// The message to include in the exception when <paramref name="actual"/>
-    /// is not the same as <paramref name="expected"/>. The message is shown
-    /// in test results.
-    /// </param>
-    /// <exception cref="AssertFailedException">
-    /// Thrown if <paramref name="expected"/> does not refer to the same object
-    /// as <paramref name="actual"/>.
-    /// </exception>
-    public static void AreSame<T>(T? expected, T? actual, string? message)
-        => AreSame(expected, actual, message, null);
-
-    /// <summary>
-    /// Tests whether the specified objects both refer to the same object and
-    /// throws an exception if the two inputs do not refer to the same object.
-    /// </summary>
-    /// <typeparam name="T">
-    /// The type of values to compare.
-    /// </typeparam>
-    /// <param name="expected">
-    /// The first object to compare. This is the value the test expects.
-    /// </param>
-    /// <param name="actual">
-    /// The second object to compare. This is the value produced by the code under test.
-    /// </param>
-    /// <param name="message">
-    /// The message to include in the exception when <paramref name="actual"/>
-    /// is not the same as <paramref name="expected"/>. The message is shown
-    /// in test results.
-    /// </param>
-    /// <param name="parameters">
-    /// An array of parameters to use when formatting <paramref name="message"/>.
-    /// </param>
-    /// <exception cref="AssertFailedException">
-    /// Thrown if <paramref name="expected"/> does not refer to the same object
-    /// as <paramref name="actual"/>.
-    /// </exception>
-    public static void AreSame<T>(T? expected, T? actual, string? message, params object?[]? parameters)
+    [StackTraceHidden]
+    [InterpolatedStringHandler]
+    [EditorBrowsable(EditorBrowsableState.Never)]
+#pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
+    public readonly struct AssertAreSameInterpolatedStringHandler<TArgument>
     {
-        if (ReferenceEquals(expected, actual))
+        private readonly StringBuilder? _builder;
+        private readonly TArgument? _expected;
+        private readonly TArgument? _actual;
+
+        public AssertAreSameInterpolatedStringHandler(int literalLength, int formattedCount, TArgument? expected, TArgument? actual, out bool shouldAppend)
+        {
+            _expected = expected;
+            _actual = actual;
+            shouldAppend = IsAreSameFailing(expected, actual);
+            if (shouldAppend)
+            {
+                _builder = new StringBuilder(literalLength + formattedCount);
+            }
+        }
+
+        internal void ComputeAssertion(string expectedExpression, string actualExpression)
+        {
+            if (_builder is not null)
+            {
+                ReportAssertAreSameFailed(_expected, _actual, _builder.ToString(), expectedExpression, actualExpression);
+            }
+        }
+
+        public void AppendLiteral(string value) => _builder!.Append(value);
+
+        public void AppendFormatted<T>(T value) => AppendFormatted(value, format: null);
+
+#if NETCOREAPP3_1_OR_GREATER
+        public void AppendFormatted(ReadOnlySpan<char> value) => _builder!.Append(value);
+
+#pragma warning disable RS0027 // API with optional parameter(s) should have the most parameters amongst its public overloads
+        public void AppendFormatted(ReadOnlySpan<char> value, int alignment = 0, string? format = null) => AppendFormatted(value.ToString(), alignment, format);
+#pragma warning restore RS0027 // API with optional parameter(s) should have the most parameters amongst its public overloads
+#endif
+
+        // NOTE: All the overloads involving format and/or alignment are not super efficient.
+        // This code path is only for when an assert is failing, so that's not the common scenario
+        // and should be okay if not very optimized.
+        // A more efficient implementation that can be used for .NET 6 and later is to delegate the work to
+        // the BCL's StringBuilder.AppendInterpolatedStringHandler
+        public void AppendFormatted<T>(T value, string? format) => _builder!.AppendFormat(null, $"{{0:{format}}}", value);
+
+        public void AppendFormatted<T>(T value, int alignment) => _builder!.AppendFormat(null, $"{{0,{alignment}}}", value);
+
+        public void AppendFormatted<T>(T value, int alignment, string? format) => _builder!.AppendFormat(null, $"{{0,{alignment}:{format}}}", value);
+
+        public void AppendFormatted(string? value) => _builder!.Append(value);
+
+#pragma warning disable RS0027 // API with optional parameter(s) should have the most parameters amongst its public overloads
+        public void AppendFormatted(string? value, int alignment = 0, string? format = null) => _builder!.AppendFormat(null, $"{{0,{alignment}:{format}}}", value);
+
+        public void AppendFormatted(object? value, int alignment = 0, string? format = null) => _builder!.AppendFormat(null, $"{{0,{alignment}:{format}}}", value);
+#pragma warning restore RS0027 // API with optional parameter(s) should have the most parameters amongst its public overloads
+    }
+
+    [StackTraceHidden]
+    [InterpolatedStringHandler]
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    public readonly struct AssertAreNotSameInterpolatedStringHandler<TArgument>
+    {
+        private readonly StringBuilder? _builder;
+        private readonly TArgument? _notExpected;
+        private readonly TArgument? _actual;
+
+        public AssertAreNotSameInterpolatedStringHandler(int literalLength, int formattedCount, TArgument? notExpected, TArgument? actual, out bool shouldAppend)
+        {
+            _notExpected = notExpected;
+            _actual = actual;
+            shouldAppend = IsAreNotSameFailing(notExpected, actual);
+            if (shouldAppend)
+            {
+                _builder = new StringBuilder(literalLength + formattedCount);
+            }
+        }
+
+        internal void ComputeAssertion(string notExpectedExpression, string actualExpression)
+        {
+            if (_builder is not null)
+            {
+                ReportAssertAreNotSameFailed(_notExpected, _actual, _builder.ToString(), notExpectedExpression, actualExpression);
+            }
+        }
+
+        public void AppendLiteral(string value) => _builder!.Append(value);
+
+        public void AppendFormatted<T>(T value) => AppendFormatted(value, format: null);
+
+#if NETCOREAPP3_1_OR_GREATER
+        public void AppendFormatted(ReadOnlySpan<char> value) => _builder!.Append(value);
+
+#pragma warning disable RS0027 // API with optional parameter(s) should have the most parameters amongst its public overloads
+        public void AppendFormatted(ReadOnlySpan<char> value, int alignment = 0, string? format = null) => AppendFormatted(value.ToString(), alignment, format);
+#pragma warning restore RS0027 // API with optional parameter(s) should have the most parameters amongst its public overloads
+#endif
+
+        // NOTE: All the overloads involving format and/or alignment are not super efficient.
+        // This code path is only for when an assert is failing, so that's not the common scenario
+        // and should be okay if not very optimized.
+        // A more efficient implementation that can be used for .NET 6 and later is to delegate the work to
+        // the BCL's StringBuilder.AppendInterpolatedStringHandler
+        public void AppendFormatted<T>(T value, string? format) => _builder!.AppendFormat(null, $"{{0:{format}}}", value);
+
+        public void AppendFormatted<T>(T value, int alignment) => _builder!.AppendFormat(null, $"{{0,{alignment}}}", value);
+
+        public void AppendFormatted<T>(T value, int alignment, string? format) => _builder!.AppendFormat(null, $"{{0,{alignment}:{format}}}", value);
+
+        public void AppendFormatted(string? value) => _builder!.Append(value);
+
+#pragma warning disable RS0027 // API with optional parameter(s) should have the most parameters amongst its public overloads
+        public void AppendFormatted(string? value, int alignment = 0, string? format = null) => _builder!.AppendFormat(null, $"{{0,{alignment}:{format}}}", value);
+
+        public void AppendFormatted(object? value, int alignment = 0, string? format = null) => _builder!.AppendFormat(null, $"{{0,{alignment}:{format}}}", value);
+#pragma warning restore RS0027 // API with optional parameter(s) should have the most parameters amongst its public overloads
+    }
+#pragma warning restore CS1591 // Missing XML comment for publicly visible type or member
+
+    /// <inheritdoc cref="AreSame{T}(T, T, string?, string, string)" />
+#pragma warning disable IDE0060 // Remove unused parameter - https://github.com/dotnet/roslyn/issues/76578
+    public static void AreSame<T>(T? expected, T? actual, [InterpolatedStringHandlerArgument(nameof(expected), nameof(actual))] ref AssertAreSameInterpolatedStringHandler<T> message, [CallerArgumentExpression(nameof(expected))] string expectedExpression = "", [CallerArgumentExpression(nameof(actual))] string actualExpression = "")
+#pragma warning restore IDE0060 // Remove unused parameter
+    {
+        TelemetryCollector.TrackAssertionCall("Assert.AreSame");
+        message.ComputeAssertion(expectedExpression, actualExpression);
+    }
+
+#pragma warning disable RS0027 // API with optional parameter(s) should have the most parameters amongst its public overloads
+
+    /// <summary>
+    /// Tests whether the specified objects both refer to the same object and
+    /// throws an exception if the two inputs do not refer to the same object.
+    /// </summary>
+    /// <typeparam name="T">
+    /// The type of values to compare.
+    /// </typeparam>
+    /// <param name="expected">
+    /// The first object to compare. This is the value the test expects.
+    /// </param>
+    /// <param name="actual">
+    /// The second object to compare. This is the value produced by the code under test.
+    /// </param>
+    /// <param name="message">
+    /// The message to include in the exception when <paramref name="actual"/>
+    /// is not the same as <paramref name="expected"/>. The message is shown
+    /// in test results.
+    /// </param>
+    /// <param name="expectedExpression">
+    /// The syntactic expression of expected as given by the compiler via caller argument expression.
+    /// Users shouldn't pass a value for this parameter.
+    /// </param>
+    /// <param name="actualExpression">
+    /// The syntactic expression of actual as given by the compiler via caller argument expression.
+    /// Users shouldn't pass a value for this parameter.
+    /// </param>
+    /// <exception cref="AssertFailedException">
+    /// Thrown if <paramref name="expected"/> does not refer to the same object
+    /// as <paramref name="actual"/>.
+    /// </exception>
+    public static void AreSame<T>(T? expected, T? actual, string? message = "", [CallerArgumentExpression(nameof(expected))] string expectedExpression = "", [CallerArgumentExpression(nameof(actual))] string actualExpression = "")
+    {
+        TelemetryCollector.TrackAssertionCall("Assert.AreSame");
+
+        if (!IsAreSameFailing(expected, actual))
         {
             return;
         }
 
-        string userMessage = BuildUserMessage(message, parameters);
-        string finalMessage = userMessage;
+        ReportAssertAreSameFailed(expected, actual, message, expectedExpression, actualExpression);
+    }
 
-        if (expected is ValueType)
+    private static bool IsAreSameFailing<T>(T? expected, T? actual)
+        => !object.ReferenceEquals(expected, actual);
+
+    [DoesNotReturn]
+    private static void ReportAssertAreSameFailed<T>(T? expected, T? actual, string? userMessage, string expectedExpression, string actualExpression)
+    {
+        StructuredAssertionMessage msg = new("Expected both values to refer to the same object.");
+
+        if (expected is ValueType && actual is ValueType)
         {
-            if (actual is ValueType)
-            {
-                finalMessage = string.Format(
-                    CultureInfo.CurrentCulture,
-                    FrameworkMessages.AreSameGivenValues,
-                    userMessage);
-            }
+            msg.WithAdditionalSummaryLine("Do not pass value types to AreSame \u2014 value types are boxed on each call, so references will never be the same.");
         }
 
-        ThrowAssertFailed("Assert.AreSame", finalMessage);
+        msg.WithUserMessage(userMessage);
+
+        if (expected is not ValueType || actual is not ValueType)
+        {
+            string expectedText = expected is null ? "null" : $"{expected.GetType()} (hash: 0x{RuntimeHelpers.GetHashCode(expected):X})";
+            string actualText = actual is null ? "null" : $"{actual.GetType()} (hash: 0x{RuntimeHelpers.GetHashCode(actual):X})";
+            EvidenceBlock evidence = EvidenceBlock.Create()
+                .AddLine("expected:", expectedText)
+                .AddLine("actual:", actualText);
+            msg.WithEvidence(evidence).WithExpectedAndActual(expectedText, actualText);
+        }
+
+        msg.WithCallSiteExpression(FormatCallSiteExpression("Assert.AreSame", expectedExpression, actualExpression, "<expected>", "<actual>"));
+
+        ReportAssertFailed(msg);
+    }
+
+    /// <inheritdoc cref="AreNotSame{T}(T, T, string?, string, string)" />
+#pragma warning disable IDE0060 // Remove unused parameter - https://github.com/dotnet/roslyn/issues/76578
+    public static void AreNotSame<T>(T? notExpected, T? actual, [InterpolatedStringHandlerArgument(nameof(notExpected), nameof(actual))] ref AssertAreNotSameInterpolatedStringHandler<T> message, [CallerArgumentExpression(nameof(notExpected))] string notExpectedExpression = "", [CallerArgumentExpression(nameof(actual))] string actualExpression = "")
+#pragma warning restore IDE0060 // Remove unused parameter
+    {
+        TelemetryCollector.TrackAssertionCall("Assert.AreNotSame");
+        message.ComputeAssertion(notExpectedExpression, actualExpression);
     }
 
     /// <summary>
@@ -120,70 +242,50 @@ public sealed partial class Assert
     /// <param name="actual">
     /// The second object to compare. This is the value produced by the code under test.
     /// </param>
-    /// <exception cref="AssertFailedException">
-    /// Thrown if <paramref name="notExpected"/> refers to the same object
-    /// as <paramref name="actual"/>.
-    /// </exception>
-    public static void AreNotSame<T>(T? notExpected, T? actual)
-        => AreNotSame(notExpected, actual, string.Empty, null);
-
-    /// <summary>
-    /// Tests whether the specified objects refer to different objects and
-    /// throws an exception if the two inputs refer to the same object.
-    /// </summary>
-    /// <typeparam name="T">
-    /// The type of values to compare.
-    /// </typeparam>
-    /// <param name="notExpected">
-    /// The first object to compare. This is the value the test expects not
-    /// to match <paramref name="actual"/>.
-    /// </param>
-    /// <param name="actual">
-    /// The second object to compare. This is the value produced by the code under test.
-    /// </param>
     /// <param name="message">
     /// The message to include in the exception when <paramref name="actual"/>
     /// is the same as <paramref name="notExpected"/>. The message is shown in
     /// test results.
     /// </param>
-    /// <exception cref="AssertFailedException">
-    /// Thrown if <paramref name="notExpected"/> refers to the same object
-    /// as <paramref name="actual"/>.
-    /// </exception>
-    public static void AreNotSame<T>(T? notExpected, T? actual, string? message)
-        => AreNotSame(notExpected, actual, message, null);
-
-    /// <summary>
-    /// Tests whether the specified objects refer to different objects and
-    /// throws an exception if the two inputs refer to the same object.
-    /// </summary>
-    /// <typeparam name="T">
-    /// The type of values to compare.
-    /// </typeparam>
-    /// <param name="notExpected">
-    /// The first object to compare. This is the value the test expects not
-    /// to match <paramref name="actual"/>.
+    /// <param name="notExpectedExpression">
+    /// The syntactic expression of notExpected as given by the compiler via caller argument expression.
+    /// Users shouldn't pass a value for this parameter.
     /// </param>
-    /// <param name="actual">
-    /// The second object to compare. This is the value produced by the code under test.
-    /// </param>
-    /// <param name="message">
-    /// The message to include in the exception when <paramref name="actual"/>
-    /// is the same as <paramref name="notExpected"/>. The message is shown in
-    /// test results.
-    /// </param>
-    /// <param name="parameters">
-    /// An array of parameters to use when formatting <paramref name="message"/>.
+    /// <param name="actualExpression">
+    /// The syntactic expression of actual as given by the compiler via caller argument expression.
+    /// Users shouldn't pass a value for this parameter.
     /// </param>
     /// <exception cref="AssertFailedException">
     /// Thrown if <paramref name="notExpected"/> refers to the same object
     /// as <paramref name="actual"/>.
     /// </exception>
-    public static void AreNotSame<T>(T? notExpected, T? actual, string? message, params object?[]? parameters)
+    public static void AreNotSame<T>(T? notExpected, T? actual, string? message = "", [CallerArgumentExpression(nameof(notExpected))] string notExpectedExpression = "", [CallerArgumentExpression(nameof(actual))] string actualExpression = "")
     {
-        if (ReferenceEquals(notExpected, actual))
+        TelemetryCollector.TrackAssertionCall("Assert.AreNotSame");
+
+        if (IsAreNotSameFailing(notExpected, actual))
         {
-            ThrowAssertFailed("Assert.AreNotSame", BuildUserMessage(message, parameters));
+            ReportAssertAreNotSameFailed(notExpected, actual, message, notExpectedExpression, actualExpression);
         }
+    }
+
+    private static bool IsAreNotSameFailing<T>(T? notExpected, T? actual)
+        => object.ReferenceEquals(notExpected, actual);
+
+    [DoesNotReturn]
+    private static void ReportAssertAreNotSameFailed<T>(T? notExpected, T? actual, string? userMessage, string notExpectedExpression, string actualExpression)
+    {
+        StructuredAssertionMessage msg = new("Expected values to refer to different objects.");
+
+        msg.WithAdditionalSummaryLine(
+            notExpected is null && actual is null
+                ? "Both values are null."
+                : "Both values refer to the same object.");
+
+        msg.WithUserMessage(userMessage);
+
+        msg.WithCallSiteExpression(FormatCallSiteExpression("Assert.AreNotSame", notExpectedExpression, actualExpression, "<notExpected>", "<actual>"));
+
+        ReportAssertFailed(msg);
     }
 }

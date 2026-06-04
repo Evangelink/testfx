@@ -11,14 +11,14 @@ The key motivation is to complete the execution of a suite of tests, within a si
 
 Coarse-grained parallelization is already supported by vstest, and is available to all test frameworks. That works by launching test execution on each available core as a distinct process, and handing it a container worth of tests (assembly, DLL, or relevant artifact containing the tests to execute) to execute. The unit of isolation is a process. The unit of scheduling is a test container. You can read more about that in our [blogpost](https://blogs.msdn.microsoft.com/visualstudioalm/2016/10/10/parallel-test-execution/).
 
-This document is about providing __finer-grained control__ over parallel execution __via in-assembly parallel execution of tests__ – it enables running tests within an assembly in parallel.
+This document is about providing **finer-grained control** over parallel execution **via in-assembly parallel execution of tests** – it enables running tests within an assembly in parallel.
 
 ## Requirements
 
-1. __Easy onboarding__ - it should be possible to enable parallel execution for existing MSTest V2 code. For e.g. there might be 10s of 100s of test projects participating in a test run - insisting that all of them make changes to their source code to enable parallelism is a barrier to onboarding the feature.
-2. __Fine grained control__ - there might still be certain assemblies, or test classes or test methods within the assembly, that might not be ready for execution in parallel. It should be possible for such artifacts to opt-out of parallel execution. Conversely, there might be only a few assemblies that want to opt-in to parallel execution - that should also be possible.
-3. __Override__ - Parallel execution will have an impact on data collectors. Since test execution will be in parallel, the start/end events marking the execution of a particular test might get interleaved with those of any other test that might be executing in parallel. Therefore it should be possible for a feature that requires data collection to override and OFF all parallel execution. An example of a feature that might want to do this would be TIA (Test Impact Analysis).
-4. __Test lifecycle semantics__ - we will need to clarify the semantics to the various xxxInitialize/xxxCleanup methods.
+1. **Easy onboarding** - it should be possible to enable parallel execution for existing MSTest V2 code. For e.g. there might be 10s of 100s of test projects participating in a test run - insisting that all of them make changes to their source code to enable parallelism is a barrier to onboarding the feature.
+2. **Fine grained control** - there might still be certain assemblies, or test classes or test methods within the assembly, that might not be ready for execution in parallel. It should be possible for such artifacts to opt-out of parallel execution. Conversely, there might be only a few assemblies that want to opt-in to parallel execution - that should also be possible.
+3. **Override** - Parallel execution will have an impact on data collectors. Since test execution will be in parallel, the start/end events marking the execution of a particular test might get interleaved with those of any other test that might be executing in parallel. Therefore it should be possible for a feature that requires data collection to override and OFF all parallel execution. An example of a feature that might want to do this would be TIA (Test Impact Analysis).
+4. **Test lifecycle semantics** - we will need to clarify the semantics to the various xxxInitialize/xxxCleanup methods.
 
 ## Approach
 
@@ -26,7 +26,7 @@ The simplest way to enable in-assembly parallel execution is to enable it global
 
 ```xml
 <RunSettings>
-<!-- MSTest adapter -->  
+<!-- MSTest adapter -->
   <MSTest>
     <Parallelize>
       <Workers>4</Workers>
@@ -70,8 +70,8 @@ When used at the Method level, the test method will be executed serially after t
 Finally, just as in-assembly parallel execution can be enabled globally via the .runsettings file, it can be also be disabled globally as follows:
 
 ```xml
-<RunSettings>  
-  <!-- Configurations that affect the Test Framework -->  
+<RunSettings>
+  <!-- Configurations that affect the Test Framework -->
   <RunConfiguration>
     <DisableParallelization>true</DisableParallelization>
   </RunConfiguration>
@@ -89,8 +89,8 @@ Test lifecyle method semantics
 In-assembly parallel execution can be conditioned using the following means:
 
 1. as annotations in source code (as described in this document).
-2. as configuration properties set via a .runsettings file [\[see here for more\]](https://github.com/Microsoft/vstest-docs/blob/main/docs/configure.md).
-3. by passing runsettings arguments via the command line [\[see here for more\]](https://github.com/Microsoft/vstest-docs/blob/main/docs/RunSettingsArguments.md).
+2. as configuration properties set via a .runsettings file [\[see here for more\]](https://github.com/microsoft/vstest/blob/main/docs/configure.md).
+3. by passing runsettings arguments via the command line [\[see here for more\]](https://github.com/microsoft/vstest/blob/main/docs/RunSettingsArguments.md).
 
 (3) overrides (2) which in turn overrides (1). The ```[DoNotParallelize]``` annotation may be applied only to source code, and hence remains unaffected by these rules - thus, even if in-assembly parallel execution in conditioned via (2) or (3), specific program elements can still opt-out safely.
 

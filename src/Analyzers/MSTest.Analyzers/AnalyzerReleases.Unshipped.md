@@ -1,13 +1,12 @@
-﻿; Unshipped analyzer release
+; Unshipped analyzer release
 ; https://github.com/dotnet/roslyn-analyzers/blob/main/src/Microsoft.CodeAnalysis.Analyzers/ReleaseTrackingAnalyzers.Help.md
+
 ### New Rules
 
 Rule ID | Category | Severity | Notes
 --------|----------|----------|-------
-MSTEST0017 | Usage | Info | AssertionArgsShouldBePassedInCorrectOrder, [Documentation](https://learn.microsoft.com/dotnet/core/testing/mstest-analyzers/mstest0017)
-MSTEST0019 | Design | Disabled | PreferTestInitializeOverConstructorAnalyzer, [Documentation](https://learn.microsoft.com/dotnet/core/testing/mstest-analyzers/mstest0019)
-MSTEST0020 | Design | Disabled | PreferConstructorOverTestInitializeAnalyzer, [Documentation](https://learn.microsoft.com/dotnet/core/testing/mstest-analyzers/mstest0020)
-MSTEST0021 | Design | Disabled | PreferDisposeOverTestCleanupAnalyzer, [Documentation](https://learn.microsoft.com/dotnet/core/testing/mstest-analyzers/mstest0021)
-MSTEST0022 | Design | Disabled | PreferTestCleanupOverDisposeAnalyzer, [Documentation](https://learn.microsoft.com/dotnet/core/testing/mstest-analyzers/mstest0022)
-MSTEST0023 | Usage | Info | DoNotNegateBooleanAssertionAnalyzer, [Documentation](https://learn.microsoft.com/dotnet/core/testing/mstest-analyzers/mstest0023)
-MSTEST0024 | Usage | Info | DoNotStoreStaticTestContextAnalyzer, [Documentation](https://learn.microsoft.com/dotnet/core/testing/mstest-analyzers/mstest0024)
+MSTEST0064 | Usage | Info | PreferAsyncAssertionAnalyzer, [Documentation](https://learn.microsoft.com/dotnet/core/testing/mstest-analyzers/mstest0064)
+MSTEST0065 | Usage | Warning | AvoidAssertAreEqualOnCollectionsAnalyzer, [Documentation](https://learn.microsoft.com/dotnet/core/testing/mstest-analyzers/mstest0065)
+MSTEST0066 | Design | Info | IgnoreShouldHaveJustificationAnalyzer, [Documentation](https://learn.microsoft.com/dotnet/core/testing/mstest-analyzers/mstest0066)
+MSTEST0067 | Usage | Disabled | AvoidThreadSleepAndTaskWaitInTestsAnalyzer, [Documentation](https://learn.microsoft.com/dotnet/core/testing/mstest-analyzers/mstest0067)
+MSTEST0068 | Usage | Info | CollectionAssertToAssertAnalyzer, [Documentation](https://learn.microsoft.com/dotnet/core/testing/mstest-analyzers/mstest0068)

@@ -1,13 +1,21 @@
 ---
 name: Bug report
-about: Create a bug report to help us improve MSTest
-labels: [bug, need-triage]
+about: Create a bug report to help us improve Microsoft.Testing.Platform and MSTest
+labels: [needs/triage]
+type: Bug
 ---
 
 ## Describe the bug
 
 <!-- 
 A clear and concise description of what the bug is and which version it impacts.
+-->
+
+## Version used
+
+<!--
+The MSTest or Microsoft.Testing.Platform version used that has the bug.
+Ensure you try the latest version before opening the bug.
 -->
 
 ## Steps To Reproduce

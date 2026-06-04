@@ -1,10 +1,7 @@
-// Copyright (c) Microsoft Corporation. All rights reserved.
+﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 #if NETFRAMEWORK
-
-using System.Globalization;
-using System.Reflection;
 
 using Microsoft.VisualStudio.TestPlatform.MSTestAdapter.PlatformServices.Utilities;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -21,7 +18,7 @@ namespace Microsoft.VisualStudio.TestPlatform.MSTestAdapter.PlatformServices.Dep
 /// Utility function for Assembly related info
 /// The caller is supposed to create AppDomain and create instance of given class in there.
 /// </summary>
-internal class AssemblyLoadWorker : MarshalByRefObject
+internal sealed class AssemblyLoadWorker : MarshalByRefObject
 {
     private readonly IAssemblyUtility _assemblyUtility;
 
@@ -30,10 +27,7 @@ internal class AssemblyLoadWorker : MarshalByRefObject
     {
     }
 
-    internal AssemblyLoadWorker(IAssemblyUtility assemblyUtility)
-    {
-        _assemblyUtility = assemblyUtility;
-    }
+    internal AssemblyLoadWorker(IAssemblyUtility assemblyUtility) => _assemblyUtility = assemblyUtility;
 
     /// <summary>
     /// Returns the full path to the dependent assemblies of the parameter managed assembly recursively.
@@ -42,12 +36,12 @@ internal class AssemblyLoadWorker : MarshalByRefObject
     /// <param name="assemblyPath"> Path to the assembly file to load from. </param>
     /// <param name="warnings"> The warnings. </param>
     /// <returns> Full path to dependent assemblies. </returns>
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes", Justification = "Requirement is to handle all kinds of user exceptions and message appropriately.")]
+    [SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes", Justification = "Requirement is to handle all kinds of user exceptions and message appropriately.")]
     public IReadOnlyCollection<string> GetFullPathToDependentAssemblies(string assemblyPath, out IList<string> warnings)
     {
         DebugEx.Assert(!StringEx.IsNullOrEmpty(assemblyPath), "assemblyPath");
 
-        warnings = new List<string>();
+        warnings = [];
         Assembly? assembly;
         try
         {
@@ -77,16 +71,15 @@ internal class AssemblyLoadWorker : MarshalByRefObject
     /// initialize the lifetime service.
     /// </summary>
     /// <returns> The <see cref="object"/>. </returns>
-    public override object? InitializeLifetimeService()
-    {
+    public override object? InitializeLifetimeService() =>
         // Infinite.
-        return null;
-    }
+        null;
 
     /// <summary>
     /// Get the target dotNet framework string for the assembly.
     /// </summary>
     /// <param name="path">Path of the assembly file.</param>
+    /// <param name="errorMessage">Error message if any.</param>
     /// <returns> String representation of the target dotNet framework e.g. .NETFramework,Version=v4.0. </returns>
     internal string GetTargetFrameworkVersionStringFromPath(string path, out string? errorMessage)
     {
@@ -128,7 +121,7 @@ internal class AssemblyLoadWorker : MarshalByRefObject
                 continue;
             }
 
-            var declaringType = data.NamedArguments[0].MemberInfo.DeclaringType;
+            Type declaringType = data.NamedArguments[0].MemberInfo.DeclaringType;
             if (declaringType == null)
             {
                 continue;
@@ -137,7 +130,7 @@ internal class AssemblyLoadWorker : MarshalByRefObject
             string attributeName = declaringType.FullName;
             if (string.Equals(
                 attributeName,
-                Constants.TargetFrameworkAttributeFullName,
+                EngineConstants.TargetFrameworkAttributeFullName,
                 StringComparison.OrdinalIgnoreCase))
             {
                 dotNetVersion = data.ConstructorArguments[0].Value.ToString();
@@ -225,7 +218,7 @@ internal class AssemblyLoadWorker : MarshalByRefObject
     /// <param name="result"> The result. </param>
     /// <param name="visitedAssemblies"> The visited Assemblies. </param>
     /// <param name="warnings"> The warnings. </param>
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes", Justification = "Requirement is to handle all kinds of user exceptions and message appropriately.")]
+    [SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes", Justification = "Requirement is to handle all kinds of user exceptions and message appropriately.")]
     private void GetDependentAssembliesInternal(string assemblyString, IList<string> result, ISet<string> visitedAssemblies, IList<string> warnings)
     {
         DebugEx.Assert(!StringEx.IsNullOrEmpty(assemblyString), "assemblyString");

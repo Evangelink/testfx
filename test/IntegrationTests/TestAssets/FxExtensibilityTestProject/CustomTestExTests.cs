@@ -21,10 +21,7 @@ public class CustomTestExTests
     [DataRow("A")]
     [DataRow("B")]
     [DataRow("C")]
-    public void CustomTestMethod2(string value)
-    {
-        Assert.AreEqual("B", value);
-    }
+    public void CustomTestMethod2(string value) => Assert.AreEqual("B", value);
 
     private static int s_customTestClass1ExecutionCount;
 
@@ -40,18 +37,15 @@ public class IterativeTestMethodAttribute : TestMethodAttribute
 {
     private readonly int _stabilityThreshold;
 
-    public IterativeTestMethodAttribute(int stabilityThreshold)
-    {
-        _stabilityThreshold = stabilityThreshold;
-    }
+    public IterativeTestMethodAttribute(int stabilityThreshold) => _stabilityThreshold = stabilityThreshold;
 
-    public override TestResult[] Execute(ITestMethod testMethod)
+    public override async Task<TestResult[]> ExecuteAsync(ITestMethod testMethod)
     {
         var results = new List<TestResult>();
         for (int count = 0; count < _stabilityThreshold; count++)
         {
-            var testResults = base.Execute(testMethod);
-            foreach (var testResult in testResults)
+            TestResult[] testResults = await base.ExecuteAsync(testMethod);
+            foreach (TestResult testResult in testResults)
             {
                 testResult.DisplayName = $"{testMethod.TestMethodName} - Execution number {count + 1}";
             }
@@ -59,7 +53,7 @@ public class IterativeTestMethodAttribute : TestMethodAttribute
             results.AddRange(testResults);
         }
 
-        return results.ToArray();
+        return [.. results];
     }
 }
 
@@ -67,15 +61,10 @@ public class IterativeTestClassAttribute : TestClassAttribute
 {
     private readonly int _stabilityThreshold;
 
-    public IterativeTestClassAttribute(int stabilityThreshold)
-    {
-        _stabilityThreshold = stabilityThreshold;
-    }
+    public IterativeTestClassAttribute(int stabilityThreshold) => _stabilityThreshold = stabilityThreshold;
 
-    public override TestMethodAttribute GetTestMethodAttribute(TestMethodAttribute testMethodAttribute)
-    {
-        return testMethodAttribute is IterativeTestMethodAttribute
+    public override TestMethodAttribute? GetTestMethodAttribute(TestMethodAttribute? testMethodAttribute)
+        => testMethodAttribute is IterativeTestMethodAttribute
             ? testMethodAttribute
             : new IterativeTestMethodAttribute(_stabilityThreshold);
-    }
 }

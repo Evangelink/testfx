@@ -1,12 +1,7 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-#if !NETCOREAPP
-using System.Reflection;
-#endif
-
-using System.Globalization;
-
+using Microsoft.Testing.Platform.Extensions;
 using Microsoft.Testing.Platform.Extensions.TestFramework;
 using Microsoft.Testing.Platform.Extensions.TestHost;
 using Microsoft.Testing.Platform.Extensions.TestHostControllers;
@@ -23,17 +18,19 @@ internal sealed class ServiceProvider : IServiceProvider, ICloneable
 
     public bool AllowTestAdapterFrameworkRegistration { get; set; }
 
-    private static Type[] InternalOnlyExtensions => new[]
-    {
+#pragma warning disable CS0618 // Type or member is obsolete
+    private static Type[] InternalOnlyExtensions =>
+    [
         // TestHost
-        typeof(ITestApplicationLifecycleCallbacks),
+        typeof(ITestHostApplicationLifetime),
         typeof(IDataConsumer),
         typeof(ITestSessionLifetimeHandler),
 
         // TestHostControllers
         typeof(ITestHostEnvironmentVariableProvider),
-        typeof(ITestHostProcessLifetimeHandler),
-    };
+        typeof(ITestHostProcessLifetimeHandler)
+    ];
+#pragma warning restore CS0618 // Type or member is obsolete
 
     public void AddService(object service, bool throwIfSameInstanceExit = true)
     {
@@ -75,6 +72,31 @@ internal sealed class ServiceProvider : IServiceProvider, ICloneable
         return true;
     }
 
+    /// <summary>
+    /// Replaces the first registered service instance that is an instance of <typeparamref name="T"/> with the new service.
+    /// If no such service is found, the new service is added at the end of the list.
+    /// </summary>
+    /// <typeparam name="T">The type of service to replace.</typeparam>
+    internal void ReplaceService<T>(T newService)
+        where T : class
+    {
+        _ = newService ?? throw new ArgumentNullException(nameof(newService));
+        ArgumentGuard.Ensure(
+            newService is not ITestFramework || AllowTestAdapterFrameworkRegistration,
+            nameof(newService),
+            PlatformResources.ServiceProviderShouldNotRegisterTestFramework);
+
+        int index = _services.FindIndex(s => s is T);
+        if (index >= 0)
+        {
+            _services[index] = newService;
+        }
+        else
+        {
+            _services.Add(newService);
+        }
+    }
+
     public IEnumerable<object> GetServicesInternal(
         Type serviceType,
         bool stopAtFirst = false,
@@ -87,8 +109,7 @@ internal sealed class ServiceProvider : IServiceProvider, ICloneable
 
         foreach (object serviceInstance in _services)
         {
-#if !NETCOREAPP
-            if (serviceType.GetTypeInfo().IsAssignableFrom(serviceInstance.GetType()))
+            if (serviceType.IsInstanceOfType(serviceInstance))
             {
                 yield return serviceInstance;
                 if (stopAtFirst)
@@ -96,16 +117,6 @@ internal sealed class ServiceProvider : IServiceProvider, ICloneable
                     yield break;
                 }
             }
-#else
-            if (serviceInstance.GetType().IsAssignableTo(serviceType))
-            {
-                yield return serviceInstance;
-                if (stopAtFirst)
-                {
-                    yield break;
-                }
-            }
-#endif
         }
     }
 
@@ -114,7 +125,7 @@ internal sealed class ServiceProvider : IServiceProvider, ICloneable
 
     public object Clone(Func<object, bool> filter)
     {
-        var clone = new ServiceProvider();
+        ServiceProvider clone = new();
         foreach (object service in _services)
         {
             if (filter(service))
@@ -128,7 +139,7 @@ internal sealed class ServiceProvider : IServiceProvider, ICloneable
 
     public object Clone()
     {
-        var clone = new ServiceProvider();
+        ServiceProvider clone = new();
         clone._services.AddRange(Services);
 
         return clone;

@@ -5,28 +5,30 @@ using Microsoft.MSTestV2.CLIAutomation;
 
 namespace MSTest.IntegrationTests;
 
+[TestClass]
 public class ClsTests : CLITestBase
 {
     private const string TestAssetName = "ClsTestProject";
 
     // This test in itself is not so important. What matters is that the asset gets build. If we regress and start having
     // the [DataRow] attribute no longer CLS compliant, the build will raise a warning in VS (and the build will fail in CI).
-    public void TestsAreRun()
+    [TestMethod]
+    public async Task TestsAreRun()
     {
         // Arrange
-        var assemblyPath = GetAssetFullPath(TestAssetName);
+        string assemblyPath = GetAssetFullPath(TestAssetName);
 
         // Act
-        var testCases = DiscoverTests(assemblyPath);
-        var testResults = RunTests(testCases);
+        System.Collections.Immutable.ImmutableArray<Microsoft.VisualStudio.TestPlatform.ObjectModel.TestCase> testCases = DiscoverTests(assemblyPath);
+        System.Collections.Immutable.ImmutableArray<Microsoft.VisualStudio.TestPlatform.ObjectModel.TestResult> testResults = await RunTestsAsync(testCases);
 
         // Assert
         VerifyE2E.TestsPassed(
             testResults,
             "TestMethod",
             "IntDataRow (10)",
-            "StringDataRow (some string)",
-            "StringDataRow2 (some string)",
-            "StringDataRow2 (some other string)");
+            "StringDataRow (\"some string\")",
+            "StringDataRow2 (\"some string\")",
+            "StringDataRow2 (\"some other string\")");
     }
 }

@@ -1,35 +1,46 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-#if NETCOREAPP
-using System.Buffers;
-#endif
 using System.IO.Pipes;
-using System.Runtime.InteropServices;
 
+using Microsoft.CodeAnalysis;
 using Microsoft.Testing.Platform.Helpers;
-#if NET
-using Microsoft.Testing.Platform.Resources;
-#endif
 
 namespace Microsoft.Testing.Platform.IPC;
 
+[Embedded]
+#if !MTP_MSBUILD_TASKS
+[UnsupportedOSPlatform("browser")]
+#endif
 internal sealed class NamedPipeClient : NamedPipeBase, IClient
 {
+    private const PipeOptions AsyncCurrentUserPipeOptions = PipeOptions.Asynchronous
+#if NET
+        | PipeOptions.CurrentUserOnly
+#endif
+        ;
+
     private readonly NamedPipeClientStream _namedPipeClientStream;
     private readonly SemaphoreSlim _lock = new(1, 1);
-
-    private readonly MemoryStream _serializationBuffer = new();
-    private readonly MemoryStream _messageBuffer = new();
-    private readonly byte[] _readBuffer = new byte[250000];
+    private readonly IEnvironment _environment;
 
     private bool _disposed;
 
     public NamedPipeClient(string name)
+        : this(name, new SystemEnvironment())
     {
-        ArgumentGuard.IsNotNull(name);
-        _namedPipeClientStream = new(".", name, PipeDirection.InOut);
+    }
+
+    public NamedPipeClient(string name, IEnvironment environment)
+    {
+        if (name is null)
+        {
+            throw new ArgumentNullException(nameof(name));
+        }
+
+        _namedPipeClientStream = new(".", name, PipeDirection.InOut, AsyncCurrentUserPipeOptions);
         PipeName = name;
+        _environment = environment;
     }
 
     public string PipeName { get; }
@@ -37,161 +48,63 @@ internal sealed class NamedPipeClient : NamedPipeBase, IClient
     public bool IsConnected => _namedPipeClientStream.IsConnected;
 
     public async Task ConnectAsync(CancellationToken cancellationToken)
-        => await _namedPipeClientStream.ConnectAsync(cancellationToken);
+        => await _namedPipeClientStream.ConnectAsync(cancellationToken).ConfigureAwait(false);
 
     public async Task<TResponse> RequestReplyAsync<TRequest, TResponse>(TRequest request, CancellationToken cancellationToken)
        where TRequest : IRequest
        where TResponse : IResponse
     {
-        await _lock.WaitAsync(cancellationToken);
+        await _lock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
             INamedPipeSerializer requestNamedPipeSerializer = GetSerializer(typeof(TRequest));
 
-            // Ask to serialize the body
-            _serializationBuffer.Position = 0;
-            requestNamedPipeSerializer.Serialize(request, _serializationBuffer);
-
-            // Write the message size
-            _messageBuffer.Position = 0;
-
-            // The length of the message is the size of the message plus one byte to store the serializer id
-            // Space for the message
-            int sizeOfTheWholeMessage = (int)_serializationBuffer.Position;
-
-            // Space for the serializer id
-            sizeOfTheWholeMessage += sizeof(int);
-
-            // Write the message size
-#if NETCOREAPP
-            byte[] bytes = ArrayPool<byte>.Shared.Rent(sizeof(int));
+            // Serialize and send the request
             try
             {
-                ApplicationStateGuard.Ensure(BitConverter.TryWriteBytes(bytes, sizeOfTheWholeMessage), PlatformResources.UnexpectedExceptionDuringByteConversionErrorMessage);
-                await _messageBuffer.WriteAsync(bytes.AsMemory(0, sizeof(int)), cancellationToken);
+                await WriteMessageAsync(_namedPipeClientStream, requestNamedPipeSerializer, request, cancellationToken).ConfigureAwait(false);
             }
-            finally
+            catch (Exception ex) when (ex is IOException or ObjectDisposedException)
             {
-                ArrayPool<byte>.Shared.Return(bytes);
-            }
-#else
-            await _messageBuffer.WriteAsync(BitConverter.GetBytes(sizeOfTheWholeMessage), 0, sizeof(int), cancellationToken);
-#endif
-
-            // Write the serializer id
-#if NETCOREAPP
-            bytes = ArrayPool<byte>.Shared.Rent(sizeof(int));
-            try
-            {
-                ApplicationStateGuard.Ensure(BitConverter.TryWriteBytes(bytes, requestNamedPipeSerializer.Id), PlatformResources.UnexpectedExceptionDuringByteConversionErrorMessage);
-                await _messageBuffer.WriteAsync(bytes.AsMemory(0, sizeof(int)), cancellationToken);
-            }
-            finally
-            {
-                ArrayPool<byte>.Shared.Return(bytes);
-            }
-#else
-            await _messageBuffer.WriteAsync(BitConverter.GetBytes(requestNamedPipeSerializer.Id), 0, sizeof(int), cancellationToken);
-#endif
-
-            try
-            {
-                // Write the message
-#if NETCOREAPP
-                await _messageBuffer.WriteAsync(_serializationBuffer.GetBuffer().AsMemory(0, (int)_serializationBuffer.Position), cancellationToken);
-#else
-                await _messageBuffer.WriteAsync(_serializationBuffer.GetBuffer(), 0, (int)_serializationBuffer.Position, cancellationToken);
-#endif
-            }
-            finally
-            {
-                // Reset the serialization buffer
-                _serializationBuffer.Position = 0;
-            }
-
-            // Send the message
-            try
-            {
-#if NETCOREAPP
-                await _namedPipeClientStream.WriteAsync(_messageBuffer.GetBuffer().AsMemory(0, (int)_messageBuffer.Position), cancellationToken);
-#else
-                await _namedPipeClientStream.WriteAsync(_messageBuffer.GetBuffer(), 0, (int)_messageBuffer.Position, cancellationToken);
-#endif
-                await _namedPipeClientStream.FlushAsync(cancellationToken);
-                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-                {
-                    _namedPipeClientStream.WaitForPipeDrain();
-                }
-            }
-            finally
-            {
-                // Reset the buffers
-                _messageBuffer.Position = 0;
-                _serializationBuffer.Position = 0;
+                // The server disconnected while we were writing the request. Mirror the read-EOF handling
+                // below: if we cannot deliver the request there's no way to recover, so exit abnormally
+                // instead of surfacing a raw IPC error to the caller.
+                _environment.Exit((int)ExitCode.GenericFailure);
+                throw;
             }
 
             // Read the response
-            int currentMessageSize = 0;
-            int missingBytesToReadOfWholeMessage = 0;
-            while (true)
+            object? response = await ReadNextMessageAsync(_namedPipeClientStream, cancellationToken).ConfigureAwait(false);
+            if (response is null)
             {
-                int missingBytesToReadOfCurrentChunk = 0;
-                int currentReadIndex = 0;
-#if NETCOREAPP
-                int currentReadBytes = await _namedPipeClientStream.ReadAsync(_readBuffer.AsMemory(currentReadIndex, _readBuffer.Length), cancellationToken);
-#else
-                int currentReadBytes = await _namedPipeClientStream.ReadAsync(_readBuffer, currentReadIndex, _readBuffer.Length, cancellationToken);
-#endif
+                // We are reading a message response.
+                // If we cannot get a response, there is no way we can recover and continue executing.
+                // This can happen if the other processes gets killed or crashes while while it's sending the response.
+                // This is especially important for 'dotnet test', where the user can simply kill the dotnet.exe process themselves.
+                // In that case, we want the MTP process to also die.
+                // Exit code 1 indicates abnormal termination due to IPC connection loss.
 
-                // Reset the current chunk size
-                missingBytesToReadOfCurrentChunk = currentReadBytes;
-
-                // If currentRequestSize is 0, we need to read the message size
-                if (currentMessageSize == 0)
+                // Surface a diagnostic on stderr so the user has a chance to understand why this process is exiting.
+                // We deliberately use Console.Error (and not stdout) to avoid corrupting any machine-readable output
+                // that may be flowing through stdout.
+                try
                 {
-                    // We need to read the message size, first 4 bytes
-                    currentMessageSize = BitConverter.ToInt32(_readBuffer, 0);
-                    missingBytesToReadOfCurrentChunk = currentReadBytes - sizeof(int);
-                    missingBytesToReadOfWholeMessage = currentMessageSize;
-                    currentReadIndex = sizeof(int);
+                    await Console.Error.WriteLineAsync($"[NamedPipeClient] Pipe '{PipeName}' was closed by the server before a response was received. The peer process likely exited or was killed. Terminating with exit code {(int)ExitCode.GenericFailure}.").ConfigureAwait(false);
+                }
+                catch (Exception ex) when (ex is IOException or ObjectDisposedException or InvalidOperationException or NotSupportedException or ArgumentException or OperationCanceledException)
+                {
+                    // Best-effort diagnostic only; never let logging failures shadow the original problem.
                 }
 
-                if (missingBytesToReadOfCurrentChunk > 0)
-                {
-                    // We need to read the rest of the message
-#if NETCOREAPP
-                    await _messageBuffer.WriteAsync(_readBuffer.AsMemory(currentReadIndex, missingBytesToReadOfCurrentChunk), cancellationToken);
-#else
-                    await _messageBuffer.WriteAsync(_readBuffer, currentReadIndex, missingBytesToReadOfCurrentChunk, cancellationToken);
-#endif
-                    missingBytesToReadOfWholeMessage -= missingBytesToReadOfCurrentChunk;
-                }
+                _environment.Exit((int)ExitCode.GenericFailure);
 
-                // If we have read all the message, we can deserialize it
-                if (missingBytesToReadOfWholeMessage == 0)
-                {
-                    // Deserialize the message
-                    _messageBuffer.Position = 0;
-
-                    // Get the serializer id
-                    int serializerId = BitConverter.ToInt32(_messageBuffer.GetBuffer(), 0);
-
-                    // Get the serializer
-                    _messageBuffer.Position += sizeof(int); // Skip the serializer id
-                    INamedPipeSerializer responseNamedPipeSerializer = GetSerializer(serializerId);
-
-                    // Deserialize the message
-                    try
-                    {
-                        return (TResponse)responseNamedPipeSerializer.Deserialize(_messageBuffer);
-                    }
-                    finally
-                    {
-                        // Reset the message buffer
-                        _messageBuffer.Position = 0;
-                    }
-                }
+                // _environment.Exit normally terminates the process and never returns. Guard against
+                // alternate IEnvironment implementations (e.g. tests) that don't terminate by throwing
+                // explicitly — otherwise we would fall through to the cast below and return null.
+                throw new InvalidOperationException($"Pipe '{PipeName}' was closed by the server before a response was received.");
             }
+
+            return (TResponse)response!;
         }
         finally
         {
@@ -201,21 +114,14 @@ internal sealed class NamedPipeClient : NamedPipeBase, IClient
 
     public void Dispose()
     {
-        if (!_disposed)
+        if (_disposed)
         {
-            _namedPipeClientStream.Dispose();
-            _disposed = true;
+            return;
         }
-    }
 
-#if NETCOREAPP
-    public async ValueTask DisposeAsync()
-    {
-        if (!_disposed)
-        {
-            await _namedPipeClientStream.DisposeAsync();
-            _disposed = true;
-        }
+        _lock.Dispose();
+        DisposeBuffers();
+        _namedPipeClientStream.Dispose();
+        _disposed = true;
     }
-#endif
 }

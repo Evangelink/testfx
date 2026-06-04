@@ -1,13 +1,9 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System.Collections;
-using System.Reflection;
+using AwesomeAssertions;
 
-using FluentAssertions;
-
-using Microsoft.VisualStudio.TestPlatform.MSTestAdapter.PlatformServices.Utilities;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Microsoft.VisualStudio.TestPlatform.MSTestAdapter.PlatformServices;
 
 using SampleFrameworkExtensions;
 
@@ -15,20 +11,18 @@ using TestFramework.ForTestingMSTest;
 
 namespace PlatformServices.Desktop.ComponentTests;
 
+/// <summary>
+/// Integration tests for ReflectionOperations which provides platform-specific reflection operations.
+/// </summary>
 public class ReflectionUtilityTests : TestContainer
 {
     private readonly Assembly _testAsset;
-
-    /// <summary>
-    /// Dictionary of Assemblies discovered to date. Must be locked as it may
-    /// be accessed in a multi-threaded context.
-    /// </summary>
-    private readonly Dictionary<string, Assembly> _resolvedAssemblies = [];
+    private readonly ReflectionOperations _reflectionOperations = new();
 
     public ReflectionUtilityTests()
     {
-        var currentAssemblyDirectory = new FileInfo(typeof(ReflectionUtilityTests).Assembly.Location).Directory;
-        var testAssetPath =
+        DirectoryInfo currentAssemblyDirectory = new FileInfo(typeof(ReflectionUtilityTests).Assembly.Location).Directory;
+        string testAssetPath =
             Path.Combine(
                 currentAssemblyDirectory.Parent.Parent.Parent.FullName,
                 "TestProjectForDiscovery",
@@ -39,268 +33,192 @@ public class ReflectionUtilityTests : TestContainer
 #endif
                 currentAssemblyDirectory.Name /* TFM (e.g. net462) */,
                 "TestProjectForDiscovery.dll");
-        _testAsset = Assembly.ReflectionOnlyLoadFrom(testAssetPath);
-
-        // This is needed for System assemblies.
-        AppDomain.CurrentDomain.ReflectionOnlyAssemblyResolve += new ResolveEventHandler(ReflectionOnlyOnResolve);
+        _testAsset = Assembly.LoadFrom(testAssetPath);
     }
 
     public void GetCustomAttributesShouldReturnAllAttributes()
     {
-        var methodInfo = _testAsset.GetType("TestProjectForDiscovery.AttributeTestBaseClass").GetMethod("DummyVTestMethod1");
+        MethodInfo methodInfo = _testAsset.GetType("TestProjectForDiscovery.AttributeTestBaseClass").GetMethod("DummyVTestMethod1");
 
-        var attributes = ReflectionUtility.GetCustomAttributes(methodInfo, false);
-
-        attributes.Should().NotBeNull();
-        attributes.Should().HaveCount(2);
-
-        var expectedAttributes = new string[] { "TestCategory : base", "Owner : base" };
-        GetAttributeValuePairs(attributes).Should().Equal(expectedAttributes);
-    }
-
-    public void GetCustomAttributesShouldReturnAllAttributesIgnoringBaseInheritance()
-    {
-        var methodInfo = _testAsset.GetType("TestProjectForDiscovery.AttributeTestClass").GetMethod("DummyVTestMethod1");
-
-        var attributes = ReflectionUtility.GetCustomAttributes(methodInfo, false);
+        object[]? attributes = _reflectionOperations.GetCustomAttributes(methodInfo);
 
         attributes.Should().NotBeNull();
-        attributes.Should().HaveCount(2);
 
-        var expectedAttributes = new string[] { "TestCategory : derived", "Owner : derived" };
-        GetAttributeValuePairs(attributes).Should().Equal(expectedAttributes);
+        // Filter to known test attributes to avoid fragility if the test asset ever
+        // enables nullable annotations (which would add compiler-generated attributes).
+        string[] expectedAttributes = ["Owner : base", "TestCategory : base"];
+        GetAttributeValuePairs(attributes!).Should().Equal(expectedAttributes);
     }
 
     public void GetCustomAttributesShouldReturnAllAttributesWithBaseInheritance()
     {
-        var methodInfo = _testAsset.GetType("TestProjectForDiscovery.AttributeTestClass").GetMethod("DummyVTestMethod1");
+        MethodInfo methodInfo = _testAsset.GetType("TestProjectForDiscovery.AttributeTestClass").GetMethod("DummyVTestMethod1");
 
-        var attributes = ReflectionUtility.GetCustomAttributes(methodInfo, true);
+        object[]? attributes = _reflectionOperations.GetCustomAttributes(methodInfo);
 
         attributes.Should().NotBeNull();
-        attributes.Should().HaveCount(3);
 
         // Notice that the Owner on the base method does not show up since it can only be defined once.
-        var expectedAttributes = new string[] { "TestCategory : derived", "TestCategory : base", "Owner : derived" };
-        GetAttributeValuePairs(attributes).Should().Equal(expectedAttributes);
+        // Filter to known test attributes to avoid fragility if the test asset ever
+        // enables nullable annotations (which would add compiler-generated attributes).
+        string[] expectedAttributes = ["Owner : derived", "TestCategory : derived", "TestCategory : base"];
+        GetAttributeValuePairs(attributes!).Should().Equal(expectedAttributes);
     }
 
     public void GetCustomAttributesOnTypeShouldReturnAllAttributes()
     {
-        var typeInfo = _testAsset.GetType("TestProjectForDiscovery.AttributeTestBaseClass").GetTypeInfo();
+        Type type = _testAsset.GetType("TestProjectForDiscovery.AttributeTestBaseClass");
 
-        var attributes = ReflectionUtility.GetCustomAttributes(typeInfo, false);
-
-        attributes.Should().NotBeNull();
-        attributes.Should().HaveCount(1);
-
-        var expectedAttributes = new string[] { "TestCategory : ba" };
-        GetAttributeValuePairs(attributes).Should().Equal(expectedAttributes);
-    }
-
-    public void GetCustomAttributesOnTypeShouldReturnAllAttributesIgnoringBaseInheritance()
-    {
-        var typeInfo = _testAsset.GetType("TestProjectForDiscovery.AttributeTestClass").GetTypeInfo();
-
-        var attributes = ReflectionUtility.GetCustomAttributes(typeInfo, false);
+        object[]? attributes = _reflectionOperations.GetCustomAttributes(type);
 
         attributes.Should().NotBeNull();
-        attributes.Should().HaveCount(1);
 
-        var expectedAttributes = new string[] { "TestCategory : a" };
-        GetAttributeValuePairs(attributes).Should().Equal(expectedAttributes);
+        // Filter to known test attributes to avoid fragility with compiler-generated attributes.
+        string[] expectedAttributes = ["TestCategory : ba"];
+        GetAttributeValuePairs(attributes!).Should().Equal(expectedAttributes);
     }
 
     public void GetCustomAttributesOnTypeShouldReturnAllAttributesWithBaseInheritance()
     {
-        var methodInfo = _testAsset.GetType("TestProjectForDiscovery.AttributeTestClass").GetTypeInfo();
+        Type type = _testAsset.GetType("TestProjectForDiscovery.AttributeTestClass");
 
-        var attributes = ReflectionUtility.GetCustomAttributes(methodInfo, true);
+        object[]? attributes = _reflectionOperations.GetCustomAttributes(type);
 
         attributes.Should().NotBeNull();
-        attributes.Should().HaveCount(2);
 
-        var expectedAttributes = new string[] { "TestCategory : a", "TestCategory : ba" };
-        GetAttributeValuePairs(attributes).Should().Equal(expectedAttributes);
+        // Filter to known test attributes to avoid fragility with compiler-generated attributes.
+        string[] expectedAttributes = ["TestCategory : a", "TestCategory : ba"];
+        GetAttributeValuePairs(attributes!).Should().Equal(expectedAttributes);
     }
 
     public void GetSpecificCustomAttributesShouldReturnAllAttributes()
     {
-        var methodInfo = _testAsset.GetType("TestProjectForDiscovery.AttributeTestBaseClass").GetMethod("DummyVTestMethod1");
+        MethodInfo methodInfo = _testAsset.GetType("TestProjectForDiscovery.AttributeTestBaseClass").GetMethod("DummyVTestMethod1");
 
-        var attributes = ReflectionUtility.GetCustomAttributes(methodInfo, typeof(TestCategoryAttribute), false);
-
-        attributes.Should().NotBeNull();
-        attributes.Should().HaveCount(1);
-
-        var expectedAttributes = new string[] { "TestCategory : base" };
-        GetAttributeValuePairs(attributes).Should().Equal(expectedAttributes);
-    }
-
-    public void GetSpecificCustomAttributesShouldReturnAllAttributesIgnoringBaseInheritance()
-    {
-        var methodInfo = _testAsset.GetType("TestProjectForDiscovery.AttributeTestClass").GetMethod("DummyVTestMethod1");
-
-        var attributes = ReflectionUtility.GetCustomAttributes(methodInfo, typeof(TestCategoryAttribute), false);
+        TestCategoryAttribute[] attributes = _reflectionOperations.GetAttributes<TestCategoryAttribute>(methodInfo).ToArray();
 
         attributes.Should().NotBeNull();
         attributes.Should().HaveCount(1);
 
-        var expectedAttributes = new string[] { "TestCategory : derived" };
+        string[] expectedAttributes = ["TestCategory : base"];
         GetAttributeValuePairs(attributes).Should().Equal(expectedAttributes);
     }
 
     public void GetSpecificCustomAttributesShouldReturnAllAttributesWithBaseInheritance()
     {
-        var methodInfo =
+        MethodInfo methodInfo =
             _testAsset.GetType("TestProjectForDiscovery.AttributeTestClass").GetMethod("DummyVTestMethod1");
 
-        var attributes = ReflectionUtility.GetCustomAttributes(methodInfo, typeof(TestCategoryAttribute), true);
+        TestCategoryAttribute[] attributes = _reflectionOperations.GetAttributes<TestCategoryAttribute>(methodInfo).ToArray();
 
         attributes.Should().NotBeNull();
         attributes.Should().HaveCount(2);
 
-        var expectedAttributes = new string[] { "TestCategory : derived", "TestCategory : base", };
+        string[] expectedAttributes = ["TestCategory : derived", "TestCategory : base"];
         GetAttributeValuePairs(attributes).Should().Equal(expectedAttributes);
     }
 
     public void GetCustomAttributesShouldReturnAllAttributesIncludingUserDefinedAttributes()
     {
-        var methodInfo = _testAsset.GetType("TestProjectForDiscovery.AttributeTestClassWithCustomAttributes").GetMethod("DummyVTestMethod1");
+        MethodInfo methodInfo = _testAsset.GetType("TestProjectForDiscovery.AttributeTestClassWithCustomAttributes").GetMethod("DummyVTestMethod1");
 
-        var attributes = ReflectionUtility.GetCustomAttributes(methodInfo, null, true);
+        object[]? attributes = _reflectionOperations.GetCustomAttributes(methodInfo);
 
         attributes.Should().NotBeNull();
-        attributes.Should().HaveCount(3);
 
-        var expectedAttributes = new string[] { "Duration : superfast", "TestCategory : base", "Owner : base" };
-        GetAttributeValuePairs(attributes).Should().Equal(expectedAttributes);
+        // Filter to known test attributes to avoid fragility with compiler-generated attributes.
+        string[] expectedAttributes = ["Duration : superfast", "Owner : base", "TestCategory : base"];
+        GetAttributeValuePairs(attributes!).Should().Equal(expectedAttributes);
     }
 
     public void GetSpecificCustomAttributesShouldReturnAllAttributesIncludingUserDefinedAttributes()
     {
-        var methodInfo = _testAsset.GetType("TestProjectForDiscovery.AttributeTestClassWithCustomAttributes").GetMethod("DummyVTestMethod1");
+        MethodInfo methodInfo = _testAsset.GetType("TestProjectForDiscovery.AttributeTestClassWithCustomAttributes").GetMethod("DummyVTestMethod1");
 
-        var attributes = ReflectionUtility.GetCustomAttributes(methodInfo, typeof(TestPropertyAttribute), true);
+        TestPropertyAttribute[] attributes = _reflectionOperations.GetAttributes<TestPropertyAttribute>(methodInfo).ToArray();
 
         attributes.Should().NotBeNull();
-        attributes.Should().HaveCount(1);
+        attributes.Should().HaveCount(2);
 
-        var expectedAttributes = new string[] { "Duration : superfast" };
+        string[] expectedAttributes = ["Duration : superfast", "Owner : base"];
         GetAttributeValuePairs(attributes).Should().Equal(expectedAttributes);
     }
 
     public void GetSpecificCustomAttributesShouldReturnArrayAttributesAsWell()
     {
-        var methodInfo = _testAsset.GetType("TestProjectForDiscovery.AttributeTestClassWithCustomAttributes").GetMethod("DummyTestMethod2");
+        MethodInfo methodInfo = _testAsset.GetType("TestProjectForDiscovery.AttributeTestClassWithCustomAttributes").GetMethod("DummyTestMethod2");
 
-        var attributes = ReflectionUtility.GetCustomAttributes(methodInfo, typeof(CategoryArrayAttribute), true);
+        CategoryArrayAttribute[] attributes = _reflectionOperations.GetAttributes<CategoryArrayAttribute>(methodInfo).ToArray();
 
         attributes.Should().NotBeNull();
         attributes.Should().HaveCount(1);
 
-        var expectedAttributes = new string[] { "CategoryAttribute : foo,foo2" };
+        string[] expectedAttributes = ["CategoryAttribute : foo,foo2"];
         GetAttributeValuePairs(attributes).Should().Equal(expectedAttributes);
     }
 
     public void GetSpecificCustomAttributesOnTypeShouldReturnAllAttributes()
     {
-        var typeInfo = _testAsset.GetType("TestProjectForDiscovery.AttributeTestBaseClass").GetTypeInfo();
+        Type type = _testAsset.GetType("TestProjectForDiscovery.AttributeTestBaseClass");
 
-        var attributes = ReflectionUtility.GetCustomAttributes(typeInfo, typeof(TestCategoryAttribute), false);
-
-        attributes.Should().NotBeNull();
-        attributes.Should().HaveCount(1);
-
-        var expectedAttributes = new string[] { "TestCategory : ba" };
-        GetAttributeValuePairs(attributes).Should().Equal(expectedAttributes);
-    }
-
-    public void GetSpecificCustomAttributesOnTypeShouldReturnAllAttributesIgnoringBaseInheritance()
-    {
-        var typeInfo = _testAsset.GetType("TestProjectForDiscovery.AttributeTestClass").GetTypeInfo();
-
-        var attributes = ReflectionUtility.GetCustomAttributes(typeInfo, typeof(TestCategoryAttribute), false);
+        TestCategoryAttribute[] attributes = _reflectionOperations.GetAttributes<TestCategoryAttribute>(type).ToArray();
 
         attributes.Should().NotBeNull();
         attributes.Should().HaveCount(1);
 
-        var expectedAttributes = new string[] { "TestCategory : a" };
+        string[] expectedAttributes = ["TestCategory : ba"];
         GetAttributeValuePairs(attributes).Should().Equal(expectedAttributes);
     }
 
     public void GetSpecificCustomAttributesOnTypeShouldReturnAllAttributesWithBaseInheritance()
     {
-        var methodInfo = _testAsset.GetType("TestProjectForDiscovery.AttributeTestClass").GetTypeInfo();
+        Type type = _testAsset.GetType("TestProjectForDiscovery.AttributeTestClass");
 
-        var attributes = ReflectionUtility.GetCustomAttributes(methodInfo, typeof(TestCategoryAttribute), true);
+        TestCategoryAttribute[] attributes = _reflectionOperations.GetAttributes<TestCategoryAttribute>(type).ToArray();
 
         attributes.Should().NotBeNull();
         attributes.Should().HaveCount(2);
 
-        var expectedAttributes = new string[] { "TestCategory : a", "TestCategory : ba" };
+        string[] expectedAttributes = ["TestCategory : a", "TestCategory : ba"];
         GetAttributeValuePairs(attributes).Should().Equal(expectedAttributes);
     }
 
     public void GetSpecificCustomAttributesOnAssemblyShouldReturnAllAttributes()
     {
-        var asm = _testAsset.GetType("TestProjectForDiscovery.AttributeTestClass").Assembly;
+        Assembly asm = _testAsset.GetType("TestProjectForDiscovery.AttributeTestClass").Assembly;
 
-        var attributes = ReflectionUtility.GetCustomAttributes(asm, typeof(TestCategoryAttribute));
+        object[] attributes = _reflectionOperations.GetCustomAttributes(asm, typeof(TestCategoryAttribute));
 
         attributes.Should().NotBeNull();
         attributes.Should().HaveCount(2);
 
-        var expectedAttributes = new string[] { "TestCategory : a1", "TestCategory : a2" };
+        string[] expectedAttributes = ["TestCategory : a1", "TestCategory : a2"];
         GetAttributeValuePairs(attributes).Should().Equal(expectedAttributes);
-    }
-
-    private Assembly ReflectionOnlyOnResolve(object sender, ResolveEventArgs args)
-    {
-        string assemblyNameToLoad = AppDomain.CurrentDomain.ApplyPolicy(args.Name);
-
-        // Put it in the resolved assembly cache so that if the Load call below
-        // triggers another assembly resolution, then we don't end up in stack overflow.
-        _resolvedAssemblies[assemblyNameToLoad] = null;
-
-        var assembly = Assembly.ReflectionOnlyLoad(assemblyNameToLoad);
-
-        if (assembly != null)
-        {
-            _resolvedAssemblies[assemblyNameToLoad] = assembly;
-            return assembly;
-        }
-
-        return null;
     }
 
     private static string[] GetAttributeValuePairs(IEnumerable attributes)
     {
         var attributeValuePairs = new List<string>();
-        foreach (var attribute in attributes)
+        foreach (object attribute in attributes)
         {
-            if (attribute is OwnerAttribute)
+            if (attribute is OwnerAttribute ownerAttribute)
             {
-                var a = attribute as OwnerAttribute;
-                attributeValuePairs.Add("Owner : " + a.Owner);
+                attributeValuePairs.Add("Owner : " + ownerAttribute.Owner);
             }
-            else if (attribute is TestCategoryAttribute)
+            else if (attribute is TestCategoryAttribute categoryAttribute)
             {
-                var a = attribute as TestCategoryAttribute;
-                attributeValuePairs.Add("TestCategory : " + a.TestCategories.Aggregate((i, j) => { return i + "," + j; }));
+                attributeValuePairs.Add("TestCategory : " + categoryAttribute.TestCategories.Aggregate((i, j) => i + ',' + j));
             }
-            else if (attribute is DurationAttribute)
+            else if (attribute is DurationAttribute durationAttribute)
             {
-                var a = attribute as DurationAttribute;
-                attributeValuePairs.Add("Duration : " + a.Duration);
+                attributeValuePairs.Add("Duration : " + durationAttribute.Duration);
             }
-            else if (attribute is CategoryArrayAttribute)
+            else if (attribute is CategoryArrayAttribute arrayAttribute)
             {
-                var a = attribute as CategoryArrayAttribute;
-                attributeValuePairs.Add("CategoryAttribute : " + a.Value.Aggregate((i, j) => { return i + "," + j; }));
+                attributeValuePairs.Add("CategoryAttribute : " + arrayAttribute.Value.Aggregate((i, j) => i + ',' + j));
             }
         }
 
-        return attributeValuePairs.ToArray();
+        return [.. attributeValuePairs];
     }
 }

@@ -6,31 +6,25 @@ using Microsoft.Testing.Platform.Acceptance.IntegrationTests.Helpers;
 
 namespace MSTest.Acceptance.IntegrationTests;
 
-[TestGroup]
-public sealed class AssemblyResolutionTests : AcceptanceTestBase
+[TestClass]
+public sealed class AssemblyResolutionTests : AcceptanceTestBase<AssemblyResolutionTests.TestAssetFixture>
 {
-    private readonly TestAssetFixture _testAssetFixture;
-
-    public AssemblyResolutionTests(ITestExecutionContext testExecutionContext, TestAssetFixture testAssetFixture)
-        : base(testExecutionContext)
-    {
-        _testAssetFixture = testAssetFixture;
-    }
-
+    [TestMethod]
     public async Task AssemblyResolution_WhenNotSpecified_TestFails()
     {
-        TestHostResult testHostResult = await _testAssetFixture.TestHost.ExecuteAsync();
+        TestHostResult testHostResult = await AssetFixture.TestHost.ExecuteAsync(cancellationToken: TestContext.CancellationToken);
 
         // Assert
         testHostResult.AssertExitCodeIs(2);
         testHostResult.AssertOutputContains($"System.IO.FileNotFoundException: Could not load file or assembly '{TestAssetFixture.ProjectName}");
-        testHostResult.AssertOutputContains("Failed! - Failed: 1, Passed: 0, Skipped: 0, Total: 1");
+        testHostResult.AssertOutputContainsSummary(failed: 1, passed: 0, skipped: 0);
     }
 
+    [TestMethod]
     public async Task AssemblyResolution_WhenSpecified_TestSucceeds()
     {
         // Arrange
-        string runSettingsFilePath = Path.Combine(_testAssetFixture.TestHost.DirectoryName, ".runsettings");
+        string runSettingsFilePath = Path.Combine(AssetFixture.TestHost.DirectoryName, ".runsettings");
         File.WriteAllText(runSettingsFilePath, $"""
             <?xml version="1.0" encoding="utf-8"?>
             <RunSettings>
@@ -38,27 +32,26 @@ public sealed class AssemblyResolutionTests : AcceptanceTestBase
               </RunConfiguration>
               <MSTestV2>
                 <AssemblyResolution>
-                  <Directory path="{_testAssetFixture.MainDllFolder.Path}" />
+                  <Directory path="{AssetFixture.MainDllFolder.Path}" />
                 </AssemblyResolution>
               </MSTestV2>
             </RunSettings>
             """);
 
         // Act
-        TestHostResult testHostResult = await _testAssetFixture.TestHost.ExecuteAsync($"--settings {runSettingsFilePath}");
+        TestHostResult testHostResult = await AssetFixture.TestHost.ExecuteAsync($"--settings {runSettingsFilePath}", cancellationToken: TestContext.CancellationToken);
 
         // Assert
         testHostResult.AssertExitCodeIs(0);
-        testHostResult.AssertOutputContains("Passed! - Failed: 0, Passed: 1, Skipped: 0, Total: 1");
+        testHostResult.AssertOutputContainsSummary(failed: 0, passed: 1, skipped: 0);
         testHostResult.AssertOutputDoesNotContain("System.IO.FileNotFoundException: Could not load file or assembly 'MSTest.Extensibility.Samples");
     }
 
-    [TestFixture(TestFixtureSharingStrategy.PerTestGroup)]
-    public sealed class TestAssetFixture(AcceptanceFixture acceptanceFixture) : IAsyncInitializable, IDisposable
+    public sealed class TestAssetFixture : ITestAssetFixture
     {
         public const string ProjectName = "AssemblyResolution.Main";
-        private const string TargetFramework = "net6.0";
         private const string TestProjectName = "AssemblyResolution.Test";
+        private static readonly string TargetFramework = TargetFrameworks.NetCurrent;
 
         private readonly TempDirectory _testAssetDirectory = new();
 
@@ -72,11 +65,11 @@ public sealed class AssemblyResolutionTests : AcceptanceTestBase
             MainDllFolder?.Dispose();
         }
 
-        public async Task InitializeAsync(InitializationContext context)
+        public async Task InitializeAsync(CancellationToken cancellationToken)
         {
-            var solution = CreateTestAsset();
-            var result = await DotnetCli.RunAsync($"build -nodeReuse:false {solution.SolutionFile} -c Release", acceptanceFixture.NuGetGlobalPackagesFolder.Path);
-            Assert.AreEqual(0, result.ExitCode);
+            VSSolution solution = CreateTestAsset();
+            DotnetMuxerResult result = await DotnetCli.RunAsync($"build {solution.SolutionFile} -c Release", cancellationToken: cancellationToken);
+            result.AssertExitCodeIs(0);
 
             TestHost = TestHost.LocateFrom(solution.Projects.Skip(1).Single().FolderPath, TestProjectName, TargetFramework);
             MainDllFolder = MoveMainDllToDifferentTempDirectory();
@@ -87,7 +80,7 @@ public sealed class AssemblyResolutionTests : AcceptanceTestBase
             VSSolution solution = new(Path.Combine(_testAssetDirectory.Path, "MSTestSolution"), "MSTestSolution");
             solution.AddOrUpdateFileContent("NuGet.config", TestAsset.GetNuGetConfig(false, false));
 
-            var mainProject = solution.CreateCSharpProject(ProjectName, TargetFramework);
+            CSharpProject mainProject = solution.CreateCSharpProject(ProjectName, TargetFramework);
             mainProject.AddOrUpdateFileContent(mainProject.ProjectFile, $"""
                 <Project Sdk="Microsoft.NET.Sdk">
                     <PropertyGroup>
@@ -108,7 +101,7 @@ public sealed class AssemblyResolutionTests : AcceptanceTestBase
                 }
                 """);
 
-            var testProject = solution.CreateCSharpProject(TestProjectName, TargetFramework);
+            CSharpProject testProject = solution.CreateCSharpProject(TestProjectName, TargetFramework);
             testProject.AddProjectReference(mainProject.ProjectFile);
             testProject.AddOrUpdateFileContent(testProject.ProjectFile, $"""
                 <Project Sdk="Microsoft.NET.Sdk">
@@ -136,7 +129,7 @@ public sealed class AssemblyResolutionTests : AcceptanceTestBase
                 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
                 namespace AssemblyResolution.Test;
-                
+
                 [TestClass]
                 public class UnitTest1
                 {
@@ -153,11 +146,11 @@ public sealed class AssemblyResolutionTests : AcceptanceTestBase
 
         private TempDirectory MoveMainDllToDifferentTempDirectory()
         {
-            var sampleDllFilePath = Path.Combine(TestHost.DirectoryName, $"{ProjectName}.dll");
+            string sampleDllFilePath = Path.Combine(TestHost.DirectoryName, $"{ProjectName}.dll");
             Assert.IsTrue(File.Exists(sampleDllFilePath));
 
             TempDirectory tempDirectory2 = new();
-            var newSampleDllFilePath = tempDirectory2.CopyFile(sampleDllFilePath);
+            string newSampleDllFilePath = tempDirectory2.CopyFile(sampleDllFilePath);
             Assert.IsTrue(File.Exists(newSampleDllFilePath));
 
             File.Delete(sampleDllFilePath);
@@ -166,4 +159,6 @@ public sealed class AssemblyResolutionTests : AcceptanceTestBase
             return tempDirectory2;
         }
     }
+
+    public TestContext TestContext { get; set; }
 }

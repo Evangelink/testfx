@@ -1,16 +1,14 @@
-// Copyright (c) Microsoft Corporation. All rights reserved.
+﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-#if NETFRAMEWORK || NET
-using System.Diagnostics;
-using System.Reflection;
+#if NETFRAMEWORK || (NET && !WINDOWS_UWP)
 #if NETFRAMEWORK
 using System.Runtime.InteropServices.WindowsRuntime;
 using System.Security;
 using System.Security.Permissions;
 #endif
 
-using Microsoft.VisualStudio.TestPlatform.ObjectModel;
+using Microsoft.VisualStudio.TestPlatform.MSTest.TestAdapter;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace Microsoft.VisualStudio.TestPlatform.MSTestAdapter.PlatformServices;
@@ -20,19 +18,19 @@ namespace Microsoft.VisualStudio.TestPlatform.MSTestAdapter.PlatformServices;
 /// The idea is that Unit Test Adapter creates App Domain for running tests and sets AppBase to tests dir.
 /// Since we don't want to put our assemblies to GAC and they are not in tests dir, we use custom way to resolve them.
 /// </summary>
-#if NETFRAMEWORK
-public
-#else
-internal sealed
+#pragma warning disable CA1852 // Seal internal types - This class is inherited in tests on .NET Framework.
+internal
+#if !NETFRAMEWORK
+    sealed
 #endif
-class AssemblyResolver :
+    class AssemblyResolver :
 #if NETFRAMEWORK
         MarshalByRefObject,
 #endif
     IDisposable
 {
     /// <summary>
-    /// The assembly name of the dll containing logger APIs(EqtTrace) from the TestPlatform.
+    /// The assembly name of the dll containing logger APIs(PlatformServiceProvider.Instance.AdapterTraceLogger) from the TestPlatform.
     /// </summary>
     /// <remarks>
     /// The reason we have this is because the AssemblyResolver itself logs information during resolution.
@@ -41,7 +39,7 @@ class AssemblyResolver :
     private const string LoggerAssemblyNameLegacy = "Microsoft.VisualStudio.TestPlatform.ObjectModel";
 
     /// <summary>
-    /// The assembly name of the dll containing logger APIs(EqtTrace) from the TestPlatform.
+    /// The assembly name of the dll containing logger APIs(PlatformServiceProvider.Instance.AdapterTraceLogger) from the TestPlatform.
     /// </summary>
     /// <remarks>
     /// The reason we have this is because the AssemblyResolver itself logs information during resolution.
@@ -84,8 +82,13 @@ class AssemblyResolver :
     /// <summary>
     /// lock for the loaded assemblies cache.
     /// </summary>
+#if NET9_0_OR_GREATER
+    private readonly Lock _syncLock = new();
+#else
     private readonly object _syncLock = new();
+#endif
 
+    private static List<string>? s_currentlyLoading;
     private bool _disposed;
 
     /// <summary>
@@ -100,12 +103,18 @@ class AssemblyResolver :
     /// </remarks>
     public AssemblyResolver(IList<string> directories)
     {
-        if (directories == null || directories.Count == 0)
+        if (directories is null)
         {
             throw new ArgumentNullException(nameof(directories));
         }
 
-        _searchDirectories = new List<string>(directories);
+        // Caller always ensures non-empty.
+        if (directories.Count == 0)
+        {
+            throw ApplicationStateGuard.Unreachable();
+        }
+
+        _searchDirectories = [.. directories];
         _directoryList = new Queue<RecursiveDirectoryPath>();
 
         AppDomain.CurrentDomain.AssemblyResolve += new ResolveEventHandler(OnResolve);
@@ -146,10 +155,7 @@ class AssemblyResolver :
     /// </returns>
     [SecurityCritical]
     [SecurityPermission(SecurityAction.LinkDemand, Flags = SecurityPermissionFlag.Infrastructure)]
-    public override object? InitializeLifetimeService()
-    {
-        return null;
-    }
+    public override object? InitializeLifetimeService() => null;
 #endif
 
     /// <summary>
@@ -171,7 +177,7 @@ class AssemblyResolver :
             return;
         }
 
-        foreach (var recPath in recursiveDirectoryPath)
+        foreach (RecursiveDirectoryPath recPath in recursiveDirectoryPath)
         {
             _directoryList.Enqueue(recPath);
         }
@@ -185,9 +191,7 @@ class AssemblyResolver :
     /// <param name="args"> The args. </param>
     /// <returns> The <see cref="Assembly"/>. </returns>
     internal Assembly? ReflectionOnlyOnResolve(object sender, ResolveEventArgs args)
-    {
-        return OnResolveInternal(sender, args, true);
-    }
+        => OnResolveInternal(sender, args, true);
 #endif
 
     /// <summary>
@@ -217,10 +221,10 @@ class AssemblyResolver :
         if (DoesDirectoryExist(path))
         {
             // Get the directories in the path provided.
-            var directories = GetDirectories(path);
+            string[] directories = GetDirectories(path);
 
             // Add each directory and its subdirectories to the collection.
-            foreach (var directory in directories)
+            foreach (string directory in directories)
             {
                 searchDirectories.Add(directory);
 
@@ -247,11 +251,11 @@ class AssemblyResolver :
             if (disposing)
             {
                 // cleanup Managed resources like calling dispose on other managed object created.
-                AppDomain.CurrentDomain.AssemblyResolve -= new ResolveEventHandler(OnResolve);
+                AppDomain.CurrentDomain.AssemblyResolve -= OnResolve;
 
 #if NETFRAMEWORK
-                AppDomain.CurrentDomain.ReflectionOnlyAssemblyResolve -= new ResolveEventHandler(ReflectionOnlyOnResolve);
-                WindowsRuntimeMetadata.ReflectionOnlyNamespaceResolve -= new EventHandler<NamespaceResolveEventArgs>(WindowsRuntimeMetadataReflectionOnlyNamespaceResolve);
+                AppDomain.CurrentDomain.ReflectionOnlyAssemblyResolve -= ReflectionOnlyOnResolve;
+                WindowsRuntimeMetadata.ReflectionOnlyNamespaceResolve -= WindowsRuntimeMetadataReflectionOnlyNamespaceResolve;
 #endif
             }
 
@@ -271,10 +275,7 @@ class AssemblyResolver :
 #else
     private static
 #endif
-    bool DoesDirectoryExist(string path)
-    {
-        return Directory.Exists(path);
-    }
+    bool DoesDirectoryExist(string path) => Directory.Exists(path);
 
     /// <summary>
     /// Gets the directories from a path.
@@ -287,42 +288,46 @@ class AssemblyResolver :
 #else
     private static
 #endif
-    string[] GetDirectories(string path)
-    {
-        return Directory.GetDirectories(path);
-    }
+    string[] GetDirectories(string path) => Directory.GetDirectories(path);
 
+    /// <summary>
+    /// Verifies if a file exists.
+    /// </summary>
+    /// <param name="filePath">The file path.</param>
+    /// <returns><c>true</c> if the file exists; <c>false</c> otherwise.</returns>
 #if NETFRAMEWORK
     protected virtual
 #else
     private static
 #endif
-    bool DoesFileExist(string filePath)
-    {
-        return File.Exists(filePath);
-    }
+    bool DoesFileExist(string filePath) => File.Exists(filePath);
 
+    /// <summary>
+    /// Loads an assembly from the given path.
+    /// </summary>
+    /// <param name="path">The path of the assembly.</param>
+    /// <returns>The loaded <see cref="Assembly"/>.</returns>
+    [UnconditionalSuppressMessage("ReflectionAnalysis", "IL2026:Members attributed with RequiresUnreferencedCode may break when trimming", Justification = "AssemblyResolver is part of the legacy reflection-mode loader and is not used in source-generator / Native AOT execution mode.")]
 #if NETFRAMEWORK
     protected virtual
 #else
     private static
 #endif
-    Assembly LoadAssemblyFrom(string path)
-    {
-        return Assembly.LoadFrom(path);
-    }
+    Assembly LoadAssemblyFrom(string path) => Assembly.LoadFrom(path);
 
 #if NETFRAMEWORK
-    protected virtual Assembly ReflectionOnlyLoadAssemblyFrom(string path)
-    {
-        return Assembly.ReflectionOnlyLoadFrom(path);
-    }
+    /// <summary>
+    /// Loads an assembly from the given path in a reflection-only context.
+    /// </summary>
+    /// <param name="path">The path of the assembly.</param>
+    /// <returns>The loaded <see cref="Assembly"/>.</returns>
+    protected virtual Assembly ReflectionOnlyLoadAssemblyFrom(string path) => Assembly.ReflectionOnlyLoadFrom(path);
 #endif
 
     /// <summary>
     /// It will search for a particular assembly in the given list of directory.
     /// </summary>
-    /// <param name="searchDirectorypaths"> The search Directorypaths. </param>
+    /// <param name="searchDirectorypaths"> The search directory paths. </param>
     /// <param name="name"> The name. </param>
     /// <param name="isReflectionOnly"> Indicates whether this is called under a Reflection Only Load context. </param>
     /// <returns> The <see cref="Assembly"/>. </returns>
@@ -333,13 +338,13 @@ class AssemblyResolver :
 #endif
     Assembly? SearchAssembly(List<string> searchDirectorypaths, string name, bool isReflectionOnly)
     {
-        if (searchDirectorypaths == null || searchDirectorypaths.Count == 0)
+        if (searchDirectorypaths.Count == 0)
         {
             return null;
         }
 
         // args.Name is like: "Microsoft.VisualStudio.TestTools.Common, Version=[VersionMajor].0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a".
-        AssemblyName? requestedName = null;
+        AssemblyName? requestedName;
 
         try
         {
@@ -352,10 +357,10 @@ class AssemblyResolver :
                 name,
                 () =>
                 {
-                    if (EqtTrace.IsInfoEnabled)
+                    if (PlatformServiceProvider.Instance.AdapterTraceLogger.IsInfoEnabled)
                     {
-                        EqtTrace.Info(
-                            "AssemblyResolver: {0}: Failed to create assemblyName. Reason:{1} ",
+                        PlatformServiceProvider.Instance.AdapterTraceLogger.Info(
+                            "MSTest.AssemblyResolver.OnResolve: Failed to create assemblyName '{0}'. Reason: {1} ",
                             name,
                             ex);
                     }
@@ -364,9 +369,9 @@ class AssemblyResolver :
             return null;
         }
 
-        DebugEx.Assert(requestedName != null && !StringEx.IsNullOrEmpty(requestedName.Name), "AssemblyResolver.OnResolve: requested is null or name is empty!");
+        DebugEx.Assert(!StringEx.IsNullOrEmpty(requestedName.Name), "MSTest.AssemblyResolver.OnResolve: requested name is empty!");
 
-        foreach (var dir in searchDirectorypaths)
+        foreach (string dir in searchDirectorypaths)
         {
             if (StringEx.IsNullOrEmpty(dir))
             {
@@ -377,17 +382,49 @@ class AssemblyResolver :
                 name,
                 () =>
                 {
-                    if (EqtTrace.IsVerboseEnabled)
+                    if (PlatformServiceProvider.Instance.AdapterTraceLogger.IsVerboseEnabled)
                     {
-                        EqtTrace.Verbose("AssemblyResolver: Searching assembly: {0} in the directory: {1}", requestedName.Name, dir);
+                        PlatformServiceProvider.Instance.AdapterTraceLogger.Verbose("MSTest.AssemblyResolver.OnResolve: Searching assembly '{0}' in the directory '{1}'", requestedName.Name, dir);
                     }
                 });
 
-            foreach (var extension in new string[] { ".dll", ".exe" })
+            foreach (string extension in new string[] { ".dll", ".exe" })
             {
-                var assemblyPath = Path.Combine(dir, requestedName.Name + extension);
+                string assemblyPath = Path.Combine(dir, requestedName.Name + extension);
 
-                var assembly = SearchAndLoadAssembly(assemblyPath, name, requestedName, isReflectionOnly);
+                bool isPushed = false;
+                bool isResource = requestedName.Name.EndsWith(".resources", StringComparison.InvariantCulture);
+                if (isResource)
+                {
+                    // Are we recursively looking up the same resource?  Note - our backout code will set
+                    // the ResourceHelper's currentlyLoading stack to null if an exception occurs.
+                    if (s_currentlyLoading != null && s_currentlyLoading.Count > 0 && s_currentlyLoading.LastIndexOf(assemblyPath) != -1)
+                    {
+                        SafeLog(
+                            name,
+                            () =>
+                            {
+                                if (PlatformServiceProvider.Instance.AdapterTraceLogger.IsInfoEnabled)
+                                {
+                                    PlatformServiceProvider.Instance.AdapterTraceLogger.Info("MSTest.AssemblyResolver.OnResolve: Assembly '{0}' is searching for itself recursively '{1}', returning as not found.", name, assemblyPath);
+                                }
+                            });
+                        _resolvedAssemblies[name] = null;
+                        return null;
+                    }
+
+                    s_currentlyLoading ??= [];
+                    s_currentlyLoading.Add(assemblyPath); // Push
+                    isPushed = true;
+                }
+
+                Assembly? assembly = SearchAndLoadAssembly(assemblyPath, name, requestedName, isReflectionOnly);
+                if (isResource && isPushed)
+                {
+                    DebugEx.Assert(s_currentlyLoading is not null, "_currentlyLoading should not be null");
+                    s_currentlyLoading.RemoveAt(s_currentlyLoading.Count - 1); // Pop
+                }
+
                 if (assembly != null)
                 {
                     return assembly;
@@ -410,16 +447,16 @@ class AssemblyResolver :
         DebugEx.Assert(requestedName != null, "requested assembly name should not be null.");
         DebugEx.Assert(foundName != null, "found assembly name should not be null.");
 
-        var requestedPublicKey = requestedName.GetPublicKeyToken();
+        byte[]? requestedPublicKey = requestedName.GetPublicKeyToken();
         if (requestedPublicKey != null)
         {
-            var foundPublicKey = foundName.GetPublicKeyToken();
+            byte[]? foundPublicKey = foundName.GetPublicKeyToken();
             if (foundPublicKey == null)
             {
                 return false;
             }
 
-            for (var i = 0; i < requestedPublicKey.Length; ++i)
+            for (int i = 0; i < requestedPublicKey.Length; ++i)
             {
                 if (requestedPublicKey[i] != foundPublicKey[i])
                 {
@@ -459,15 +496,15 @@ class AssemblyResolver :
     /// <param name="args"> The args. </param>
     /// <param name="isReflectionOnly"> Indicates whether this is called under a Reflection Only Load context. </param>
     /// <returns> The <see cref="Assembly"/>.  </returns>
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes", Justification = "Requirement is to handle all kinds of user exceptions and message appropriately.")]
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Usage", "CA1801:ReviewUnusedParameters", MessageId = "senderAppDomain", Justification = "This is an event handler.")]
+    [SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes", Justification = "Requirement is to handle all kinds of user exceptions and message appropriately.")]
+    [SuppressMessage("Microsoft.Usage", "CA1801:ReviewUnusedParameters", MessageId = "senderAppDomain", Justification = "This is an event handler.")]
 #pragma warning disable IDE0060 // Remove unused parameter
     private Assembly? OnResolveInternal(object? senderAppDomain, ResolveEventArgs args, bool isReflectionOnly)
 #pragma warning restore IDE0060 // Remove unused parameter
     {
         if (StringEx.IsNullOrEmpty(args.Name))
         {
-            Debug.Fail("AssemblyResolver.OnResolve: args.Name is null or empty.");
+            Debug.Fail("MSTest.AssemblyResolver.OnResolve: args.Name is null or empty.");
             return null;
         }
 
@@ -475,9 +512,9 @@ class AssemblyResolver :
             args.Name,
             () =>
             {
-                if (EqtTrace.IsInfoEnabled)
+                if (PlatformServiceProvider.Instance.AdapterTraceLogger.IsInfoEnabled)
                 {
-                    EqtTrace.Info("AssemblyResolver: Resolving assembly: {0}.", args.Name);
+                    PlatformServiceProvider.Instance.AdapterTraceLogger.Info("MSTest.AssemblyResolver.OnResolve: Resolving assembly '{0}'", args.Name);
                 }
             });
 
@@ -487,75 +524,71 @@ class AssemblyResolver :
             assemblyNameToLoad,
             () =>
             {
-                if (EqtTrace.IsInfoEnabled)
+                if (PlatformServiceProvider.Instance.AdapterTraceLogger.IsInfoEnabled)
                 {
-                    EqtTrace.Info("AssemblyResolver: Resolving assembly after applying policy: {0}.", assemblyNameToLoad);
+                    PlatformServiceProvider.Instance.AdapterTraceLogger.Info("MSTest.AssemblyResolver.OnResolve: Resolving assembly after applying policy '{0}'", assemblyNameToLoad);
                 }
             });
 
         lock (_syncLock)
         {
             // Since both normal and reflection only cache are accessed in same block, putting only one lock should be sufficient.
-            if (TryLoadFromCache(assemblyNameToLoad, isReflectionOnly, out var assembly))
+            if (TryLoadFromCache(assemblyNameToLoad, isReflectionOnly, out Assembly? assembly))
             {
                 return assembly;
             }
 
             assembly = SearchAssembly(_searchDirectories, assemblyNameToLoad, isReflectionOnly);
-
             if (assembly != null)
             {
                 return assembly;
             }
 
-            if (_directoryList != null && _directoryList.Count != 0)
+            // required assembly is not present in searchDirectories??
+            // see, if we can find it in user specified search directories.
+            while (assembly == null && _directoryList?.Count > 0)
             {
-                // required assembly is not present in searchDirectories??
-                // see, if we can find it in user specified search directories.
-                while (assembly == null && _directoryList.Count > 0)
+                // instead of loading whole search directory in one time, we are adding directory on the basis of need
+                RecursiveDirectoryPath currentNode = _directoryList.Dequeue();
+
+                List<string> incrementalSearchDirectory = [];
+
+                if (DoesDirectoryExist(currentNode.DirectoryPath))
                 {
-                    // instead of loading whole search directory in one time, we are adding directory on the basis of need
-                    var currentNode = _directoryList.Dequeue();
+                    incrementalSearchDirectory.Add(currentNode.DirectoryPath);
 
-                    List<string> incrementalSearchDirectory = [];
-
-                    if (DoesDirectoryExist(currentNode.DirectoryPath))
+                    if (currentNode.IncludeSubDirectories)
                     {
-                        incrementalSearchDirectory.Add(currentNode.DirectoryPath);
+                        // Add all its sub-directory in depth first search order.
+                        AddSubdirectories(currentNode.DirectoryPath, incrementalSearchDirectory);
+                    }
 
-                        if (currentNode.IncludeSubDirectories)
+                    // Add this directory list in this.searchDirectories so that when we will try to resolve some other
+                    // assembly, then it will look in this whole directory first.
+                    _searchDirectories.AddRange(incrementalSearchDirectory);
+
+                    assembly = SearchAssembly(incrementalSearchDirectory, assemblyNameToLoad, isReflectionOnly);
+                }
+                else
+                {
+                    // generate warning that path does not exist.
+                    SafeLog(
+                        assemblyNameToLoad,
+                        () =>
                         {
-                            // Add all its sub-directory in depth first search order.
-                            AddSubdirectories(currentNode.DirectoryPath, incrementalSearchDirectory);
-                        }
-
-                        // Add this directory list in this.searchDirectories so that when we will try to resolve some other
-                        // assembly, then it will look in this whole directory first.
-                        _searchDirectories.AddRange(incrementalSearchDirectory);
-
-                        assembly = SearchAssembly(incrementalSearchDirectory, assemblyNameToLoad, isReflectionOnly);
-                    }
-                    else
-                    {
-                        // generate warning that path does not exist.
-                        SafeLog(
-                            assemblyNameToLoad,
-                            () =>
+                            if (PlatformServiceProvider.Instance.AdapterTraceLogger.IsWarningEnabled)
                             {
-                                if (EqtTrace.IsWarningEnabled)
-                                {
-                                    EqtTrace.Warning(
-                                    "The Directory: {0}, does not exist",
-                                    currentNode.DirectoryPath);
-                                }
-                            });
-                    }
+                                PlatformServiceProvider.Instance.AdapterTraceLogger.Warning(
+                                "MSTest.AssemblyResolver.OnResolve: the directory '{0}', does not exist",
+                                currentNode.DirectoryPath);
+                            }
+                        });
                 }
+            }
 
-                if (assembly != null)
-                {
-                    return assembly;
-                }
+            if (assembly != null)
+            {
+                return assembly;
             }
 
             // Try for default load for System dlls that can't be found in search paths. Needs to loaded just by name.
@@ -570,10 +603,7 @@ class AssemblyResolver :
 
                     assembly = Assembly.ReflectionOnlyLoad(assemblyNameToLoad);
 
-                    if (assembly != null)
-                    {
-                        _reflectionOnlyResolvedAssemblies[assemblyNameToLoad] = assembly;
-                    }
+                    _reflectionOnlyResolvedAssemblies[assemblyNameToLoad] = assembly;
 
                     return assembly;
                 }
@@ -585,22 +615,19 @@ class AssemblyResolver :
 
                 assembly = Assembly.Load(assemblyNameToLoad);
 
-                if (assembly != null)
-                {
-                    _resolvedAssemblies[assemblyNameToLoad] = assembly;
-                }
+                _resolvedAssemblies[assemblyNameToLoad] = assembly;
 
                 return assembly;
             }
             catch (Exception ex)
             {
                 SafeLog(
-                    args?.Name,
+                    args.Name,
                     () =>
                     {
-                        if (EqtTrace.IsInfoEnabled)
+                        if (PlatformServiceProvider.Instance.AdapterTraceLogger.IsInfoEnabled)
                         {
-                            EqtTrace.Info("AssemblyResolver: {0}: Failed to load assembly. Reason: {1}", assemblyNameToLoad, ex);
+                            PlatformServiceProvider.Instance.AdapterTraceLogger.Info("MSTest.AssemblyResolver.OnResolve: Failed to load assembly '{0}'. Reason: {1}", assemblyNameToLoad, ex);
                         }
                     });
             }
@@ -627,9 +654,9 @@ class AssemblyResolver :
                 assemblyName,
                 () =>
                 {
-                    if (EqtTrace.IsInfoEnabled)
+                    if (PlatformServiceProvider.Instance.AdapterTraceLogger.IsInfoEnabled)
                     {
-                        EqtTrace.Info("AssemblyResolver: Resolved: {0}.", assemblyName);
+                        PlatformServiceProvider.Instance.AdapterTraceLogger.Info("MSTest.AssemblyResolver.OnResolve: Resolved '{0}'", assemblyName);
                     }
                 });
             return true;
@@ -640,8 +667,8 @@ class AssemblyResolver :
 
     /// <summary>
     /// Call logger APIs safely. We do not want a stackoverflow when objectmodel assembly itself
-    /// is being resolved and an EqtTrace message prompts the load of the same dll again.
-    /// CLR does not trigger a load when the EqtTrace messages are in a lambda expression. Leaving it that way
+    /// is being resolved and an PlatformServiceProvider.Instance.AdapterTraceLogger message prompts the load of the same dll again.
+    /// CLR does not trigger a load when the PlatformServiceProvider.Instance.AdapterTraceLogger messages are in a lambda expression. Leaving it that way
     /// to preserve readability instead of creating wrapper functions.
     /// </summary>
     /// <param name="assemblyName">The assembly being resolved.</param>
@@ -666,8 +693,8 @@ class AssemblyResolver :
     /// <param name="requestedName"> The requested Name. </param>
     /// <param name="isReflectionOnly"> Indicates whether this is called under a Reflection Only Load context. </param>
     /// <returns> The <see cref="Assembly"/>. </returns>
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Reliability", "CA2001:AvoidCallingProblematicMethods", MessageId = "System.Reflection.Assembly.LoadFrom", Justification = "The assembly location is figured out from the configuration that the user passes in.")]
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes", Justification = "Requirement is to handle all kinds of user exceptions and message appropriately.")]
+    [SuppressMessage("Microsoft.Reliability", "CA2001:AvoidCallingProblematicMethods", MessageId = "System.Reflection.Assembly.LoadFrom", Justification = "The assembly location is figured out from the configuration that the user passes in.")]
+    [SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes", Justification = "Requirement is to handle all kinds of user exceptions and message appropriately.")]
     private Assembly? SearchAndLoadAssembly(string assemblyPath, string assemblyName, AssemblyName requestedName, bool isReflectionOnly)
     {
         try
@@ -703,9 +730,9 @@ class AssemblyResolver :
                 assemblyName,
                 () =>
                     {
-                        if (EqtTrace.IsInfoEnabled)
+                        if (PlatformServiceProvider.Instance.AdapterTraceLogger.IsInfoEnabled)
                         {
-                            EqtTrace.Info("AssemblyResolver: Resolved assembly: {0}. ", assemblyName);
+                            PlatformServiceProvider.Instance.AdapterTraceLogger.Info("MSTest.AssemblyResolver.OnResolve: Resolved assembly '{0}'", assemblyName);
                         }
                     });
 
@@ -717,9 +744,9 @@ class AssemblyResolver :
                 assemblyName,
                 () =>
                     {
-                        if (EqtTrace.IsInfoEnabled)
+                        if (PlatformServiceProvider.Instance.AdapterTraceLogger.IsInfoEnabled)
                         {
-                            EqtTrace.Info("AssemblyResolver: Failed to load assembly: {0}. Reason:{1} ", assemblyName, ex);
+                            PlatformServiceProvider.Instance.AdapterTraceLogger.Info("MSTest.AssemblyResolver.OnResolve: Failed to load assembly '{0}'. Reason:{1} ", assemblyName, ex);
                         }
                     });
 
@@ -735,9 +762,9 @@ class AssemblyResolver :
                 assemblyName,
                 () =>
                     {
-                        if (EqtTrace.IsInfoEnabled)
+                        if (PlatformServiceProvider.Instance.AdapterTraceLogger.IsInfoEnabled)
                         {
-                            EqtTrace.Info("AssemblyResolver: Failed to load assembly: {0}. Reason:{1} ", assemblyName, ex);
+                            PlatformServiceProvider.Instance.AdapterTraceLogger.Info("MSTest.AssemblyResolver.OnResolve: Failed to load assembly '{0}'. Reason:{1} ", assemblyName, ex);
                         }
                     });
         }

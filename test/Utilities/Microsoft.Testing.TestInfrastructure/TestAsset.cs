@@ -7,17 +7,38 @@ public class TestAsset : IDisposable
 {
     private const string FileTag = "#file";
 
-    private readonly TempDirectory _tempDirectory;
+    private readonly TempDirectory? _tempDirectory;
     private readonly string _assetCode;
+
     private bool _isDisposed;
 
-    public TestAsset(string targetPath, string assetCode, bool cleanup = true)
+    public TestAsset(string assetId, string assetCode, TempDirectory tempDirectory)
     {
+        AssetId = assetId;
         _assetCode = assetCode;
-        _tempDirectory = new(targetPath, arcadeConvention: true, cleanup);
+        TargetAssetPath = Path.Combine(tempDirectory.Path, assetId);
+
+        if (Directory.Exists(TargetAssetPath))
+        {
+            throw new InvalidOperationException($"Directory / asset id '{assetId}' in '{tempDirectory.Path}' already exists. Make sure the paths for your test assets are unique. Typically you need to look into GetAssetsToGenerate method on the test fixture that is used for running the failing test");
+        }
+
+        tempDirectory.CreateDirectory(assetId);
     }
 
-    public string TargetAssetPath => _tempDirectory.Path;
+    public TestAsset(string assetName, string assetCode)
+        : this(assetName, assetCode, new TempDirectory(subDirectory: null))
+    {
+        AssetId = assetName;
+        _assetCode = assetCode;
+        // Assign temp directory because we own it.
+        _tempDirectory = new TempDirectory(assetName);
+        TargetAssetPath = _tempDirectory.Path;
+    }
+
+    public string AssetId { get; }
+
+    public string TargetAssetPath { get; }
 
     public DotnetMuxerResult? DotnetResult { get; internal set; }
 
@@ -38,7 +59,7 @@ public class TestAsset : IDisposable
         {
             if (DotnetResult is null || DotnetResult.ExitCode == 0)
             {
-                _tempDirectory.Dispose();
+                _tempDirectory?.Dispose();
             }
         }
 
@@ -60,12 +81,25 @@ public class TestAsset : IDisposable
 
     public static async Task<TestAsset> GenerateAssetAsync(string assetName, string code, bool addDefaultNuGetConfigFile = true, bool addPublicFeeds = false)
     {
-        var testAsset = new TestAsset(assetName, addDefaultNuGetConfigFile ? string.Concat(code, GetNuGetConfig(addPublicFeeds)) : code);
-        string[] splitFiles = testAsset._assetCode.Split(new string[] { FileTag }, StringSplitOptions.RemoveEmptyEntries);
+        TestAsset testAsset = new(assetName, addDefaultNuGetConfigFile ? string.Concat(code, GetNuGetConfig(addPublicFeeds)) : code);
+        string[] splitFiles = testAsset._assetCode.Split([FileTag], StringSplitOptions.RemoveEmptyEntries);
         foreach (string fileContent in splitFiles)
         {
             (string, string) fileInfo = ParseFile(fileContent);
-            await TempDirectory.WriteFileAsync(testAsset._tempDirectory.Path, fileInfo.Item1, fileInfo.Item2);
+            await TempDirectory.WriteFileAsync(testAsset.TargetAssetPath, fileInfo.Item1, fileInfo.Item2);
+        }
+
+        return testAsset;
+    }
+
+    public static async Task<TestAsset> GenerateAssetAsync(string assetName, string code, TempDirectory tempDirectory, bool addDefaultNuGetConfigFile = true, bool addPublicFeeds = false)
+    {
+        TestAsset testAsset = new(assetName, addDefaultNuGetConfigFile ? string.Concat(code, GetNuGetConfig(addPublicFeeds)) : code, tempDirectory);
+        string[] splitFiles = testAsset._assetCode.Split([FileTag], StringSplitOptions.RemoveEmptyEntries);
+        foreach (string fileContent in splitFiles)
+        {
+            (string, string) fileInfo = ParseFile(fileContent);
+            await TempDirectory.WriteFileAsync(testAsset.TargetAssetPath, fileInfo.Item1, fileInfo.Item2);
         }
 
         return testAsset;
@@ -75,8 +109,15 @@ public class TestAsset : IDisposable
     {
         string publicFeedsFragment = addPublicFeeds
             ? """
-                    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
-                    <add key="test-tools" value="https://pkgs.dev.azure.com/dnceng/public/_packaging/test-tools/nuget/v3/index.json" />
+                <add key="test-tools" value="https://pkgs.dev.azure.com/dnceng/public/_packaging/test-tools/nuget/v3/index.json" />
+            """
+            : string.Empty;
+
+        string publicFeedsMapping = addPublicFeeds
+            ? """
+            <packageSource key="test-tools">
+                <package pattern="*" />
+            </packageSource>
             """
             : string.Empty;
 
@@ -90,11 +131,12 @@ public class TestAsset : IDisposable
         <add key="local-shipping" value="{Constants.ArtifactsPackagesShipping}" />
         <add key="local-tmp-packages" value="{Constants.ArtifactsTmpPackages}" />
         <add key="dotnet-public" value="https://pkgs.dev.azure.com/dnceng/public/_packaging/dotnet-public/nuget/v3/index.json" />
+        <!-- This feed is required for FSharp.Core until preview 1 or 2 is released -->
+        <add key="dotnet10" value="https://pkgs.dev.azure.com/dnceng/public/_packaging/dotnet10/nuget/v3/index.json" />
+        <add key="dotnet11" value="https://pkgs.dev.azure.com/dnceng/public/_packaging/dotnet11/nuget/v3/index.json" />
     </packageSources>
-    <config>
-        <add key="globalPackagesFolder" value=".packages" />
-    </config>
     <packageSourceMapping>
+        {publicFeedsMapping}
         <packageSource key="local-nonshipping">
             <package pattern="*" />
         </packageSource>
@@ -105,6 +147,12 @@ public class TestAsset : IDisposable
             <package pattern="*" />
         </packageSource>
         <packageSource key="dotnet-public">
+            <package pattern="*" />
+        </packageSource>
+        <packageSource key="dotnet10">
+            <package pattern="*" />
+        </packageSource>
+        <packageSource key="dotnet11">
             <package pattern="*" />
         </packageSource>
     </packageSourceMapping>

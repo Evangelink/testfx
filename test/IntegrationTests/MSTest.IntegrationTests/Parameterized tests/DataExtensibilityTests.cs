@@ -1,10 +1,16 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using System.Collections.Immutable;
+
 using Microsoft.MSTestV2.CLIAutomation;
+using Microsoft.VisualStudio.TestPlatform.ObjectModel;
+
+using TestResult = Microsoft.VisualStudio.TestPlatform.ObjectModel.TestResult;
 
 namespace MSTest.IntegrationTests;
 
+[TestClass]
 public class DataExtensibilityTests : CLITestBase
 {
     private const string TestAssetName = "FxExtensibilityTestProject";
@@ -14,42 +20,57 @@ public class DataExtensibilityTests : CLITestBase
          - Ignored tests are discovered during discovery
          - Ignored tests are not expanded (DataRow, DataSource, etc)
      */
-
-    public void CustomTestDataSourceTests()
+    [TestMethod]
+    public async Task CustomTestDataSourceTests()
     {
         // Arrange
-        var assemblyPath = GetAssetFullPath(TestAssetName);
+        string assemblyPath = GetAssetFullPath(TestAssetName);
 
         // Act
-        var testCases = DiscoverTests(assemblyPath, "CustomTestDataSourceTestMethod1");
-        var testResults = RunTests(testCases);
+        ImmutableArray<TestCase> testCases = DiscoverTests(assemblyPath, "CustomTestDataSourceTestMethod1");
+        ImmutableArray<TestResult> testResults = await RunTestsAsync(testCases);
 
         // Assert
         VerifyE2E.ContainsTestsPassed(testResults, "CustomTestDataSourceTestMethod1 (1,2,3)", "CustomTestDataSourceTestMethod1 (4,5,6)");
     }
 
-    public void AssertExtensibilityTests()
+    [TestMethod]
+    public async Task CustomEmptyTestDataSourceTests()
     {
         // Arrange
-        var assemblyPath = GetAssetFullPath(TestAssetName);
+        string assemblyPath = GetAssetFullPath(TestAssetName);
 
         // Act
-        var testCases = DiscoverTests(assemblyPath, "FxExtensibilityTestProject.AssertExTest");
-        var testResults = RunTests(testCases);
+        ImmutableArray<TestCase> testCases = DiscoverTests(assemblyPath, "CustomEmptyTestDataSourceTestMethod");
+        ImmutableArray<TestResult> testResults = await RunTestsAsync(testCases);
 
         // Assert
-        VerifyE2E.ContainsTestsPassed(testResults, "BasicAssertExtensionTest", "ChainedAssertExtensionTest");
+        VerifyE2E.ContainsTestsFailed(testResults, [null!]);
+    }
+
+    [TestMethod]
+    public async Task AssertExtensibilityTests()
+    {
+        // Arrange
+        string assemblyPath = GetAssetFullPath(TestAssetName);
+
+        // Act
+        ImmutableArray<TestCase> testCases = DiscoverTests(assemblyPath, "FxExtensibilityTestProject.AssertExTest");
+        ImmutableArray<TestResult> testResults = await RunTestsAsync(testCases);
+
+        // Assert
         VerifyE2E.ContainsTestsFailed(testResults, "BasicFailingAssertExtensionTest", "ChainedFailingAssertExtensionTest");
     }
 
-    public void ExecuteCustomTestExtensibilityTests()
+    [TestMethod]
+    public async Task ExecuteCustomTestExtensibilityTests()
     {
         // Arrange
-        var assemblyPath = GetAssetFullPath(TestAssetName);
+        string assemblyPath = GetAssetFullPath(TestAssetName);
 
         // Act
-        var testCases = DiscoverTests(assemblyPath, "(Name~CustomTestMethod1)|(Name~CustomTestClass1)");
-        var testResults = RunTests(testCases);
+        ImmutableArray<TestCase> testCases = DiscoverTests(assemblyPath, "(Name~CustomTestMethod1)|(Name~CustomTestClass1)");
+        ImmutableArray<TestResult> testResults = await RunTestsAsync(testCases);
 
         // Assert
         VerifyE2E.ContainsTestsPassed(
@@ -69,29 +90,51 @@ public class DataExtensibilityTests : CLITestBase
             "CustomTestClass1 - Execution number 3");
     }
 
-    public void ExecuteCustomTestExtensibilityWithTestDataTests()
+    [TestMethod]
+    public async Task ExecuteCustomTestExtensibilityWithTestDataTests()
     {
         // Arrange
-        var assemblyPath = GetAssetFullPath(TestAssetName);
+        string assemblyPath = GetAssetFullPath(TestAssetName);
 
         // Act
-        var testCases = DiscoverTests(assemblyPath, "Name~CustomTestMethod2");
-        var testResults = RunTests(testCases);
+        ImmutableArray<TestCase> testCases = DiscoverTests(assemblyPath, "Name~CustomTestMethod2");
+        ImmutableArray<TestResult> testResults = await RunTestsAsync(testCases);
 
         // Assert
         VerifyE2E.TestsPassed(
             testResults,
-            "CustomTestMethod2 (B)",
-            "CustomTestMethod2 (B)",
-            "CustomTestMethod2 (B)");
+            "CustomTestMethod2 (\"B\")",
+            "CustomTestMethod2 (\"B\")",
+            "CustomTestMethod2 (\"B\")");
 
         VerifyE2E.TestsFailed(
             testResults,
-            "CustomTestMethod2 (A)",
-            "CustomTestMethod2 (A)",
-            "CustomTestMethod2 (A)",
-            "CustomTestMethod2 (C)",
-            "CustomTestMethod2 (C)",
-            "CustomTestMethod2 (C)");
+            "CustomTestMethod2 (\"A\")",
+            "CustomTestMethod2 (\"A\")",
+            "CustomTestMethod2 (\"A\")",
+            "CustomTestMethod2 (\"C\")",
+            "CustomTestMethod2 (\"C\")",
+            "CustomTestMethod2 (\"C\")");
+    }
+
+    [TestMethod]
+    public async Task WhenUsingCustomITestDataSourceWithExpansionDisabled_RespectSetting()
+    {
+        // Arrange
+        string assemblyPath = GetAssetFullPath(TestAssetName);
+
+        // Act
+        ImmutableArray<TestCase> testCases = DiscoverTests(assemblyPath, "CustomDisableExpansionTestDataSourceTestMethod1");
+        ImmutableArray<TestResult> testResults = await RunTestsAsync(testCases);
+
+        // Assert
+        Assert.HasCount(1, testCases);
+
+        VerifyE2E.TestsPassed(
+            testResults,
+            "CustomDisableExpansionTestDataSourceTestMethod1 (1,2,3)",
+            "CustomDisableExpansionTestDataSourceTestMethod1 (4,5,6)");
+
+        VerifyE2E.TestsFailed(testResults);
     }
 }

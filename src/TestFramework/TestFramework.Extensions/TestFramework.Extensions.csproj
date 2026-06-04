@@ -5,16 +5,14 @@
   <Import Project="Sdk.props" Sdk="Microsoft.NET.Sdk" Condition=" '$(OS)' != 'Windows_NT' " />
 
   <PropertyGroup>
-    <TargetFrameworks Condition=" '$(OS)' == 'Windows_NT' ">$(UwpMinimum);$(WinUiMinimum);netstandard2.0;$(NetFrameworkMinimum);$(SupportedNetFrameworks)</TargetFrameworks>
+    <TargetFrameworks Condition=" '$(OS)' == 'Windows_NT' ">netstandard2.0;$(NetFrameworkMinimum);$(SupportedNetFrameworks);$(UwpMinimum);$(ModernUwpMinimum);$(WinUiMinimum)</TargetFrameworks>
     <TargetFrameworks Condition=" '$(OS)' != 'Windows_NT' ">$(SupportedNetFrameworks);netstandard2.0</TargetFrameworks>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <UseAssemblyVersion14>true</UseAssemblyVersion14>
   </PropertyGroup>
 
   <PropertyGroup>
     <IsPackable>true</IsPackable>
     <NuspecFile Condition=" '$(OS)' == 'Windows_NT' ">MSTest.TestFramework.nuspec</NuspecFile>
-    <NuspecFile Condition=" '$(OS)' != 'Windows_NT' ">MSTest.TestFramework.Linux.nuspec</NuspecFile>
+    <NuspecFile Condition=" '$(OS)' != 'Windows_NT' ">MSTest.TestFramework.NonWindows.nuspec</NuspecFile>
     <NuspecBasePath>$(OutputPath)</NuspecBasePath>
     <PackageId>MSTest.TestFramework</PackageId>
     <PackageTags>MSTest TestFramework Unittest MSTestV2 Microsoft Test Testing TDD Framework</PackageTags>
@@ -25,17 +23,20 @@
 
       Supported platforms:
       - .NET 4.6.2+
-      - .NET Core 3.1+
-      - .NET 6.0
-      - .NET 6.0 Windows.18362+
+      - .NET 8.0+
+      - .NET 8.0 Windows.18362+ (WinUI)
       - UWP 10.0.16299
+      - UWP 10.0.17763 with .NET 9+
     </PackageDescription>
+    <NoWarn>$(NoWarn);NU5100</NoWarn>
   </PropertyGroup>
 
   <PropertyGroup>
     <RootNamespace>Microsoft.VisualStudio.TestTools.UnitTesting</RootNamespace>
-    <AssemblyName>Microsoft.VisualStudio.TestPlatform.TestFramework.Extensions</AssemblyName>
-    <DefineConstants>TRACE</DefineConstants>
+    <AssemblyName>MSTest.TestFramework.Extensions</AssemblyName>
+    <DefineConstants>$(DefineConstants);TRACE</DefineConstants>
+
+    <DefineConstants>$(DefineConstants);EXCLUDE_RANGE_INDEX_POLYFILL;EXCLUDE_OS_POLYFILL</DefineConstants>
   </PropertyGroup>
 
   <!-- WinUI specific properties -->
@@ -44,11 +45,11 @@
     <TargetPlatformVersion>10.0.18362.0</TargetPlatformVersion>
     <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
     <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
-    <RuntimeIdentifiers>win10-x86;win10-x64;win10-arm64</RuntimeIdentifiers>
+    <RuntimeIdentifiers>win-x86;win-x64;win-arm64</RuntimeIdentifiers>
   </PropertyGroup>
   <!-- UWP specific properties -->
-  <PropertyGroup Condition=" '$(TargetFramework)' == '$(UwpMinimum)' ">
-    <DefineConstants>$(DefineConstants);NETFX_CORE;WINDOWS_UWP</DefineConstants>
+  <PropertyGroup Condition=" '$(TargetFramework)' == '$(UwpMinimum)' OR '$(TargetFramework)' == '$(ModernUwpMinimum)' ">
+    <DefineConstants>$(DefineConstants);WINDOWS_UWP</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>
@@ -57,7 +58,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Condition=" '$(TargetFramework)' == '$(WinUiMinimum)' " Include="Microsoft.WindowsAppSDK" Version="$(MicrosoftWindowsAppSDKVersion)" />
+    <PackageReference Condition=" '$(TargetFramework)' == '$(WinUiMinimum)' " Include="Microsoft.WindowsAppSDK" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="$(RepoRoot)src/Polyfills/**/*.cs" Link="Polyfills\%(RecursiveDir)%(Filename)%(Extension)" />
   </ItemGroup>
 
   <ItemGroup Condition=" '$(TargetFramework)' == '$(NetFrameworkMinimum)' ">
@@ -65,7 +70,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <EmbeddedResource Condition=" '$(TargetFramework)' == '$(UwpMinimum)' " Update="Properties\Extension.UWP.rd.xml" />
+    <EmbeddedResource Condition=" '$(TargetFramework)' == '$(UwpMinimum)' OR '$(TargetFramework)' == '$(ModernUwpMinimum)' " Update="Properties\Extension.UWP.rd.xml" />
     <!-- API that is common to all frameworks that we build for. -->
     <AdditionalFiles Include="PublicAPI\PublicAPI.Shipped.txt" />
     <AdditionalFiles Include="PublicAPI\PublicAPI.Unshipped.txt" />
@@ -76,6 +81,17 @@
 
   <ItemGroup Label="NuGet">
     <NuspecProperty Include="RepoRoot=$(RepoRoot)" />
+    <NuspecProperty Include="SystemThreadingTasksExtensionsVersion=$(SystemThreadingTasksExtensionsVersion)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Polyfills" />
+    <Using Include="$(RootNamespace).Resources" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="MSTestAdapter.PlatformServices" Key="$(VsPublicKey)" />
+    <InternalsVisibleTo Include="MSTestAdapter.PlatformServices.UnitTests" Key="$(VsPublicKey)" />
   </ItemGroup>
 
   <!-- SDK bottom import -->

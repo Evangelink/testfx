@@ -1,4 +1,4 @@
-// Copyright (c) Microsoft Corporation. All rights reserved.
+﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 #if NETFRAMEWORK
@@ -25,28 +25,16 @@ internal sealed class OdbcDataConnection : TestDataConnectionSql
         _isMSSql = Connection != null && IsMSSql(Connection.Driver);
     }
 
-    public new OdbcCommandBuilder CommandBuilder
-    {
-        get { return (OdbcCommandBuilder)base.CommandBuilder; }
-    }
+    public new OdbcCommandBuilder CommandBuilder => (OdbcCommandBuilder)base.CommandBuilder;
 
-    public new OdbcConnection Connection
-    {
-        get { return (OdbcConnection)base.Connection; }
-    }
+    public new OdbcConnection Connection => (OdbcConnection)base.Connection;
 
     /// <summary>
     /// This is overridden because we need manually get quote literals, OleDb does not fill those automatically.
     /// </summary>
-    public override void GetQuoteLiterals()
-    {
-        GetQuoteLiteralsHelper();
-    }
+    public override void GetQuoteLiterals() => GetQuoteLiteralsHelper();
 
-    public override string? GetDefaultSchema()
-    {
-        return _isMSSql ? GetDefaultSchemaMSSql() : base.GetDefaultSchema();
-    }
+    public override string? GetDefaultSchema() => _isMSSql ? GetDefaultSchemaMSSql() : base.GetDefaultSchema();
 
     protected override SchemaMetaData[] GetSchemaMetaData()
     {
@@ -87,10 +75,10 @@ internal sealed class OdbcDataConnection : TestDataConnectionSql
     // Need to fix up excel connections
     private static string FixConnectionString(string connectionString, List<string> dataFolders)
     {
-        OdbcConnectionStringBuilder builder = new(connectionString);
+        OdbcConnectionStringBuilder builder = [with(connectionString)];
 
         // only fix this for excel
-        if (!string.Equals(builder.Dsn, "Excel Files", System.StringComparison.Ordinal))
+        if (!string.Equals(builder.Dsn, "Excel Files", StringComparison.Ordinal))
         {
             return connectionString;
         }

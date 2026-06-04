@@ -1,19 +1,14 @@
-// Copyright (c) Microsoft Corporation. All rights reserved.
+﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
-
-using System.Diagnostics.CodeAnalysis;
-using System.Globalization;
-using System.Text.RegularExpressions;
 
 namespace Microsoft.VisualStudio.TestTools.UnitTesting;
 
 /// <summary>
 /// The string assert.
 /// </summary>
+[StackTraceHidden]
 public sealed class StringAssert
 {
-    private static readonly object[] Empty = Array.Empty<object>();
-
     #region Singleton constructor
 
     private StringAssert()
@@ -21,7 +16,7 @@ public sealed class StringAssert
     }
 
     /// <summary>
-    /// Gets the singleton instance of the CollectionAssert functionality.
+    /// Gets the singleton instance of the StringAssert functionality.
     /// </summary>
     /// <remarks>
     /// Users can use this to plug-in custom assertions through C# extension methods.
@@ -29,7 +24,7 @@ public sealed class StringAssert
     /// Users could then use a syntax similar to the default assertions which in this case is "StringAssert.That.ContainsWords(value, substrings);"
     /// More documentation is at "https://github.com/Microsoft/testfx/docs/README.md".
     /// </remarks>
-    public static StringAssert That { get; } = new StringAssert();
+    public static StringAssert That { get; } = new();
 
     #endregion
 
@@ -51,7 +46,7 @@ public sealed class StringAssert
     /// or <paramref name="value"/> does not contain <paramref name="substring"/>.
     /// </exception>
     public static void Contains([NotNull] string? value, [NotNull] string? substring)
-        => Contains(value, substring, string.Empty, StringComparison.Ordinal);
+        => Contains(value, substring, StringComparison.Ordinal, string.Empty);
 
     /// <summary>
     /// Tests whether the specified string contains the specified substring
@@ -72,7 +67,7 @@ public sealed class StringAssert
     /// or <paramref name="value"/> does not contain <paramref name="substring"/>.
     /// </exception>
     public static void Contains([NotNull] string? value, [NotNull] string? substring, StringComparison comparisonType)
-        => Contains(value, substring, string.Empty, comparisonType);
+        => Contains(value, substring, comparisonType, string.Empty);
 
     /// <summary>
     /// Tests whether the specified string contains the specified substring
@@ -95,7 +90,7 @@ public sealed class StringAssert
     /// or <paramref name="value"/> does not contain <paramref name="substring"/>.
     /// </exception>
     public static void Contains([NotNull] string? value, [NotNull] string? substring, string? message)
-        => Contains(value, substring, message, StringComparison.Ordinal);
+        => Contains(value, substring, StringComparison.Ordinal, message);
 
     /// <summary>
     /// Tests whether the specified string contains the specified substring
@@ -107,86 +102,30 @@ public sealed class StringAssert
     /// </param>
     /// <param name="substring">
     /// The string expected to occur within <paramref name="value"/>.
-    /// </param>
-    /// <param name="message">
-    /// The message to include in the exception when <paramref name="substring"/>
-    /// is not in <paramref name="value"/>. The message is shown in
-    /// test results.
     /// </param>
     /// <param name="comparisonType">
     /// The comparison method to compare strings <paramref name="comparisonType"/>.
     /// </param>
-    /// <exception cref="AssertFailedException">
-    /// <paramref name="value"/> is null, or <paramref name="substring"/> is null,
-    /// or <paramref name="value"/> does not contain <paramref name="substring"/>.
-    /// </exception>
-    public static void Contains([NotNull] string? value, [NotNull] string? substring, string? message,
-        StringComparison comparisonType)
-        => Contains(value, substring, message, comparisonType, Empty);
-
-    /// <summary>
-    /// Tests whether the specified string contains the specified substring
-    /// and throws an exception if the substring does not occur within the
-    /// test string.
-    /// </summary>
-    /// <param name="value">
-    /// The string that is expected to contain <paramref name="substring"/>.
-    /// </param>
-    /// <param name="substring">
-    /// The string expected to occur within <paramref name="value"/>.
-    /// </param>
     /// <param name="message">
     /// The message to include in the exception when <paramref name="substring"/>
     /// is not in <paramref name="value"/>. The message is shown in
     /// test results.
     /// </param>
-    /// <param name="parameters">
-    /// An array of parameters to use when formatting <paramref name="message"/>.
-    /// </param>
     /// <exception cref="AssertFailedException">
     /// <paramref name="value"/> is null, or <paramref name="substring"/> is null,
     /// or <paramref name="value"/> does not contain <paramref name="substring"/>.
     /// </exception>
-    public static void Contains([NotNull] string? value, [NotNull] string? substring, string? message,
-        params object?[]? parameters)
-        => Contains(value, substring, message, StringComparison.Ordinal, parameters);
-
-    /// <summary>
-    /// Tests whether the specified string contains the specified substring
-    /// and throws an exception if the substring does not occur within the
-    /// test string.
-    /// </summary>
-    /// <param name="value">
-    /// The string that is expected to contain <paramref name="substring"/>.
-    /// </param>
-    /// <param name="substring">
-    /// The string expected to occur within <paramref name="value"/>.
-    /// </param>
-    /// <param name="message">
-    /// The message to include in the exception when <paramref name="substring"/>
-    /// is not in <paramref name="value"/>. The message is shown in
-    /// test results.
-    /// </param>
-    /// <param name="comparisonType">
-    /// The comparison method to compare strings <paramref name="comparisonType"/>.
-    /// </param>
-    /// <param name="parameters">
-    /// An array of parameters to use when formatting <paramref name="message"/>.
-    /// </param>
-    /// <exception cref="AssertFailedException">
-    /// <paramref name="value"/> is null, or <paramref name="substring"/> is null,
-    /// or <paramref name="value"/> does not contain <paramref name="substring"/>.
-    /// </exception>
-    public static void Contains([NotNull] string? value, [NotNull] string? substring, string? message,
-        StringComparison comparisonType, params object?[]? parameters)
+    public static void Contains([NotNull] string? value, [NotNull] string? substring, StringComparison comparisonType, string? message)
     {
-        Assert.CheckParameterNotNull(value, "StringAssert.Contains", "value", string.Empty);
-        Assert.CheckParameterNotNull(substring, "StringAssert.Contains", "substring", string.Empty);
+        TelemetryCollector.TrackAssertionCall("StringAssert.Contains");
+
+        Assert.CheckParameterNotNull(value, "StringAssert.Contains", "value");
+        Assert.CheckParameterNotNull(substring, "StringAssert.Contains", "substring");
         if (value.IndexOf(substring, comparisonType) < 0)
         {
-            string userMessage = Assert.BuildUserMessage(message, parameters);
+            string userMessage = Assert.BuildUserMessage(message);
             string finalMessage = string.Format(CultureInfo.CurrentCulture, FrameworkMessages.ContainsFail, value, substring, userMessage);
-            Assert.ThrowAssertFailed("StringAssert.Contains", finalMessage);
+            Assert.ReportAssertFailed("StringAssert.Contains", finalMessage);
         }
     }
 
@@ -206,7 +145,7 @@ public sealed class StringAssert
     /// or <paramref name="value"/> does not start with <paramref name="substring"/>.
     /// </exception>
     public static void StartsWith([NotNull] string? value, [NotNull] string? substring)
-        => StartsWith(value, substring, string.Empty, StringComparison.Ordinal);
+        => StartsWith(value, substring, StringComparison.Ordinal, string.Empty);
 
     /// <summary>
     /// Tests whether the specified string begins with the specified substring
@@ -226,9 +165,8 @@ public sealed class StringAssert
     /// <paramref name="value"/> is null, or <paramref name="substring"/> is null,
     /// or <paramref name="value"/> does not start with <paramref name="substring"/>.
     /// </exception>
-    public static void StartsWith([NotNull] string? value, [NotNull] string? substring,
-        StringComparison comparisonType)
-        => StartsWith(value, substring, string.Empty, comparisonType, Empty);
+    public static void StartsWith([NotNull] string? value, [NotNull] string? substring, StringComparison comparisonType)
+        => StartsWith(value, substring, comparisonType, string.Empty);
 
     /// <summary>
     /// Tests whether the specified string begins with the specified substring
@@ -251,7 +189,7 @@ public sealed class StringAssert
     /// or <paramref name="value"/> does not start with <paramref name="substring"/>.
     /// </exception>
     public static void StartsWith([NotNull] string? value, [NotNull] string? substring, string? message)
-        => StartsWith(value, substring, message, StringComparison.Ordinal);
+        => StartsWith(value, substring, StringComparison.Ordinal, message);
 
     /// <summary>
     /// Tests whether the specified string begins with the specified substring
@@ -263,86 +201,30 @@ public sealed class StringAssert
     /// </param>
     /// <param name="substring">
     /// The string expected to be a prefix of <paramref name="value"/>.
-    /// </param>
-    /// <param name="message">
-    /// The message to include in the exception when <paramref name="value"/>
-    /// does not begin with <paramref name="substring"/>. The message is
-    /// shown in test results.
-    /// </param>
-    /// <param name="parameters">
-    /// An array of parameters to use when formatting <paramref name="message"/>.
-    /// </param>
-    /// <exception cref="AssertFailedException">
-    /// <paramref name="value"/> is null, or <paramref name="substring"/> is null,
-    /// or <paramref name="value"/> does not start with <paramref name="substring"/>.
-    /// </exception>
-    public static void StartsWith([NotNull] string? value, [NotNull] string? substring, string? message,
-        params object?[]? parameters)
-        => StartsWith(value, substring, message, StringComparison.Ordinal, parameters);
-
-    /// <summary>
-    /// Tests whether the specified string begins with the specified substring
-    /// and throws an exception if the test string does not start with the
-    /// substring.
-    /// </summary>
-    /// <param name="value">
-    /// The string that is expected to begin with <paramref name="substring"/>.
-    /// </param>
-    /// <param name="substring">
-    /// The string expected to be a prefix of <paramref name="value"/>.
-    /// </param>
-    /// <param name="message">
-    /// The message to include in the exception when <paramref name="value"/>
-    /// does not begin with <paramref name="substring"/>. The message is
-    /// shown in test results.
     /// </param>
     /// <param name="comparisonType">
     /// The comparison method to compare strings <paramref name="comparisonType"/>.
     /// </param>
-    /// <exception cref="AssertFailedException">
-    /// <paramref name="value"/> is null, or <paramref name="substring"/> is null,
-    /// or <paramref name="value"/> does not start with <paramref name="substring"/>.
-    /// </exception>
-    public static void StartsWith([NotNull] string? value, [NotNull] string? substring, string? message,
-        StringComparison comparisonType)
-        => StartsWith(value, substring, message, comparisonType, Empty);
-
-    /// <summary>
-    /// Tests whether the specified string begins with the specified substring
-    /// and throws an exception if the test string does not start with the
-    /// substring.
-    /// </summary>
-    /// <param name="value">
-    /// The string that is expected to begin with <paramref name="substring"/>.
-    /// </param>
-    /// <param name="substring">
-    /// The string expected to be a prefix of <paramref name="value"/>.
-    /// </param>
     /// <param name="message">
     /// The message to include in the exception when <paramref name="value"/>
     /// does not begin with <paramref name="substring"/>. The message is
     /// shown in test results.
     /// </param>
-    /// <param name="comparisonType">
-    /// The comparison method to compare strings <paramref name="comparisonType"/>.
-    /// </param>
-    /// <param name="parameters">
-    /// An array of parameters to use when formatting <paramref name="message"/>.
-    /// </param>
     /// <exception cref="AssertFailedException">
     /// <paramref name="value"/> is null, or <paramref name="substring"/> is null,
     /// or <paramref name="value"/> does not start with <paramref name="substring"/>.
     /// </exception>
-    public static void StartsWith([NotNull] string? value, [NotNull] string? substring, string? message,
-        StringComparison comparisonType, params object?[]? parameters)
+    public static void StartsWith([NotNull] string? value, [NotNull] string? substring, StringComparison comparisonType, string? message)
     {
-        Assert.CheckParameterNotNull(value, "StringAssert.StartsWith", "value", string.Empty);
-        Assert.CheckParameterNotNull(substring, "StringAssert.StartsWith", "substring", string.Empty);
+        TelemetryCollector.TrackAssertionCall("StringAssert.StartsWith");
+
+        Assert.CheckParameterNotNull(value, "StringAssert.StartsWith", "value");
+        Assert.CheckParameterNotNull(substring, "StringAssert.StartsWith", "substring");
         if (!value.StartsWith(substring, comparisonType))
         {
-            string userMessage = Assert.BuildUserMessage(message, parameters);
+            string userMessage = Assert.BuildUserMessage(message);
             string finalMessage = string.Format(CultureInfo.CurrentCulture, FrameworkMessages.StartsWithFail, value, substring, userMessage);
-            Assert.ThrowAssertFailed("StringAssert.StartsWith", finalMessage);
+            Assert.ReportAssertFailed("StringAssert.StartsWith", finalMessage);
         }
     }
 
@@ -362,7 +244,7 @@ public sealed class StringAssert
     /// or <paramref name="value"/> does not end with <paramref name="substring"/>.
     /// </exception>
     public static void EndsWith([NotNull] string? value, [NotNull] string? substring)
-        => EndsWith(value, substring, string.Empty, StringComparison.Ordinal);
+        => EndsWith(value, substring, StringComparison.Ordinal, string.Empty);
 
     /// <summary>
     /// Tests whether the specified string ends with the specified substring
@@ -382,9 +264,8 @@ public sealed class StringAssert
     /// <paramref name="value"/> is null, or <paramref name="substring"/> is null,
     /// or <paramref name="value"/> does not end with <paramref name="substring"/>.
     /// </exception>
-    public static void EndsWith([NotNull] string? value, [NotNull] string? substring,
-        StringComparison comparisonType)
-        => EndsWith(value, substring, string.Empty, comparisonType, Empty);
+    public static void EndsWith([NotNull] string? value, [NotNull] string? substring, StringComparison comparisonType)
+        => EndsWith(value, substring, comparisonType, string.Empty);
 
     /// <summary>
     /// Tests whether the specified string ends with the specified substring
@@ -407,7 +288,7 @@ public sealed class StringAssert
     /// or <paramref name="value"/> does not end with <paramref name="substring"/>.
     /// </exception>
     public static void EndsWith([NotNull] string? value, [NotNull] string? substring, string? message)
-        => EndsWith(value, substring, message, StringComparison.Ordinal);
+        => EndsWith(value, substring, StringComparison.Ordinal, message);
 
     /// <summary>
     /// Tests whether the specified string ends with the specified substring
@@ -419,86 +300,30 @@ public sealed class StringAssert
     /// </param>
     /// <param name="substring">
     /// The string expected to be a suffix of <paramref name="value"/>.
-    /// </param>
-    /// <param name="message">
-    /// The message to include in the exception when <paramref name="value"/>
-    /// does not end with <paramref name="substring"/>. The message is
-    /// shown in test results.
-    /// </param>
-    /// <param name="parameters">
-    /// An array of parameters to use when formatting <paramref name="message"/>.
-    /// </param>
-    /// <exception cref="AssertFailedException">
-    /// <paramref name="value"/> is null, or <paramref name="substring"/> is null,
-    /// or <paramref name="value"/> does not end with <paramref name="substring"/>.
-    /// </exception>
-    public static void EndsWith([NotNull] string? value, [NotNull] string? substring, string? message,
-        params object?[]? parameters)
-        => EndsWith(value, substring, message, StringComparison.Ordinal, parameters);
-
-    /// <summary>
-    /// Tests whether the specified string ends with the specified substring
-    /// and throws an exception if the test string does not end with the
-    /// substring.
-    /// </summary>
-    /// <param name="value">
-    /// The string that is expected to end with <paramref name="substring"/>.
-    /// </param>
-    /// <param name="substring">
-    /// The string expected to be a suffix of <paramref name="value"/>.
-    /// </param>
-    /// <param name="message">
-    /// The message to include in the exception when <paramref name="value"/>
-    /// does not end with <paramref name="substring"/>. The message is
-    /// shown in test results.
     /// </param>
     /// <param name="comparisonType">
     /// The comparison method to compare strings <paramref name="comparisonType"/>.
     /// </param>
-    /// <exception cref="AssertFailedException">
-    /// <paramref name="value"/> is null, or <paramref name="substring"/> is null,
-    /// or <paramref name="value"/> does not end with <paramref name="substring"/>.
-    /// </exception>
-    public static void EndsWith([NotNull] string? value, [NotNull] string? substring, string? message,
-        StringComparison comparisonType)
-        => EndsWith(value, substring, message, comparisonType, Empty);
-
-    /// <summary>
-    /// Tests whether the specified string ends with the specified substring
-    /// and throws an exception if the test string does not end with the
-    /// substring.
-    /// </summary>
-    /// <param name="value">
-    /// The string that is expected to end with <paramref name="substring"/>.
-    /// </param>
-    /// <param name="substring">
-    /// The string expected to be a suffix of <paramref name="value"/>.
-    /// </param>
     /// <param name="message">
     /// The message to include in the exception when <paramref name="value"/>
     /// does not end with <paramref name="substring"/>. The message is
     /// shown in test results.
     /// </param>
-    /// <param name="comparisonType">
-    /// The comparison method to compare strings <paramref name="comparisonType"/>.
-    /// </param>
-    /// <param name="parameters">
-    /// An array of parameters to use when formatting <paramref name="message"/>.
-    /// </param>
     /// <exception cref="AssertFailedException">
     /// <paramref name="value"/> is null, or <paramref name="substring"/> is null,
     /// or <paramref name="value"/> does not end with <paramref name="substring"/>.
     /// </exception>
-    public static void EndsWith([NotNull] string? value, [NotNull] string? substring, string? message,
-        StringComparison comparisonType, params object?[]? parameters)
+    public static void EndsWith([NotNull] string? value, [NotNull] string? substring, StringComparison comparisonType, string? message)
     {
-        Assert.CheckParameterNotNull(value, "StringAssert.EndsWith", "value", string.Empty);
-        Assert.CheckParameterNotNull(substring, "StringAssert.EndsWith", "substring", string.Empty);
+        TelemetryCollector.TrackAssertionCall("StringAssert.EndsWith");
+
+        Assert.CheckParameterNotNull(value, "StringAssert.EndsWith", "value");
+        Assert.CheckParameterNotNull(substring, "StringAssert.EndsWith", "substring");
         if (!value.EndsWith(substring, comparisonType))
         {
-            string userMessage = Assert.BuildUserMessage(message, parameters);
+            string userMessage = Assert.BuildUserMessage(message);
             string finalMessage = string.Format(CultureInfo.CurrentCulture, FrameworkMessages.EndsWithFail, value, substring, userMessage);
-            Assert.ThrowAssertFailed("StringAssert.EndsWith", finalMessage);
+            Assert.ReportAssertFailed("StringAssert.EndsWith", finalMessage);
         }
     }
 
@@ -545,41 +370,17 @@ public sealed class StringAssert
     /// or <paramref name="value"/> does not match <paramref name="pattern"/>.
     /// </exception>
     public static void Matches([NotNull] string? value, [NotNull] Regex? pattern, string? message)
-        => Matches(value, pattern, message, null);
-
-    /// <summary>
-    /// Tests whether the specified string matches a regular expression and
-    /// throws an exception if the string does not match the expression.
-    /// </summary>
-    /// <param name="value">
-    /// The string that is expected to match <paramref name="pattern"/>.
-    /// </param>
-    /// <param name="pattern">
-    /// The regular expression that <paramref name="value"/> is
-    /// expected to match.
-    /// </param>
-    /// <param name="message">
-    /// The message to include in the exception when <paramref name="value"/>
-    /// does not match <paramref name="pattern"/>. The message is shown in
-    /// test results.
-    /// </param>
-    /// <param name="parameters">
-    /// An array of parameters to use when formatting <paramref name="message"/>.
-    /// </param>
-    /// <exception cref="AssertFailedException">
-    /// <paramref name="value"/> is null, or <paramref name="pattern"/> is null,
-    /// or <paramref name="value"/> does not match <paramref name="pattern"/>.
-    /// </exception>
-    public static void Matches([NotNull] string? value, [NotNull] Regex? pattern, string? message, params object?[]? parameters)
     {
-        Assert.CheckParameterNotNull(value, "StringAssert.Matches", "value", string.Empty);
-        Assert.CheckParameterNotNull(pattern, "StringAssert.Matches", "pattern", string.Empty);
+        TelemetryCollector.TrackAssertionCall("StringAssert.Matches");
+
+        Assert.CheckParameterNotNull(value, "StringAssert.Matches", "value");
+        Assert.CheckParameterNotNull(pattern, "StringAssert.Matches", "pattern");
 
         if (!pattern.IsMatch(value))
         {
-            string userMessage = Assert.BuildUserMessage(message, parameters);
+            string userMessage = Assert.BuildUserMessage(message);
             string finalMessage = string.Format(CultureInfo.CurrentCulture, FrameworkMessages.IsMatchFail, value, pattern, userMessage);
-            Assert.ThrowAssertFailed("StringAssert.Matches", finalMessage);
+            Assert.ReportAssertFailed("StringAssert.Matches", finalMessage);
         }
     }
 
@@ -622,43 +423,97 @@ public sealed class StringAssert
     /// or <paramref name="value"/> matches <paramref name="pattern"/>.
     /// </exception>
     public static void DoesNotMatch([NotNull] string? value, [NotNull] Regex? pattern, string? message)
-        => DoesNotMatch(value, pattern, message, null);
-
-    /// <summary>
-    /// Tests whether the specified string does not match a regular expression
-    /// and throws an exception if the string matches the expression.
-    /// </summary>
-    /// <param name="value">
-    /// The string that is expected not to match <paramref name="pattern"/>.
-    /// </param>
-    /// <param name="pattern">
-    /// The regular expression that <paramref name="value"/> is
-    /// expected to not match.
-    /// </param>
-    /// <param name="message">
-    /// The message to include in the exception when <paramref name="value"/>
-    /// matches <paramref name="pattern"/>. The message is shown in test
-    /// results.
-    /// </param>
-    /// <param name="parameters">
-    /// An array of parameters to use when formatting <paramref name="message"/>.
-    /// </param>
-    /// <exception cref="AssertFailedException">
-    /// <paramref name="value"/> is null, or <paramref name="pattern"/> is null,
-    /// or <paramref name="value"/> matches <paramref name="pattern"/>.
-    /// </exception>
-    public static void DoesNotMatch([NotNull] string? value, [NotNull] Regex? pattern, string? message, params object?[]? parameters)
     {
-        Assert.CheckParameterNotNull(value, "StringAssert.DoesNotMatch", "value", string.Empty);
-        Assert.CheckParameterNotNull(pattern, "StringAssert.DoesNotMatch", "pattern", string.Empty);
+        TelemetryCollector.TrackAssertionCall("StringAssert.DoesNotMatch");
+
+        Assert.CheckParameterNotNull(value, "StringAssert.DoesNotMatch", "value");
+        Assert.CheckParameterNotNull(pattern, "StringAssert.DoesNotMatch", "pattern");
 
         if (pattern.IsMatch(value))
         {
-            string userMessage = Assert.BuildUserMessage(message, parameters);
+            string userMessage = Assert.BuildUserMessage(message);
             string finalMessage = string.Format(CultureInfo.CurrentCulture, FrameworkMessages.IsNotMatchFail, value, pattern, userMessage);
-            Assert.ThrowAssertFailed("StringAssert.DoesNotMatch", finalMessage);
+            Assert.ReportAssertFailed("StringAssert.DoesNotMatch", finalMessage);
         }
     }
 
     #endregion Regular Expressions
+
+    #region DoNotUse
+
+    /// <summary>
+    /// Static equals overloads are used for comparing instances of two types for equality.
+    /// This method should <b>not</b> be used for comparison of two instances for equality.
+    /// Please use StringAssert methods or Assert.AreEqual and associated overloads in your unit tests.
+    /// </summary>
+    /// <param name="objA"> Object A. </param>
+    /// <param name="objB"> Object B. </param>
+    /// <returns> Never returns. </returns>
+    [SuppressMessage("Microsoft.Naming", "CA1720:IdentifiersShouldNotContainTypeNames", MessageId = "obj", Justification = "We want to compare 'object A' with 'object B', so it makes sense to have 'obj' in the parameter name")]
+#if DEBUG && NET8_0_OR_GREATER
+    [Obsolete(
+        FrameworkConstants.DoNotUseStringAssertEquals,
+        error: false,
+        DiagnosticId = "MSTEST0102",
+        UrlFormat = "https://aka.ms/mstest/diagnostics#{0}")]
+#elif DEBUG
+    [Obsolete(
+        FrameworkConstants.DoNotUseStringAssertEquals,
+        error: false)]
+#elif NET8_0_OR_GREATER
+    [Obsolete(
+        FrameworkConstants.DoNotUseStringAssertEquals,
+        error: true,
+        DiagnosticId = "MSTEST0102",
+        UrlFormat = "https://aka.ms/mstest/diagnostics#{0}")]
+#else
+    [Obsolete(
+        FrameworkConstants.DoNotUseStringAssertEquals,
+        error: true)]
+#endif
+    [DoesNotReturn]
+    public static new bool Equals(object? objA, object? objB)
+    {
+        Assert.Fail(FrameworkMessages.DoNotUseStringAssertEquals);
+        return false;
+    }
+
+    /// <summary>
+    /// Static ReferenceEquals overloads are used for comparing instances of two types for reference
+    /// equality. This method should <b>not</b> be used for comparison of two instances for
+    /// reference equality. Please use StringAssert methods or Assert.AreSame and associated overloads in your unit tests.
+    /// </summary>
+    /// <param name="objA"> Object A. </param>
+    /// <param name="objB"> Object B. </param>
+    /// <returns> Never returns. </returns>
+    [SuppressMessage("Microsoft.Naming", "CA1720:IdentifiersShouldNotContainTypeNames", MessageId = "obj", Justification = "We want to compare 'object A' with 'object B', so it makes sense to have 'obj' in the parameter name")]
+#if DEBUG && NET8_0_OR_GREATER
+    [Obsolete(
+        FrameworkConstants.DoNotUseStringAssertReferenceEquals,
+        error: false,
+        DiagnosticId = "MSTEST0103",
+        UrlFormat = "https://aka.ms/mstest/diagnostics#{0}")]
+#elif DEBUG
+    [Obsolete(
+        FrameworkConstants.DoNotUseStringAssertReferenceEquals,
+        error: false)]
+#elif NET8_0_OR_GREATER
+    [Obsolete(
+        FrameworkConstants.DoNotUseStringAssertReferenceEquals,
+        error: true,
+        DiagnosticId = "MSTEST0103",
+        UrlFormat = "https://aka.ms/mstest/diagnostics#{0}")]
+#else
+    [Obsolete(
+        FrameworkConstants.DoNotUseStringAssertReferenceEquals,
+        error: true)]
+#endif
+    [DoesNotReturn]
+    public static new bool ReferenceEquals(object? objA, object? objB)
+    {
+        Assert.Fail(FrameworkMessages.DoNotUseStringAssertReferenceEquals);
+        return false;
+    }
+
+    #endregion
 }

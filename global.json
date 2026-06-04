@@ -1,25 +1,43 @@
 {
   "tools": {
-    "dotnet": "8.0.101",
+    "dotnet": "11.0.100-preview.5.26227.104",
     "runtimes": {
       "dotnet": [
-        "3.1.32",
-        "6.0.29",
-        "7.0.18",
-        "8.0.4"
+        "8.0.27",
+        "9.0.16",
+        "10.0.8"
+      ],
+      "dotnet/x86": [
+        "9.0.16",
+        "10.0.8"
+      ],
+      "aspnetcore": [
+        "9.0.16",
+        "10.0.8"
       ]
     },
     "vs": {
-      "version": "17.8.0"
+      "version": "17.14.10",
+      "components": [
+        "Microsoft.VisualStudio.Workload.Universal"
+      ]
     }
   },
   "sdk": {
-    "version": "8.0.101",
+    "version": "11.0.100-preview.5.26227.104",
+    "paths": [
+      ".dotnet",
+      "$host$"
+    ],
+    "errorMessage": "The .NET SDK could not be found, please run ./build.cmd on Windows or ./build.sh on Linux and macOS.",
     "allowPrerelease": true,
     "rollForward": "latestFeature"
   },
+  "test": {
+    "runner": "Microsoft.Testing.Platform"
+  },
   "msbuild-sdks": {
-    "Microsoft.DotNet.Arcade.Sdk": "8.0.0-beta.24225.1",
+    "Microsoft.DotNet.Arcade.Sdk": "11.0.0-beta.26303.5",
     "MSBuild.Sdk.Extras": "3.0.44"
   }
 }

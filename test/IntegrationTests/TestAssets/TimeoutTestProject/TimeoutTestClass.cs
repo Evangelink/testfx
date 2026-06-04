@@ -5,26 +5,27 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace TimeoutTestProject;
 
+#pragma warning disable CS0618 // Type or member is obsolete
 [TestClass]
 public class TimeoutTestClass
 {
-    public TestContext TestContext { get; set; }
+    public TestContext TestContext { get; set; } = null!;
 
     [TestMethod]
-    [Timeout(TestTimeout.Infinite)]
+    [Timeout(int.MaxValue)]
     public void TimeoutTest_WhenUserCancelsTestContextToken_AbortTest()
     {
         TestContext.CancellationTokenSource.Cancel();
-        Assert.Fail("Test should have been cancelled");
+        Assert.Fail("Test should have been canceled");
     }
 
 #if NETFRAMEWORK
     [TestMethod]
-    [Timeout(TestTimeout.Infinite)]
+    [Timeout(int.MaxValue)]
     public void TimeoutTest_WhenUserCallsThreadAbort_AbortTest()
     {
         Thread.CurrentThread.Abort();
-        Assert.Fail("Test should have been cancelled");
+        Assert.Fail("Test should have been canceled");
     }
 #endif
 
@@ -32,7 +33,7 @@ public class TimeoutTestClass
     public void RegularTest_WhenUserCancelsTestContextToken_TestContinues()
     {
         TestContext.CancellationTokenSource.Cancel();
-        Assert.Fail("Expected failure: test should not be cancelled");
+        Assert.Fail("Expected failure: test should not be canceled");
     }
 
     [TestMethod]
@@ -46,10 +47,7 @@ public class TimeoutTestClass
 
     [TestMethod]
     [Timeout(500)]
-    public void TimeoutTest_WhenTimeoutReached_ForcesTestAbort()
-    {
-        Thread.Sleep(100_000);
-    }
+    public void TimeoutTest_WhenTimeoutReached_ForcesTestAbort() => Thread.Sleep(100_000);
 
     private void ExecuteLong()
     {

@@ -12,14 +12,18 @@ using MSTest.Analyzers.Helpers;
 
 namespace MSTest.Analyzers;
 
+/// <summary>
+/// MSTEST0002: <inheritdoc cref="Resources.TestClassShouldBeValidTitle"/>.
+/// </summary>
 [DiagnosticAnalyzer(LanguageNames.CSharp, LanguageNames.VisualBasic)]
 public sealed class TestClassShouldBeValidAnalyzer : DiagnosticAnalyzer
 {
     private static readonly LocalizableResourceString Title = new(nameof(Resources.TestClassShouldBeValidTitle), Resources.ResourceManager, typeof(Resources));
     private static readonly LocalizableResourceString Description = new(nameof(Resources.TestClassShouldBeValidDescription), Resources.ResourceManager, typeof(Resources));
-    private static readonly LocalizableResourceString MessageFormat = new(nameof(Resources.TestClassShouldBeValidMessageFormat_Public), Resources.ResourceManager, typeof(Resources));
+    private static readonly LocalizableResourceString MessageFormat = new(nameof(Resources.TestClassShouldBeValidMessageFormat), Resources.ResourceManager, typeof(Resources));
 
-    internal static readonly DiagnosticDescriptor PublicRule = DiagnosticDescriptorHelper.Create(
+    /// <inheritdoc cref="Resources.TestClassShouldBeValidTitle" />
+    public static readonly DiagnosticDescriptor TestClassShouldBeValidRule = DiagnosticDescriptorHelper.Create(
         DiagnosticIds.TestClassShouldBeValidRuleId,
         Title,
         MessageFormat,
@@ -28,12 +32,11 @@ public sealed class TestClassShouldBeValidAnalyzer : DiagnosticAnalyzer
         DiagnosticSeverity.Warning,
         isEnabledByDefault: true);
 
-    internal static readonly DiagnosticDescriptor PublicOrInternalRule = PublicRule.WithMessage(new(nameof(Resources.TestClassShouldBeValidMessageFormat_PublicOrInternal), Resources.ResourceManager, typeof(Resources)));
-    internal static readonly DiagnosticDescriptor NotStaticRule = PublicRule.WithMessage(new(nameof(Resources.TestClassShouldBeValidMessageFormat_NotStatic), Resources.ResourceManager, typeof(Resources)));
-
+    /// <inheritdoc />
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; }
-        = ImmutableArray.Create(PublicRule);
+        = ImmutableArray.Create(TestClassShouldBeValidRule);
 
+    /// <inheritdoc />
     public override void Initialize(AnalysisContext context)
     {
         context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
@@ -41,14 +44,14 @@ public sealed class TestClassShouldBeValidAnalyzer : DiagnosticAnalyzer
 
         context.RegisterCompilationStartAction(context =>
         {
-            if (context.Compilation.TryGetOrCreateTypeByMetadataName(WellKnownTypeNames.MicrosoftVisualStudioTestToolsUnitTestingTestClassAttribute, out var testClassAttributeSymbol))
+            if (context.Compilation.TryGetOrCreateTypeByMetadataName(WellKnownTypeNames.MicrosoftVisualStudioTestToolsUnitTestingTestClassAttribute, out INamedTypeSymbol? testClassAttributeSymbol))
             {
                 bool canDiscoverInternals = context.Compilation.CanDiscoverInternals();
-                var testMethodAttributeSymbol = context.Compilation.GetOrCreateTypeByMetadataName(WellKnownTypeNames.MicrosoftVisualStudioTestToolsUnitTestingTestMethodAttribute);
-                var testInitializeAttributeSymbol = context.Compilation.GetOrCreateTypeByMetadataName(WellKnownTypeNames.MicrosoftVisualStudioTestToolsUnitTestingTestInitializeAttribute);
-                var testCleanupAttributeSymbol = context.Compilation.GetOrCreateTypeByMetadataName(WellKnownTypeNames.MicrosoftVisualStudioTestToolsUnitTestingTestCleanupAttribute);
-                var classInitializeAttributeSymbol = context.Compilation.GetOrCreateTypeByMetadataName(WellKnownTypeNames.MicrosoftVisualStudioTestToolsUnitTestingClassInitializeAttribute);
-                var classCleanupAttributeSymbol = context.Compilation.GetOrCreateTypeByMetadataName(WellKnownTypeNames.MicrosoftVisualStudioTestToolsUnitTestingClassCleanupAttribute);
+                INamedTypeSymbol? testMethodAttributeSymbol = context.Compilation.GetOrCreateTypeByMetadataName(WellKnownTypeNames.MicrosoftVisualStudioTestToolsUnitTestingTestMethodAttribute);
+                INamedTypeSymbol? testInitializeAttributeSymbol = context.Compilation.GetOrCreateTypeByMetadataName(WellKnownTypeNames.MicrosoftVisualStudioTestToolsUnitTestingTestInitializeAttribute);
+                INamedTypeSymbol? testCleanupAttributeSymbol = context.Compilation.GetOrCreateTypeByMetadataName(WellKnownTypeNames.MicrosoftVisualStudioTestToolsUnitTestingTestCleanupAttribute);
+                INamedTypeSymbol? classInitializeAttributeSymbol = context.Compilation.GetOrCreateTypeByMetadataName(WellKnownTypeNames.MicrosoftVisualStudioTestToolsUnitTestingClassInitializeAttribute);
+                INamedTypeSymbol? classCleanupAttributeSymbol = context.Compilation.GetOrCreateTypeByMetadataName(WellKnownTypeNames.MicrosoftVisualStudioTestToolsUnitTestingClassCleanupAttribute);
                 context.RegisterSymbolAction(
                     context => AnalyzeSymbol(context, testClassAttributeSymbol, canDiscoverInternals, testMethodAttributeSymbol,
                         testInitializeAttributeSymbol, testCleanupAttributeSymbol, classInitializeAttributeSymbol, classCleanupAttributeSymbol),
@@ -72,17 +75,19 @@ public sealed class TestClassShouldBeValidAnalyzer : DiagnosticAnalyzer
         {
             if (!canDiscoverInternals && resultantVisibility != SymbolVisibility.Public)
             {
-                context.ReportDiagnostic(namedTypeSymbol.CreateDiagnostic(PublicRule, namedTypeSymbol.Name));
+                context.ReportDiagnostic(namedTypeSymbol.CreateDiagnostic(TestClassShouldBeValidRule, namedTypeSymbol.Name));
+                return;
             }
             else if (canDiscoverInternals && resultantVisibility == SymbolVisibility.Private)
             {
-                context.ReportDiagnostic(namedTypeSymbol.CreateDiagnostic(PublicOrInternalRule, namedTypeSymbol.Name));
+                context.ReportDiagnostic(namedTypeSymbol.CreateDiagnostic(TestClassShouldBeValidRule, namedTypeSymbol.Name));
+                return;
             }
         }
 
         if (namedTypeSymbol.IsStatic)
         {
-            foreach (var member in namedTypeSymbol.GetMembers())
+            foreach (ISymbol member in namedTypeSymbol.GetMembers())
             {
                 if (member.Kind != SymbolKind.Method)
                 {
@@ -95,7 +100,7 @@ public sealed class TestClassShouldBeValidAnalyzer : DiagnosticAnalyzer
                     continue;
                 }
 
-                foreach (var attribute in method.GetAttributes())
+                foreach (AttributeData attribute in method.GetAttributes())
                 {
                     if (SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, testInitializeAttributeSymbol)
                         || SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, testCleanupAttributeSymbol)
@@ -103,10 +108,10 @@ public sealed class TestClassShouldBeValidAnalyzer : DiagnosticAnalyzer
                         || SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, classCleanupAttributeSymbol)
                         || attribute.AttributeClass.Inherits(testMethodAttributeSymbol))
                     {
-                        context.ReportDiagnostic(namedTypeSymbol.CreateDiagnostic(NotStaticRule, namedTypeSymbol.Name));
+                        context.ReportDiagnostic(namedTypeSymbol.CreateDiagnostic(TestClassShouldBeValidRule, namedTypeSymbol.Name));
 
                         // We only need to report once per class.
-                        break;
+                        return;
                     }
                 }
             }

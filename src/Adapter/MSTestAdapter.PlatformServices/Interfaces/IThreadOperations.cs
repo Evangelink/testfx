@@ -6,7 +6,7 @@ namespace Microsoft.VisualStudio.TestPlatform.MSTestAdapter.PlatformServices.Int
 /// <summary>
 /// This service is responsible for any thread operations specific to a platform.
 /// </summary>
-public interface IThreadOperations
+internal interface IThreadOperations
 {
     /// <summary>
     /// Execute the given action synchronously on a background thread in the given timeout.

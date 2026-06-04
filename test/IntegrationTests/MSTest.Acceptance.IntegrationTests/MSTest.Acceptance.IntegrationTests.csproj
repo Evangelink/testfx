@@ -1,41 +1,57 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFrameworks>$(NetCurrent)</TargetFrameworks>
-    <UseVSTestRunner>false</UseVSTestRunner>
-    <ImplicitUsings>true</ImplicitUsings>
-    <Nullable>enable</Nullable>
-    <GenerateProgramFile>false</GenerateProgramFile>
+    <EnableMSTestRunner>true</EnableMSTestRunner>
     <OutputType>Exe</OutputType>
+    <DefineConstants Condition=" '$(FastAcceptanceTest)' == 'true'">$(DefineConstants);SKIP_INTERMEDIATE_TARGET_FRAMEWORKS</DefineConstants>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Embedded helpers from Microsoft.Testing.Platform -->
+    <Compile Include="$(RepoRoot)src\Platform\Microsoft.Testing.Platform\Helpers\ApplicationStateGuard.cs" Link="Helpers\ApplicationStateGuard.cs" />
+    <Compile Include="$(RepoRoot)src\Platform\Microsoft.Testing.Platform\Helpers\EnvironmentVariableConstants.cs" Link="Helpers\EnvironmentVariableConstants.cs" />
+    <Compile Include="$(RepoRoot)src\Platform\Microsoft.Testing.Platform\Helpers\ExitCodes.cs" Link="Helpers\ExitCodes.cs" />
+    <Compile Include="$(RepoRoot)src\Platform\Microsoft.Testing.Platform\Resources\PlatformResources.cs" Link="Resources\PlatformResources.cs" />
+  </ItemGroup>
 
   <ItemGroup>
     <Compile Include="$(RepoRoot)test\IntegrationTests\Microsoft.Testing.Platform.Acceptance.IntegrationTests\Helpers\AcceptanceAssert.cs" Link="Helpers\AcceptanceAssert.cs" />
     <Compile Include="$(RepoRoot)test\IntegrationTests\Microsoft.Testing.Platform.Acceptance.IntegrationTests\Helpers\AcceptanceFixture.cs" Link="Helpers\AcceptanceFixture.cs" />
     <Compile Include="$(RepoRoot)test\IntegrationTests\Microsoft.Testing.Platform.Acceptance.IntegrationTests\Helpers\AcceptanceTestBase.cs" Link="Helpers\AcceptanceTestBase.cs" />
+    <Compile Include="$(RepoRoot)test\IntegrationTests\Microsoft.Testing.Platform.Acceptance.IntegrationTests\ServerMode\**\*.cs" Link="ServerMode\%(RecursiveDir)%(FileName)%(Extension)" />
+    <Compile Include="$(RepoRoot)test\Utilities\Automation.CLI\VSTestConsoleLocator.cs" Link="Helpers\VSTestConsoleLocator.cs" />
+    <Compile Include="$(RepoRoot)\test\Utilities\Microsoft.Testing.TestInfrastructure\RootFinder.cs" Link="Helpers\RootFinder.cs" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" />
-    <PackageReference Include="Microsoft.Testing.Extensions.TrxReport" />
-    <PackageReference Include="Microsoft.Testing.Extensions.CrashDump" />
-    <PackageReference Include="Microsoft.Testing.Internal.Framework" />
-    <PackageReference Include="Microsoft.Testing.Internal.Framework.SourceGeneration" />
+    <PackageReference Include="MSBuild.StructuredLogger" />
+    <!-- Transitive dependency of StreamJsonRpc, pinned to fix a security vulnerability -->
+    <PackageReference Include="Nerdbank.MessagePack" />
     <PackageReference Include="StreamJsonRpc" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="$(RepoRoot)src\Platform\Microsoft.Testing.Platform\Microsoft.Testing.Platform.csproj" />
-    <ProjectReference Include="$(RepoRoot)test\Utilities\Microsoft.Testing.TestInfrastructure\Microsoft.Testing.TestInfrastructure.csproj" />
+    <Compile Include="$(RepoRoot)src/Polyfills/**/*.cs" Link="Polyfills\%(RecursiveDir)%(Filename)%(Extension)" />
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="MSTest.Acceptance.IntegrationTests.testingplatformconfig.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="testsbaseline.txt">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
+    <ProjectReference Include="$(RepoRoot)test\Utilities\Microsoft.Testing.TestInfrastructure\Microsoft.Testing.TestInfrastructure.csproj" />
   </ItemGroup>
+
+  <!-- Packages needed for the test assets but that we don't want to reference -->
+  <ItemGroup>
+    <PackageDownload Include="Aspire.Hosting.Testing" Version="[$(AspireHostingTestingVersion)]" />
+  </ItemGroup>
+
+  <Target Name="CopyNuGetPackagesForTestAssets" BeforeTargets="BeforeBuild">
+    <ItemGroup>
+      <MicrosoftTestingExtensionsCodeCoveragePackage Include="$(PkgMicrosoft_Testing_Extensions_CodeCoverage)\microsoft.testing.extensions.codecoverage.*.nupkg" />
+    </ItemGroup>
+
+    <Copy SkipUnchangedFiles="true" SourceFiles="@(MicrosoftTestingExtensionsCodeCoveragePackage)" DestinationFiles="$(ArtifactsTmpDir)/packages/%(Filename)%(Extension)" />
+
+    <Copy SkipUnchangedFiles="true" SourceFiles="$(NuGetPackageRoot)aspire.hosting.testing\$(AspireHostingTestingVersion)\aspire.hosting.testing.$(AspireHostingTestingVersion).nupkg" DestinationFiles="$(ArtifactsTmpDir)/packages/aspire.hosting.testing.$(AspireHostingTestingVersion).nupkg" />
+  </Target>
 
 </Project>

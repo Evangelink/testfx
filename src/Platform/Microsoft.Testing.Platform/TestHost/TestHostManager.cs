@@ -1,7 +1,7 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System.Globalization;
+using System.ComponentModel;
 
 using Microsoft.Testing.Platform.Extensions;
 using Microsoft.Testing.Platform.Extensions.TestHost;
@@ -18,7 +18,7 @@ internal sealed class TestHostManager : ITestHostManager
     private readonly List<object> _factoryOrdering = [];
 
     // Exposed extension points
-    private readonly List<Func<IServiceProvider, ITestApplicationLifecycleCallbacks>> _testApplicationLifecycleCallbacksFactories = [];
+    private readonly List<Func<IServiceProvider, ITestHostApplicationLifetime>> _testApplicationLifecycleCallbacksFactories = [];
     private readonly List<Func<IServiceProvider, IDataConsumer>> _dataConsumerFactories = [];
     private readonly List<Func<IServiceProvider, ITestSessionLifetimeHandler>> _testSessionLifetimeHandlerFactories = [];
     private readonly List<ICompositeExtensionFactory> _dataConsumersCompositeServiceFactories = [];
@@ -30,13 +30,12 @@ internal sealed class TestHostManager : ITestHostManager
 
     public void AddTestFrameworkInvoker(Func<IServiceProvider, ITestFrameworkInvoker> testFrameworkInvokerFactory)
     {
-        ArgumentGuard.IsNotNull(testFrameworkInvokerFactory);
         if (_testFrameworkInvokerFactory is not null)
         {
             throw new InvalidOperationException(PlatformResources.TestAdapterInvokerFactoryAlreadySetErrorMessage);
         }
 
-        _testFrameworkInvokerFactory = testFrameworkInvokerFactory;
+        _testFrameworkInvokerFactory = testFrameworkInvokerFactory ?? throw new ArgumentNullException(nameof(testFrameworkInvokerFactory));
     }
 
     internal async Task<ActionResult<ITestFrameworkInvoker>> TryBuildTestAdapterInvokerAsync(ServiceProvider serviceProvider)
@@ -49,12 +48,9 @@ internal sealed class TestHostManager : ITestHostManager
         ITestFrameworkInvoker testAdapterInvoke = _testFrameworkInvokerFactory(serviceProvider);
 
         // We initialize only if enabled
-        if (await testAdapterInvoke.IsEnabledAsync())
+        if (await testAdapterInvoke.IsEnabledAsync().ConfigureAwait(false))
         {
-            if (testAdapterInvoke is IAsyncInitializableExtension async)
-            {
-                await async.InitializeAsync();
-            }
+            await testAdapterInvoke.TryInitializeAsync().ConfigureAwait(false);
 
             return ActionResult.Ok(testAdapterInvoke);
         }
@@ -64,13 +60,12 @@ internal sealed class TestHostManager : ITestHostManager
 
     public void AddTestExecutionFilterFactory(Func<IServiceProvider, ITestExecutionFilterFactory> testExecutionFilterFactory)
     {
-        ArgumentGuard.IsNotNull(testExecutionFilterFactory);
         if (_testExecutionFilterFactory is not null)
         {
             throw new InvalidOperationException(PlatformResources.TEstExecutionFilterFactoryFactoryAlreadySetErrorMessage);
         }
 
-        _testExecutionFilterFactory = testExecutionFilterFactory;
+        _testExecutionFilterFactory = testExecutionFilterFactory ?? throw new ArgumentNullException(nameof(testExecutionFilterFactory));
     }
 
     internal async Task<ActionResult<ITestExecutionFilterFactory>> TryBuildTestExecutionFilterFactoryAsync(ServiceProvider serviceProvider)
@@ -83,12 +78,9 @@ internal sealed class TestHostManager : ITestHostManager
         ITestExecutionFilterFactory testExecutionFilterFactory = _testExecutionFilterFactory(serviceProvider);
 
         // We initialize only if enabled
-        if (await testExecutionFilterFactory.IsEnabledAsync())
+        if (await testExecutionFilterFactory.IsEnabledAsync().ConfigureAwait(false))
         {
-            if (testExecutionFilterFactory is IAsyncInitializableExtension async)
-            {
-                await async.InitializeAsync();
-            }
+            await testExecutionFilterFactory.TryInitializeAsync().ConfigureAwait(false);
 
             return ActionResult.Ok(testExecutionFilterFactory);
         }
@@ -96,54 +88,42 @@ internal sealed class TestHostManager : ITestHostManager
         return ActionResult.Fail<ITestExecutionFilterFactory>();
     }
 
-    public void AddTestApplicationLifecycleCallbacks(Func<IServiceProvider, ITestApplicationLifecycleCallbacks> testApplicationLifecycleCallbacks)
-    {
-        ArgumentGuard.IsNotNull(testApplicationLifecycleCallbacks);
-        _testApplicationLifecycleCallbacksFactories.Add(testApplicationLifecycleCallbacks);
-    }
+    public void AddTestHostApplicationLifetime(Func<IServiceProvider, ITestHostApplicationLifetime> testHostApplicationLifetime)
+        => _testApplicationLifecycleCallbacksFactories.Add(testHostApplicationLifetime ?? throw new ArgumentNullException(nameof(testHostApplicationLifetime)));
 
-    internal async Task<ITestApplicationLifecycleCallbacks[]> BuildTestApplicationLifecycleCallbackAsync(ServiceProvider serviceProvider)
+    internal async Task<ITestHostApplicationLifetime[]> BuildTestApplicationLifecycleCallbackAsync(ServiceProvider serviceProvider)
     {
-        List<ITestApplicationLifecycleCallbacks> testApplicationLifecycleCallbacks = [];
-        foreach (Func<IServiceProvider, ITestApplicationLifecycleCallbacks> testApplicationLifecycleCallbacksFactory in _testApplicationLifecycleCallbacksFactories)
+        List<ITestHostApplicationLifetime> testApplicationLifecycleCallbacks = [];
+        foreach (Func<IServiceProvider, ITestHostApplicationLifetime> testApplicationLifecycleCallbacksFactory in _testApplicationLifecycleCallbacksFactories)
         {
-            ITestApplicationLifecycleCallbacks service = testApplicationLifecycleCallbacksFactory(serviceProvider);
+            ITestHostApplicationLifetime service = testApplicationLifecycleCallbacksFactory(serviceProvider);
 
             // Check if we have already extensions of the same type with same id registered
-            if (testApplicationLifecycleCallbacks.Any(x => x.Uid == service.Uid))
-            {
-                ITestApplicationLifecycleCallbacks currentRegisteredExtension = testApplicationLifecycleCallbacks.Single(x => x.Uid == service.Uid);
-                throw new InvalidOperationException(string.Format(CultureInfo.InvariantCulture, PlatformResources.ExtensionWithSameUidAlreadyRegisteredErrorMessage, service.Uid, currentRegisteredExtension.GetType()));
-            }
+            testApplicationLifecycleCallbacks.ValidateUniqueExtension(service);
 
             // We initialize only if enabled
-            if (await service.IsEnabledAsync())
+            if (await service.IsEnabledAsync().ConfigureAwait(false))
             {
-                if (service is IAsyncInitializableExtension async)
-                {
-                    await async.InitializeAsync();
-                }
+                await service.TryInitializeAsync().ConfigureAwait(false);
 
                 // Register the extension for usage
                 testApplicationLifecycleCallbacks.Add(service);
             }
         }
 
-        return testApplicationLifecycleCallbacks.ToArray();
+        return [.. testApplicationLifecycleCallbacks];
     }
 
     public void AddDataConsumer(Func<IServiceProvider, IDataConsumer> dataConsumerFactory)
     {
-        ArgumentGuard.IsNotNull(dataConsumerFactory);
-        _dataConsumerFactories.Add(dataConsumerFactory);
+        _dataConsumerFactories.Add(dataConsumerFactory ?? throw new ArgumentNullException(nameof(dataConsumerFactory)));
         _factoryOrdering.Add(dataConsumerFactory);
     }
 
     public void AddDataConsumer<T>(CompositeExtensionFactory<T> compositeServiceFactory)
         where T : class, IDataConsumer
     {
-        ArgumentGuard.IsNotNull(compositeServiceFactory);
-        if (_dataConsumersCompositeServiceFactories.Contains(compositeServiceFactory))
+        if (_dataConsumersCompositeServiceFactories.Contains(compositeServiceFactory ?? throw new ArgumentNullException(nameof(compositeServiceFactory))))
         {
             throw new ArgumentException(PlatformResources.CompositeServiceFactoryInstanceAlreadyRegistered);
         }
@@ -154,25 +134,18 @@ internal sealed class TestHostManager : ITestHostManager
 
     internal async Task<(IExtension Consumer, int RegistrationOrder)[]> BuildDataConsumersAsync(ServiceProvider serviceProvider, List<ICompositeExtensionFactory> alreadyBuiltServices)
     {
-        List<(IExtension Consumer, int RegistrtionOrder)> dataConsumers = [];
+        List<(IExtension Consumer, int RegistrationOrder)> dataConsumers = [];
         foreach (Func<IServiceProvider, IDataConsumer> dataConsumerFactory in _dataConsumerFactories)
         {
             IDataConsumer service = dataConsumerFactory(serviceProvider);
 
             // Check if we have already extensions of the same type with same id registered
-            if (dataConsumers.Any(x => x.Consumer.Uid == service.Uid))
-            {
-                (IExtension Consumer, int Order) currentRegisteredExtension = dataConsumers.Single(x => x.Consumer.Uid == service.Uid);
-                throw new InvalidOperationException(string.Format(CultureInfo.InvariantCulture, PlatformResources.ExtensionWithSameUidAlreadyRegisteredErrorMessage, service.Uid, currentRegisteredExtension.Consumer.GetType()));
-            }
+            dataConsumers.ValidateUniqueExtension(service, x => x.Consumer);
 
             // We initialize only if enabled
-            if (await service.IsEnabledAsync())
+            if (await service.IsEnabledAsync().ConfigureAwait(false))
             {
-                if (service is IAsyncInitializableExtension async)
-                {
-                    await async.InitializeAsync();
-                }
+                await service.TryInitializeAsync().ConfigureAwait(false);
 
                 // Register the extension for usage
                 dataConsumers.Add((service, _factoryOrdering.IndexOf(dataConsumerFactory)));
@@ -193,19 +166,12 @@ internal sealed class TestHostManager : ITestHostManager
                 var instance = (IExtension)compositeFactoryInstance.GetInstance(serviceProvider);
 
                 // Check if we have already extensions of the same type with same id registered
-                if (dataConsumers.Any(x => x.Consumer.Uid == instance.Uid))
-                {
-                    (IExtension Consumer, int _) currentRegisteredExtension = dataConsumers.Single(x => x.Consumer.Uid == instance.Uid);
-                    throw new InvalidOperationException(string.Format(CultureInfo.InvariantCulture, PlatformResources.ExtensionWithSameUidAlreadyRegisteredErrorMessage, instance.Uid, currentRegisteredExtension.Consumer.GetType()));
-                }
+                dataConsumers.ValidateUniqueExtension(instance, x => x.Consumer);
 
                 // We initialize only if enabled
-                if (await instance.IsEnabledAsync())
+                if (await instance.IsEnabledAsync().ConfigureAwait(false))
                 {
-                    if (instance is IAsyncInitializableExtension async)
-                    {
-                        await async.InitializeAsync();
-                    }
+                    await instance.TryInitializeAsync().ConfigureAwait(false);
                 }
 
                 // Add to the list of shared singletons
@@ -216,7 +182,7 @@ internal sealed class TestHostManager : ITestHostManager
             var extension = (IExtension)compositeFactoryInstance.GetInstance();
 
             // We register the extension only if enabled
-            if (await extension.IsEnabledAsync())
+            if (await extension.IsEnabledAsync().ConfigureAwait(false))
             {
                 if (extension is IDataConsumer consumer)
                 {
@@ -229,21 +195,30 @@ internal sealed class TestHostManager : ITestHostManager
             }
         }
 
-        return dataConsumers.ToArray();
+        return [.. dataConsumers];
     }
 
+    [Obsolete("Use AddTestSessionLifetimeHandler instead.", error: true)]
+    [EditorBrowsable(EditorBrowsableState.Never)]
     public void AddTestSessionLifetimeHandle(Func<IServiceProvider, ITestSessionLifetimeHandler> testSessionLifetimeHandleFactory)
+        => AddTestSessionLifetimeHandler(testSessionLifetimeHandleFactory);
+
+    [Obsolete("Use AddTestSessionLifetimeHandler instead.", error: true)]
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    public void AddTestSessionLifetimeHandle<T>(CompositeExtensionFactory<T> compositeServiceFactory)
+        where T : class, ITestSessionLifetimeHandler
+        => AddTestSessionLifetimeHandler(compositeServiceFactory);
+
+    public void AddTestSessionLifetimeHandler(Func<IServiceProvider, ITestSessionLifetimeHandler> testSessionLifetimeHandleFactory)
     {
-        ArgumentGuard.IsNotNull(testSessionLifetimeHandleFactory);
-        _testSessionLifetimeHandlerFactories.Add(testSessionLifetimeHandleFactory);
+        _testSessionLifetimeHandlerFactories.Add(testSessionLifetimeHandleFactory ?? throw new ArgumentNullException(nameof(testSessionLifetimeHandleFactory)));
         _factoryOrdering.Add(testSessionLifetimeHandleFactory);
     }
 
-    public void AddTestSessionLifetimeHandle<T>(CompositeExtensionFactory<T> compositeServiceFactory)
+    public void AddTestSessionLifetimeHandler<T>(CompositeExtensionFactory<T> compositeServiceFactory)
         where T : class, ITestSessionLifetimeHandler
     {
-        ArgumentGuard.IsNotNull(compositeServiceFactory);
-        if (_testSessionLifetimeHandlerCompositeFactories.Contains(compositeServiceFactory))
+        if (_testSessionLifetimeHandlerCompositeFactories.Contains(compositeServiceFactory ?? throw new ArgumentNullException(nameof(compositeServiceFactory))))
         {
             throw new ArgumentException(PlatformResources.CompositeServiceFactoryInstanceAlreadyRegistered);
         }
@@ -260,19 +235,12 @@ internal sealed class TestHostManager : ITestHostManager
             ITestSessionLifetimeHandler service = testSessionLifetimeHandlerFactory(serviceProvider);
 
             // Check if we have already extensions of the same type with same id registered
-            if (testSessionLifetimeHandlers.Any(x => x.TestSessionLifetimeHandler.Uid == service.Uid))
-            {
-                (IExtension TestSessionLifetimeHandler, int _) currentRegisteredExtension = testSessionLifetimeHandlers.Single(x => x.TestSessionLifetimeHandler.Uid == service.Uid);
-                throw new InvalidOperationException(string.Format(CultureInfo.InvariantCulture, PlatformResources.ExtensionWithSameUidAlreadyRegisteredErrorMessage, service.Uid, currentRegisteredExtension.TestSessionLifetimeHandler.GetType()));
-            }
+            testSessionLifetimeHandlers.ValidateUniqueExtension(service, x => x.TestSessionLifetimeHandler);
 
             // We initialize only if enabled
-            if (await service.IsEnabledAsync())
+            if (await service.IsEnabledAsync().ConfigureAwait(false))
             {
-                if (service is IAsyncInitializableExtension async)
-                {
-                    await async.InitializeAsync();
-                }
+                await service.TryInitializeAsync().ConfigureAwait(false);
 
                 // Register the extension for usage
                 testSessionLifetimeHandlers.Add((service, _factoryOrdering.IndexOf(testSessionLifetimeHandlerFactory)));
@@ -293,19 +261,12 @@ internal sealed class TestHostManager : ITestHostManager
                 var instance = (IExtension)compositeFactoryInstance.GetInstance(serviceProvider);
 
                 // Check if we have already extensions of the same type with same id registered
-                if (testSessionLifetimeHandlers.Any(x => x.TestSessionLifetimeHandler.Uid == instance.Uid))
-                {
-                    (IExtension TestSessionLifetimeHandler, int _) currentRegisteredExtension = testSessionLifetimeHandlers.Single(x => x.TestSessionLifetimeHandler.Uid == instance.Uid);
-                    throw new InvalidOperationException(string.Format(CultureInfo.InvariantCulture, PlatformResources.ExtensionWithSameUidAlreadyRegisteredErrorMessage, instance.Uid, currentRegisteredExtension.TestSessionLifetimeHandler.GetType()));
-                }
+                testSessionLifetimeHandlers.ValidateUniqueExtension(instance, x => x.TestSessionLifetimeHandler);
 
                 // We initialize only if enabled
-                if (await instance.IsEnabledAsync())
+                if (await instance.IsEnabledAsync().ConfigureAwait(false))
                 {
-                    if (instance is IAsyncInitializableExtension async)
-                    {
-                        await async.InitializeAsync();
-                    }
+                    await instance.TryInitializeAsync().ConfigureAwait(false);
                 }
 
                 // Add to the list of shared singletons
@@ -316,7 +277,7 @@ internal sealed class TestHostManager : ITestHostManager
             var extension = (IExtension)compositeFactoryInstance.GetInstance();
 
             // We register the extension only if enabled
-            if (await extension.IsEnabledAsync())
+            if (await extension.IsEnabledAsync().ConfigureAwait(false))
             {
                 if (extension is ITestSessionLifetimeHandler testSessionLifetimeHandler)
                 {
@@ -330,6 +291,6 @@ internal sealed class TestHostManager : ITestHostManager
             }
         }
 
-        return testSessionLifetimeHandlers.ToArray();
+        return [.. testSessionLifetimeHandlers];
     }
 }

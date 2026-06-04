@@ -8,15 +8,16 @@ internal sealed class SystemTask : ITask
     public Task Run(Action action)
         => Task.Run(action);
 
-    public Task Run(Action action, CancellationToken cancellationToken)
-        => Task.Run(action, cancellationToken);
-
     public Task Run(Func<Task> function, CancellationToken cancellationToken)
         => Task.Run(function, cancellationToken);
 
     public Task<T> Run<T>(Func<Task<T>?> function, CancellationToken cancellationToken)
         => Task.Run(function, cancellationToken);
 
+#if !MTP_MSBUILD_TASKS
+    [UnsupportedOSPlatform("browser")]
+    [UnsupportedOSPlatform("wasi")]
+#endif
     public Task RunLongRunning(Func<Task> action, string name, CancellationToken cancellationToken)
     {
         // We create custom thread so we can assign the name that will help us to identify the thread in the dump
@@ -26,7 +27,7 @@ internal sealed class SystemTask : ITask
         }
 
         TaskCompletionSource<int> taskCompletionSource = new();
-        Thread thread = new(new ThreadStart(() =>
+        Thread thread = new(() =>
         {
             try
             {
@@ -41,7 +42,7 @@ internal sealed class SystemTask : ITask
                 // will end inside the AppDomain.CurrentDomain.UnhandledException handler as expected
                 throw;
             }
-        }))
+        })
         {
             IsBackground = true,
             Name = name,
@@ -52,21 +53,12 @@ internal sealed class SystemTask : ITask
         return taskCompletionSource.Task;
     }
 
-    public Task WhenAll(IEnumerable<Task> tasks)
-        => Task.WhenAll(tasks);
-
     public Task WhenAll(params Task[] tasks)
         => Task.WhenAll(tasks);
-
-    public Task<Task> WhenAny(params Task[] tasks)
-        => Task.WhenAny(tasks);
-
-    public Task Delay(TimeSpan timeSpan)
-        => Task.Delay(timeSpan);
 
     public Task Delay(int millisecondDelay)
         => Task.Delay(millisecondDelay);
 
-    public Task Delay(TimeSpan timeSpan, CancellationToken cancellation)
-        => Task.Delay(timeSpan, cancellation);
+    public Task Delay(TimeSpan timeSpan, CancellationToken cancellationToken)
+        => Task.Delay(timeSpan, cancellationToken);
 }

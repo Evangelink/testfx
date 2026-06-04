@@ -1,9 +1,10 @@
-// Copyright (c) Microsoft Corporation. All rights reserved.
+﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 #if !WINDOWS_UWP
-using System.Diagnostics.CodeAnalysis;
+#if NETFRAMEWORK
 using System.Security;
+#endif
 
 namespace Microsoft.VisualStudio.TestPlatform.MSTestAdapter.PlatformServices;
 
@@ -19,9 +20,14 @@ namespace Microsoft.VisualStudio.TestPlatform.MSTestAdapter.PlatformServices;
 ///
 /// For each directory we need to have two info 1) path 2) includeSubDirectories.
 /// </summary>
+#if NETFRAMEWORK
 [Serializable]
+#endif
 [SuppressMessage("StyleCop.CSharp.DocumentationRules", "SA1603:DocumentationMustContainValidXml", Justification = "Reviewed. Suppression is ok here.")]
-public class RecursiveDirectoryPath : MarshalByRefObject
+internal sealed class RecursiveDirectoryPath
+#if NETFRAMEWORK
+    : MarshalByRefObject
+#endif
 {
     /// <summary>
     /// Initializes a new instance of the <see cref="RecursiveDirectoryPath"/> class.
@@ -46,6 +52,7 @@ public class RecursiveDirectoryPath : MarshalByRefObject
     /// </summary>
     public bool IncludeSubDirectories { get; private set; }
 
+#if NETFRAMEWORK
     /// <summary>
     /// Returns object to be used for controlling lifetime, null means infinite lifetime.
     /// </summary>
@@ -53,14 +60,7 @@ public class RecursiveDirectoryPath : MarshalByRefObject
     /// The <see cref="object"/>.
     /// </returns>
     [SecurityCritical]
-#if NET5_0_OR_GREATER
-#pragma warning disable CA1041 // Provide ObsoleteAttribute message
-    [Obsolete]
-#pragma warning restore CA1041 // Provide ObsoleteAttribute message
+    public override object? InitializeLifetimeService() => null;
 #endif
-    public override object InitializeLifetimeService()
-    {
-        return null!;
-    }
 }
 #endif

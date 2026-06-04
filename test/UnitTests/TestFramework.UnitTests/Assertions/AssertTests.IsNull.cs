@@ -1,16 +1,74 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-#nullable enable
-
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using AwesomeAssertions;
 
 using TestFramework.ForTestingMSTest;
 
-namespace Microsoft.VisualStudio.TestPlatform.TestFramework.UnitTests.Assertions;
+namespace Microsoft.VisualStudio.TestPlatform.TestFramework.UnitTests;
 
 public partial class AssertTests : TestContainer
 {
+    public void IsNull_PassNull_ShouldPass()
+        => Assert.IsNull(null);
+
+    public void IsNull_PassNonNull_ShouldFail()
+    {
+        Action action = () => Assert.IsNull(new object());
+        action.Should().Throw<Exception>()
+            .WithMessage(
+                """
+                Assertion failed. Expected value to be null.
+
+                actual: System.Object
+
+                Assert.IsNull(new object())
+                """);
+    }
+
+    public void IsNull_StringMessage_PassNull_ShouldPass()
+        => Assert.IsNull(null, "User-provided message");
+
+    public void IsNull_StringMessage_PassNonNull_ShouldFail()
+    {
+        Action action = () => Assert.IsNull(new object(), "User-provided message");
+        action.Should().Throw<Exception>()
+            .WithMessage(
+                """
+                Assertion failed. Expected value to be null.
+                User-provided message
+
+                actual: System.Object
+
+                Assert.IsNull(new object())
+                """);
+    }
+
+    public void IsNull_InterpolatedString_PassNull_ShouldPass()
+    {
+        DummyClassTrackingToStringCalls o = new();
+        Assert.IsNull(null, $"User-provided message {o}");
+        o.WasToStringCalled.Should().BeFalse();
+    }
+
+    public async Task IsNull_InterpolatedString_PassNonNull_ShouldFail()
+    {
+        DummyClassTrackingToStringCalls o = new();
+        DateTime dateTime = DateTime.Now;
+        Func<Task> action = async () => Assert.IsNull(new object(), $"User-provided message. {o}, {o,35}, {await GetHelloStringAsync()}, {new DummyIFormattable()}, {dateTime:tt}, {dateTime,5:tt}");
+        (await action.Should().ThrowAsync<Exception>())
+            .WithMessage(
+                $"""
+                Assertion failed. Expected value to be null.
+                User-provided message. DummyClassTrackingToStringCalls,     DummyClassTrackingToStringCalls, Hello, DummyIFormattable.ToString(), {string.Format(null, "{0:tt}", dateTime)}, {string.Format(null, "{0,5:tt}", dateTime)}
+
+                actual: System.Object
+
+                Assert.IsNull(new object())
+                """);
+        o.WasToStringCalled.Should().BeTrue();
+    }
+
     public void IsNotNull_WhenNonNullNullableValue_DoesNotThrowAndLearnNotNull()
     {
         object? obj = GetObj();
@@ -25,12 +83,59 @@ public partial class AssertTests : TestContainer
         _ = obj.ToString(); // No potential NRE warning
     }
 
-    public void IsNotNull_WhenNonNullNullableValueAndCompositeMessage_DoesNotThrowAndLearnNotNull()
+    public void IsNotNull_WhenNonNullNullableValueAndInterpolatedStringMessage_DoesNotThrowAndLearnNotNull()
     {
         object? obj = GetObj();
-        Assert.IsNotNull(obj, "my message with {0}", "some arg");
+        DummyClassTrackingToStringCalls o = new();
+        Assert.IsNotNull(obj, $"my message {o}");
+        o.WasToStringCalled.Should().BeFalse();
         _ = obj.ToString(); // No potential NRE warning
     }
 
-    private object? GetObj() => new();
+    public void IsNotNull_PassNull_ShouldFail()
+    {
+        Action action = () => Assert.IsNotNull(null);
+        action.Should().Throw<Exception>()
+            .WithMessage(
+                """
+                Assertion failed. Expected value to not be null.
+
+                actual: null
+
+                Assert.IsNotNull(null)
+                """);
+    }
+
+    public void IsNotNull_StringMessage_PassNonNull_ShouldFail()
+    {
+        Action action = () => Assert.IsNotNull(null, "User-provided message");
+        action.Should().Throw<Exception>()
+            .WithMessage(
+                """
+                Assertion failed. Expected value to not be null.
+                User-provided message
+
+                actual: null
+
+                Assert.IsNotNull(null)
+                """);
+    }
+
+    public async Task IsNotNull_InterpolatedString_PassNonNull_ShouldFail()
+    {
+        DummyClassTrackingToStringCalls o = new();
+        DateTime dateTime = DateTime.Now;
+        Func<Task> action = async () => Assert.IsNotNull(null, $"User-provided message. {o}, {o,35}, {await GetHelloStringAsync()}, {new DummyIFormattable()}, {dateTime:tt}, {dateTime,5:tt}");
+        (await action.Should().ThrowAsync<Exception>())
+            .WithMessage(
+                $"""
+                Assertion failed. Expected value to not be null.
+                User-provided message. DummyClassTrackingToStringCalls,     DummyClassTrackingToStringCalls, Hello, DummyIFormattable.ToString(), {string.Format(null, "{0:tt}", dateTime)}, {string.Format(null, "{0,5:tt}", dateTime)}
+
+                actual: null
+
+                Assert.IsNotNull(null)
+                """);
+        o.WasToStringCalled.Should().BeTrue();
+    }
 }

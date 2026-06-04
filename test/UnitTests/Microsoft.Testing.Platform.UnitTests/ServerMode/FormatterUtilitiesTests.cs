@@ -1,31 +1,31 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using Microsoft.Testing.Internal.Framework;
 using Microsoft.Testing.Platform.Extensions.Messages;
 using Microsoft.Testing.Platform.ServerMode;
-using Microsoft.Testing.TestInfrastructure;
 
 using TestNode = Microsoft.Testing.Platform.Extensions.Messages.TestNode;
 using TestNodeUid = Microsoft.Testing.Platform.Extensions.Messages.TestNodeUid;
 
 namespace Microsoft.Testing.Platform.UnitTests;
 
-[TestGroup]
-public class FormatterUtilitiesTests : TestBase
+[TestClass]
+public sealed class FormatterUtilitiesTests
 {
     private readonly IMessageFormatter _formatter = FormatterUtilities.CreateFormatter();
 
-    public FormatterUtilitiesTests(ITestExecutionContext testExecutionContext)
-        : base(testExecutionContext)
-    {
+    public static IEnumerable<object[]> SerializerTypesForDynamicData
+        => SerializerUtilities.SerializerTypes.Select(x => new object[] { x });
+
+    public FormatterUtilitiesTests()
+        =>
 #if NETCOREAPP
         Assert.AreEqual("System.Text.Json", _formatter.Id);
 #else
         Assert.AreEqual("Jsonite", _formatter.Id);
 #endif
-    }
 
+    [TestMethod]
     public void CanDeserializeTaskResponse()
     {
 #pragma warning disable SA1009 // Closing parenthesis should be spaced correctly
@@ -46,11 +46,11 @@ public class FormatterUtilitiesTests : TestBase
 
         var response = (ResponseMessage)msg;
         Assert.AreEqual(1, response.Id);
-        Assert.AreEqual(null, response.Result);
+        Assert.IsNull(response.Result);
     }
 
-    [ArgumentsProvider(memberName: nameof(SerializerUtilities.SerializerTypes), memberType: typeof(SerializerUtilities),
-        TestArgumentsEntryProviderMethodName = nameof(FormatSerializerTypes))]
+    [DynamicData(nameof(SerializerTypesForDynamicData), DynamicDataDisplayName = nameof(FormatSerializerTypes))]
+    [TestMethod]
     public async Task SerializeDeserialize_Succeed(Type type)
     {
         object instanceToSerialize = CreateInstance(type);
@@ -73,16 +73,17 @@ public class FormatterUtilitiesTests : TestBase
         static bool HasCustomDeserializeAssert(Type type) => type == typeof(TestNode);
     }
 
-    [Arguments(typeof(DiscoverRequestArgs))]
-    [Arguments(typeof(RunRequestArgs))]
+    [DataRow(typeof(DiscoverRequestArgs))]
+    [DataRow(typeof(RunRequestArgs))]
+    [TestMethod]
     public void DeserializeSpecificTypes(Type type)
     {
-        var json = CreateSerializedInstance(type);
+        string json = CreateSerializedInstance(type);
         Type? deserializer = SerializerUtilities.DeserializerTypes.SingleOrDefault(x => x == type);
 
         if (deserializer is not null)
         {
-            var actual = Deserialize(deserializer, json);
+            object actual = Deserialize(deserializer, json);
             object expected = CreateInstance(type);
 
             if (type == typeof(DiscoverRequestArgs))
@@ -95,19 +96,102 @@ public class FormatterUtilitiesTests : TestBase
             }
             else
             {
-                Assert.AreEqual(actual, expected);
+                Assert.AreEqual(expected, actual);
             }
         }
     }
 
-    private void AssertRequestArgs<TRequestArgs>(Type type, TRequestArgs actualRequest, TRequestArgs expectedRequest)
+    [DataRow(typeof(DiscoverRequestArgs))]
+    [DataRow(typeof(RunRequestArgs))]
+    [TestMethod]
+    public void Deserialize_InvalidRunId_ThrowsMessageFormatException(Type type)
+    {
+        const string json = """
+            {
+                "runId": "not-a-guid"
+            }
+            """;
+
+        Assert.Throws<MessageFormatException>(() => Deserialize(type, json));
+    }
+
+    [DataRow("testing/discoverTests", "\"runId\": 42")]
+    [DataRow("testing/runTests", "\"runId\": 42")]
+    [DataRow("testing/discoverTests", "")]
+    [DataRow("testing/runTests", "")]
+    [TestMethod]
+    public void DeserializeRpcMessage_InvalidRunIdShape_CapturesInvalidParamsSentinel(string method, string runIdProperty)
+    {
+        string json = $$"""
+            {
+                "jsonrpc": "2.0",
+                "id": 42,
+                "method": "{{method}}",
+                "params": {
+                    {{runIdProperty}}
+                }
+            }
+            """;
+
+#pragma warning disable SA1009 // Closing parenthesis should be spaced correctly
+#pragma warning disable SA1111 // Closing parenthesis should be on line of last parameter
+        RpcMessage msg = _formatter.Deserialize<RpcMessage>(json
+#if NETCOREAPP
+            .AsMemory()
+#endif
+            );
+#pragma warning restore SA1111 // Closing parenthesis should be on line of last parameter
+#pragma warning restore SA1009 // Closing parenthesis should be spaced correctly
+
+        var request = (RequestMessage)msg;
+        Assert.AreEqual(42, request.Id);
+        Assert.AreEqual(method, request.Method);
+        var invalid = (InvalidRequestParamsArgs)request.Params!;
+        Assert.AreEqual(ErrorCodes.InvalidParams, invalid.ErrorCode);
+    }
+
+    [DataRow("testing/discoverTests")]
+    [DataRow("testing/runTests")]
+    [TestMethod]
+    public void DeserializeRpcMessage_InvalidRunId_CapturesInvalidParamsSentinel(string method)
+    {
+        string json = $$"""
+            {
+                "jsonrpc": "2.0",
+                "id": 42,
+                "method": "{{method}}",
+                "params": {
+                    "runId": "not-a-guid"
+                }
+            }
+            """;
+
+#pragma warning disable SA1009 // Closing parenthesis should be spaced correctly
+#pragma warning disable SA1111 // Closing parenthesis should be on line of last parameter
+        RpcMessage msg = _formatter.Deserialize<RpcMessage>(json
+#if NETCOREAPP
+            .AsMemory()
+#endif
+            );
+#pragma warning restore SA1111 // Closing parenthesis should be on line of last parameter
+#pragma warning restore SA1009 // Closing parenthesis should be spaced correctly
+
+        var request = (RequestMessage)msg;
+        Assert.AreEqual(42, request.Id);
+        Assert.AreEqual(method, request.Method);
+        var invalid = (InvalidRequestParamsArgs)request.Params!;
+        Assert.AreEqual(ErrorCodes.InvalidParams, invalid.ErrorCode);
+        Assert.Contains("runId", invalid.ErrorMessage);
+    }
+
+    private static void AssertRequestArgs<TRequestArgs>(Type type, TRequestArgs actualRequest, TRequestArgs expectedRequest)
         where TRequestArgs : RequestArgsBase
     {
         Assert.AreEqual(expectedRequest.RunId, actualRequest.RunId);
         Assert.AreEqual(expectedRequest.TestNodes?.Count, actualRequest.TestNodes?.Count);
 
-        var actualTestNodes = actualRequest.TestNodes?.ToArray();
-        var expectedTestNodes = expectedRequest.TestNodes?.ToArray();
+        TestNode[]? actualTestNodes = actualRequest.TestNodes?.ToArray();
+        TestNode[]? expectedTestNodes = expectedRequest.TestNodes?.ToArray();
 
         for (int i = 0; i < actualRequest.TestNodes?.Count; i++)
         {
@@ -129,8 +213,8 @@ public class FormatterUtilitiesTests : TestBase
         }
     }
 
-    internal static TestArgumentsEntry<Type> FormatSerializerTypes(TestArgumentsContext testArgumentsContext)
-        => new((Type)testArgumentsContext.Arguments, ((Type)testArgumentsContext.Arguments).Name);
+    public static string? FormatSerializerTypes(MethodInfo methodInfo, object?[]? data)
+        => (data?[0] as Type)?.Name;
 
     private static void AssertSerialize(Type type, string instanceSerialized)
     {
@@ -155,7 +239,7 @@ public class FormatterUtilitiesTests : TestBase
 
         if (type == typeof(TelemetryEventArgs))
         {
-            Assert.AreEqual("""{"EventName":"eventName","metrics":{"key":1}}""".Replace(" ", string.Empty), instanceSerialized, because);
+            Assert.AreEqual("""{"eventName":"eventName","metrics":{"key":1}}""".Replace(" ", string.Empty), instanceSerialized, because);
             return;
         }
 
@@ -173,7 +257,7 @@ public class FormatterUtilitiesTests : TestBase
 
         if (type == typeof(TestNode))
         {
-            Assert.AreEqual("""{"uid":"uid","display-name":"DisplayName","tuples-key":[{"a":"1"},{"b":"2"}],"array-key":["1","2"],"time.start-utc":"2023-01-01T01:01:01.0000000+00:00","time.stop-utc":"2023-01-01T01:01:01.0000000+00:00","time.duration-ms":0,"location.namespace":"namespace","location.type":"typeName","location.method":"methodName(param1,param2)","location.file":"filePath","location.line-start":1,"location.line-end":2,"key":"value","node-type":"action","execution-state":"failed","error.message":"sample","error.stacktrace":"","assert.actual":"","assert.expected":""}""".Replace(" ", string.Empty), instanceSerialized, because);
+            Assert.AreEqual("""{"uid":"uid","display-name":"DisplayName","traits":[{"testmetadata-key":"testmetadata-value"}],"standardError":"textProperty2","standardOutput":"textProperty","time.duration-ms":0,"location.type":"namespace.typeName","location.method":"methodName(param1,param2)","location.method-arity":0,"location.file":"filePath","location.line-start":1,"location.line-end":2,"key":"value","node-type":"action","execution-state":"failed","error.message":"sample","error.stacktrace":"","assert.actual":"","assert.expected":""}""".Replace(" ", string.Empty), instanceSerialized, because);
             return;
         }
 
@@ -185,7 +269,7 @@ public class FormatterUtilitiesTests : TestBase
 
         if (type == typeof(TestNodeUpdateMessage))
         {
-            Assert.AreEqual("""{"node":{"uid":"uid","display-name":"DisplayName","tuples-key":[{"a":"1"},{"b":"2"}],"array-key":["1","2"],"time.start-utc":"2023-01-01T01:01:01.0000000+00:00","time.stop-utc":"2023-01-01T01:01:01.0000000+00:00","time.duration-ms":0,"location.namespace":"namespace","location.type":"typeName","location.method":"methodName(param1,param2)","location.file":"filePath","location.line-start":1,"location.line-end":2,"key":"value","node-type":"action","execution-state":"failed","error.message":"sample","error.stacktrace":"","assert.actual":"","assert.expected":""},"parent":"parent-uid"}""".Replace(" ", string.Empty), instanceSerialized, because);
+            Assert.AreEqual("""{"node":{"uid":"uid","display-name":"DisplayName","traits":[{"testmetadata-key":"testmetadata-value"}],"standardError":"textProperty2","standardOutput":"textProperty","time.duration-ms":0,"location.type":"namespace.typeName","location.method":"methodName(param1,param2)","location.method-arity":0,"location.file":"filePath","location.line-start":1,"location.line-end":2,"key":"value","node-type":"action","execution-state":"failed","error.message":"sample","error.stacktrace":"","assert.actual":"","assert.expected":""},"parent":"parent-uid"}""".Replace(" ", string.Empty), instanceSerialized, because);
             return;
         }
 
@@ -209,13 +293,13 @@ public class FormatterUtilitiesTests : TestBase
 
         if (type == typeof(ServerTestingCapabilities))
         {
-            Assert.AreEqual("""{"supportsDiscovery":true,"experimental_multiRequestSupport":true,"vstestProvider":true}""".Replace(" ", string.Empty), instanceSerialized, because);
+            Assert.AreEqual("""{"supportsDiscovery":true,"experimental_multiRequestSupport":true,"vstestProvider":true,"attachmentsSupport":true,"multipleConnectionProvider":true}""".Replace(" ", string.Empty), instanceSerialized, because);
             return;
         }
 
         if (type == typeof(ServerCapabilities))
         {
-            Assert.AreEqual("""{"testing":{"supportsDiscovery":true,"experimental_multiRequestSupport":true,"vstestProvider":true}}""".Replace(" ", string.Empty), instanceSerialized, because);
+            Assert.AreEqual("""{"testing":{"supportsDiscovery":true,"experimental_multiRequestSupport":true,"vstestProvider":true,"attachmentsSupport":true,"multipleConnectionProvider":true}}""".Replace(" ", string.Empty), instanceSerialized, because);
             return;
         }
 
@@ -227,7 +311,7 @@ public class FormatterUtilitiesTests : TestBase
 
         if (type == typeof(InitializeResponseArgs))
         {
-            Assert.AreEqual("""{"serverInfo":{"name":"ServerInfoName","version":"Version"},"capabilities":{"testing":{"supportsDiscovery":true,"experimental_multiRequestSupport":true,"vstestProvider":true}}}""".Replace(" ", string.Empty), instanceSerialized, because);
+            Assert.AreEqual("""{"processId":1,"serverInfo":{"name":"ServerInfoName","version":"Version"},"capabilities":{"testing":{"supportsDiscovery":true,"experimental_multiRequestSupport":true,"vstestProvider":true,"attachmentsSupport":true,"multipleConnectionProvider":true}}}""".Replace(" ", string.Empty), instanceSerialized, because);
             return;
         }
 
@@ -255,6 +339,18 @@ public class FormatterUtilitiesTests : TestBase
             return;
         }
 
+        if (type == typeof(TestsAttachments))
+        {
+            Assert.AreEqual("""{"attachments":[{"uri":"Uri","producer":"Producer","type":"Type","display-name":"DisplayName","description":"Description"}]}""".Replace(" ", string.Empty), instanceSerialized, because);
+            return;
+        }
+
+        if (type == typeof(RunTestAttachment))
+        {
+            Assert.AreEqual("""{"uri":"Uri","producer":"Producer","type":"Type","display-name":"DisplayName","description":"Description"}""".Replace(" ", string.Empty), instanceSerialized, because);
+            return;
+        }
+
         if (type == typeof(object))
         {
             Assert.AreEqual("{}".Replace(" ", string.Empty), instanceSerialized, because);
@@ -264,9 +360,7 @@ public class FormatterUtilitiesTests : TestBase
         throw new NotImplementedException($"Assertion not implemented '{type}', value to assert:\n{instanceSerialized}");
     }
 
-    private static string CreateSerializedInstance(Type type)
-    {
-        return type == typeof(DiscoverRequestArgs) || type == typeof(RunRequestArgs)
+    private static string CreateSerializedInstance(Type type) => type == typeof(DiscoverRequestArgs) || type == typeof(RunRequestArgs)
             ? """
             {
                 "runId":"00000000-0000-0000-0000-000000000000",
@@ -282,7 +376,6 @@ public class FormatterUtilitiesTests : TestBase
                 }
             """
             : throw new NotImplementedException($"Serialized instance doesn't exist for '{type}'");
-    }
 
     private static object CreateInstance(Type type)
     {
@@ -293,7 +386,7 @@ public class FormatterUtilitiesTests : TestBase
 
         if (type == typeof(ProcessInfoArgs))
         {
-            return new ProcessInfoArgs("program", "arts", "workingDir", new Dictionary<string, string?>() { { "key", "value" } });
+            return new ProcessInfoArgs("program", "arts", "workingDir", new Dictionary<string, string?> { ["key"] = "value" });
         }
 
         if (type == typeof(KeyValuePair<string, string>))
@@ -303,7 +396,7 @@ public class FormatterUtilitiesTests : TestBase
 
         if (type == typeof(TelemetryEventArgs))
         {
-            return new TelemetryEventArgs("eventName", new Dictionary<string, object>() { { "key", 1 } });
+            return new TelemetryEventArgs("eventName", new Dictionary<string, object> { ["key"] = 1 });
         }
 
         if (type == typeof(CancelRequestArgs))
@@ -331,7 +424,7 @@ public class FormatterUtilitiesTests : TestBase
             return new TestNodeUpdateMessage(
                 default,
                 GetSampleTestNode(),
-                new Extensions.Messages.TestNodeUid("parent-uid"));
+                new TestNodeUid("parent-uid"));
         }
 
         if (type == typeof(RunResponseArgs))
@@ -349,14 +442,24 @@ public class FormatterUtilitiesTests : TestBase
             return new Artifact("Uri", "Producer", "Type", "DisplayName", "Description");
         }
 
+        if (type == typeof(TestsAttachments))
+        {
+            return new TestsAttachments([new("Uri", "Producer", "Type", "DisplayName", "Description")]);
+        }
+
+        if (type == typeof(RunTestAttachment))
+        {
+            return new RunTestAttachment("Uri", "Producer", "Type", "DisplayName", "Description");
+        }
+
         if (type == typeof(ServerTestingCapabilities))
         {
-            return new ServerTestingCapabilities(true, true, true);
+            return new ServerTestingCapabilities(true, true, true, true, true);
         }
 
         if (type == typeof(ServerCapabilities))
         {
-            return new ServerCapabilities(new ServerTestingCapabilities(true, true, true));
+            return new ServerCapabilities(new ServerTestingCapabilities(true, true, true, true, true));
         }
 
         if (type == typeof(ServerInfo))
@@ -366,7 +469,7 @@ public class FormatterUtilitiesTests : TestBase
 
         if (type == typeof(InitializeResponseArgs))
         {
-            return new InitializeResponseArgs(new ServerInfo("ServerInfoName", "Version"), new ServerCapabilities(new ServerTestingCapabilities(true, true, true)));
+            return new InitializeResponseArgs(1, new ServerInfo("ServerInfoName", "Version"), new ServerCapabilities(new ServerTestingCapabilities(true, true, true, true, true)));
         }
 
         if (type == typeof(ErrorMessage))
@@ -393,15 +496,14 @@ public class FormatterUtilitiesTests : TestBase
         {
             return new DiscoverRequestArgs(
                 Guid.Empty,
-                new TestNode[]
-                {
+                [
                     new()
                     {
                         Uid = new TestNodeUid("UnitTest1.TestMethod1"),
                         DisplayName = "test1",
                         Properties = new PropertyBag(new TestFileLocationProperty("filePath", new LinePositionSpan(new(1, 0), new(2, 0)))),
-                    },
-                },
+                    }
+                ],
                 null);
         }
 
@@ -409,15 +511,14 @@ public class FormatterUtilitiesTests : TestBase
         {
             return new RunRequestArgs(
                 Guid.Empty,
-                new TestNode[]
-                {
+                [
                     new()
                     {
                         Uid = new TestNodeUid("UnitTest1.TestMethod1"),
                         DisplayName = "test1",
                         Properties = new PropertyBag(new TestFileLocationProperty("filePath", new LinePositionSpan(new(1, 0), new(2, 0)))),
-                    },
-                },
+                    }
+                ],
                 null);
         }
 
@@ -432,16 +533,17 @@ public class FormatterUtilitiesTests : TestBase
             TestNode testNode = new()
             {
                 DisplayName = "DisplayName",
-                Uid = new Extensions.Messages.TestNodeUid("uid"),
+                Uid = new TestNodeUid("uid"),
             };
 
             testNode.Properties.Add(new SerializableKeyValuePairStringProperty("key", "value"));
             testNode.Properties.Add(new TestFileLocationProperty("filePath", new LinePositionSpan(new(1, 0), new(2, 0))));
-            testNode.Properties.Add(new TestMethodIdentifierProperty("assemblyFullName", "namespace", "typeName", "methodName", ["param1", "param2"], "returnTypeFullName"));
+            testNode.Properties.Add(new TestMethodIdentifierProperty("assemblyFullName", "namespace", "typeName", "methodName", 0, ["param1", "param2"], "returnTypeFullName"));
             testNode.Properties.Add(new TimingProperty(new TimingInfo(new DateTimeOffset(2023, 01, 01, 01, 01, 01, TimeSpan.Zero), new DateTimeOffset(2023, 01, 01, 01, 01, 01, TimeSpan.Zero), TimeSpan.Zero)));
             testNode.Properties.Add(new FailedTestNodeStateProperty(new InvalidOperationException("sample")));
-            testNode.Properties.Add(new SerializableNamedArrayStringProperty("array-key", ["1", "2"]));
-            testNode.Properties.Add(new SerializableNamedKeyValuePairsStringProperty("tuples-key", [new KeyValuePair<string, string>("a", "1"), new KeyValuePair<string, string>("b", "2"),]));
+            testNode.Properties.Add(new StandardOutputProperty("textProperty"));
+            testNode.Properties.Add(new StandardErrorProperty("textProperty2"));
+            testNode.Properties.Add(new TestMetadataProperty("testmetadata-key", "testmetadata-value"));
 
             return testNode;
         }

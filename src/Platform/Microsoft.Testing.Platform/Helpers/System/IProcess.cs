@@ -3,27 +3,38 @@
 
 namespace Microsoft.Testing.Platform.Helpers;
 
-internal interface IProcess
+internal interface IProcess : IDisposable
 {
-    public event EventHandler Exited;
+    event EventHandler Exited;
 
+    /// <inheritdoc cref="Process.Id" />
     int Id { get; }
 
+    /// <inheritdoc cref="Process.ProcessName" />
+    string Name { get; }
+
+    /// <inheritdoc cref="Process.ExitCode" />
     int ExitCode { get; }
 
+    /// <inheritdoc cref="Process.HasExited" />
     bool HasExited { get; }
 
-#if NETCOREAPP
+    /// <inheritdoc cref="Process.MainModule" />
     IMainModule? MainModule { get; }
-#else
-    IMainModule MainModule { get; }
-#endif
 
-#if NETCOREAPP
+    /// <inheritdoc cref="Process.StartTime" />
+    DateTime StartTime { get; }
+
+    /// <summary>
+    /// Instructs the Process component to wait for the associated process to exit, or for the cancellationToken to be canceled.
+    /// </summary>
     Task WaitForExitAsync();
 
-#endif
+    /// <inheritdoc cref="Process.WaitForExit()" />
     void WaitForExit();
 
+    /// <summary>
+    /// Kills the process and try to kill all child processes.
+    /// </summary>
     void Kill();
 }

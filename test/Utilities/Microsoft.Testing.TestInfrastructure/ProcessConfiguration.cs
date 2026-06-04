@@ -5,10 +5,7 @@ namespace Microsoft.Testing.TestInfrastructure;
 
 public sealed class ProcessConfiguration
 {
-    public ProcessConfiguration(string fileName)
-    {
-        FileName = fileName;
-    }
+    public ProcessConfiguration(string fileName) => FileName = fileName;
 
     public string FileName { get; }
 
@@ -16,7 +13,7 @@ public sealed class ProcessConfiguration
 
     public string? WorkingDirectory { get; init; }
 
-    public IDictionary<string, string>? EnvironmentVariables { get; init; }
+    public IDictionary<string, string?>? EnvironmentVariables { get; init; }
 
     public Action<IProcessHandle, string>? OnErrorOutput { get; init; }
 

@@ -1,7 +1,9 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-#if NET462
+#if NETFRAMEWORK
+
+using AwesomeAssertions;
 
 using Microsoft.VisualStudio.TestPlatform.MSTestAdapter.PlatformServices;
 
@@ -13,22 +15,16 @@ public class DesktopThreadOperationsTests : TestContainer
 {
     private readonly ThreadOperations _asyncOperations;
 
-    public DesktopThreadOperationsTests()
-    {
-        _asyncOperations = new ThreadOperations();
-    }
+    public DesktopThreadOperationsTests() => _asyncOperations = new ThreadOperations();
 
     public void ExecuteShouldRunActionOnANewThread()
     {
         int actionThreadID = 0;
         var cancellationTokenSource = new CancellationTokenSource();
-        void Action()
-        {
-            actionThreadID = Environment.CurrentManagedThreadId;
-        }
+        void Action() => actionThreadID = Environment.CurrentManagedThreadId;
 
-        Verify(_asyncOperations.Execute(Action, 1000, cancellationTokenSource.Token));
-        Verify(Environment.CurrentManagedThreadId != actionThreadID);
+        _asyncOperations.Execute(Action, 1000, cancellationTokenSource.Token).Should().BeTrue();
+        Environment.CurrentManagedThreadId.Should().NotBe(actionThreadID);
     }
 
     public void TokenCancelShouldAbortExecutingAction()
@@ -38,10 +34,10 @@ public class DesktopThreadOperationsTests : TestContainer
 
         // act
         cancellationTokenSource.CancelAfter(100);
-        var result = _asyncOperations.Execute(() => { Thread.Sleep(10000); }, 100000, cancellationTokenSource.Token);
+        bool result = _asyncOperations.Execute(() => Thread.Sleep(10000), 100000, cancellationTokenSource.Token);
 
         // validate
-        Verify(!result, "The execution failed to abort");
+        result.Should().BeFalse("The execution failed to abort");
     }
 
     public void TokenCancelShouldAbortIfAlreadyCanceled()
@@ -51,10 +47,10 @@ public class DesktopThreadOperationsTests : TestContainer
         cancellationTokenSource.Cancel();
 
         // act
-        var result = _asyncOperations.Execute(() => { Thread.Sleep(10000); }, 100000, cancellationTokenSource.Token);
+        bool result = _asyncOperations.Execute(() => Thread.Sleep(10000), 100000, cancellationTokenSource.Token);
 
         // validate
-        Verify(!result, "The execution failed to abort");
+        result.Should().BeFalse("The execution failed to abort");
     }
 }
 #endif

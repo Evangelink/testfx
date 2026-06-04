@@ -1,21 +1,19 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using Microsoft.Testing.Internal.Framework;
-using Microsoft.Testing.TestInfrastructure;
-
 using VerifyCS = MSTest.Analyzers.Test.CSharpCodeFixVerifier<
     MSTest.Analyzers.TestMethodShouldNotBeIgnoredAnalyzer,
     Microsoft.CodeAnalysis.Testing.EmptyCodeFixProvider>;
 
 namespace MSTest.Analyzers.Test;
 
-[TestGroup]
-public sealed class TestMethodShouldNotBeIgnoredAnalyzerTests(ITestExecutionContext testExecutionContext) : TestBase(testExecutionContext)
+[TestClass]
+public sealed class TestMethodShouldNotBeIgnoredAnalyzerTests
 {
+    [TestMethod]
     public async Task WhenTestMethodIsNotIgnored_NoDiagnostic()
     {
-        var code = """
+        string code = """
             using Microsoft.VisualStudio.TestTools.UnitTesting;
 
             [TestClass]
@@ -31,9 +29,10 @@ public sealed class TestMethodShouldNotBeIgnoredAnalyzerTests(ITestExecutionCont
         await VerifyCS.VerifyAnalyzerAsync(code);
     }
 
+    [TestMethod]
     public async Task UsingIgnoreWithoutTestMethod_NoDiagnostic()
     {
-        var code = """
+        string code = """
             using Microsoft.VisualStudio.TestTools.UnitTesting;
 
             [TestClass]
@@ -49,9 +48,10 @@ public sealed class TestMethodShouldNotBeIgnoredAnalyzerTests(ITestExecutionCont
         await VerifyCS.VerifyAnalyzerAsync(code);
     }
 
+    [TestMethod]
     public async Task WhenTestMethodIsIgnored_Diagnostic()
     {
-        var code = """
+        string code = """
             using Microsoft.VisualStudio.TestTools.UnitTesting;
 
             [TestClass]
@@ -72,9 +72,10 @@ public sealed class TestMethodShouldNotBeIgnoredAnalyzerTests(ITestExecutionCont
                 .WithArguments("MyTestMethod"));
     }
 
+    [TestMethod]
     public async Task WhenDerivedTestMethodAttributeIsIgnored_Diagnostic()
     {
-        var code = """
+        string code = """
             using Microsoft.VisualStudio.TestTools.UnitTesting;
 
             public class DerivedTestMethod : TestMethodAttribute

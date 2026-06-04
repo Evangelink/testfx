@@ -1,21 +1,19 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using Microsoft.Testing.Internal.Framework;
-using Microsoft.Testing.TestInfrastructure;
-
 using VerifyCS = MSTest.Analyzers.Test.CSharpCodeFixVerifier<
     MSTest.Analyzers.TestClassShouldBeValidAnalyzer,
-    Microsoft.CodeAnalysis.Testing.EmptyCodeFixProvider>;
+    MSTest.Analyzers.TestClassShouldBeValidFixer>;
 
 namespace MSTest.Analyzers.Test;
 
-[TestGroup]
-public sealed class TestClassShouldBeValidAnalyzerTests(ITestExecutionContext testExecutionContext) : TestBase(testExecutionContext)
+[TestClass]
+public sealed class TestClassShouldBeValidAnalyzerTests
 {
+    [TestMethod]
     public async Task WhenClassIsPublicAndTestClass_NoDiagnostic()
     {
-        var code = """
+        string code = """
             using Microsoft.VisualStudio.TestTools.UnitTesting;
 
             [TestClass]
@@ -24,12 +22,13 @@ public sealed class TestClassShouldBeValidAnalyzerTests(ITestExecutionContext te
             }
             """;
 
-        await VerifyCS.VerifyAnalyzerAsync(code);
+        await VerifyCS.VerifyCodeFixAsync(code, code);
     }
 
+    [TestMethod]
     public async Task WhenClassIsInternalAndTestClass_Diagnostic()
     {
-        var code = """
+        string code = """
             using Microsoft.VisualStudio.TestTools.UnitTesting;
 
             [TestClass]
@@ -38,18 +37,58 @@ public sealed class TestClassShouldBeValidAnalyzerTests(ITestExecutionContext te
             }
             """;
 
-        await VerifyCS.VerifyAnalyzerAsync(
+        string fixedCode = """
+            using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+            [TestClass]
+            public class MyTestClass
+            {
+            }
+            """;
+
+        await VerifyCS.VerifyCodeFixAsync(
             code,
-            VerifyCS.Diagnostic(TestClassShouldBeValidAnalyzer.PublicRule)
+            VerifyCS.Diagnostic(TestClassShouldBeValidAnalyzer.TestClassShouldBeValidRule)
                 .WithLocation(0)
-                .WithArguments("MyTestClass"));
+                .WithArguments("MyTestClass"),
+            fixedCode);
     }
 
-    [Arguments("private")]
-    [Arguments("internal")]
+    [TestMethod]
+    public async Task WhenClassIsInternalAndTestRecord_Diagnostic()
+    {
+        string code = """
+            using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+            [TestClass]
+            internal record {|#0:MyTestClass|}
+            {
+            }
+            """;
+
+        string fixedCode = """
+            using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+            [TestClass]
+            public record MyTestClass
+            {
+            }
+            """;
+
+        await VerifyCS.VerifyCodeFixAsync(
+            code,
+            VerifyCS.Diagnostic(TestClassShouldBeValidAnalyzer.TestClassShouldBeValidRule)
+                .WithLocation(0)
+                .WithArguments("MyTestClass"),
+            fixedCode);
+    }
+
+    [DataRow("private")]
+    [DataRow("internal")]
+    [TestMethod]
     public async Task WhenClassIsInnerAndNotPublicTestClass_Diagnostic(string accessibility)
     {
-        var code = $$"""
+        string code = $$"""
             using Microsoft.VisualStudio.TestTools.UnitTesting;
 
             public class OuterClass
@@ -61,16 +100,31 @@ public sealed class TestClassShouldBeValidAnalyzerTests(ITestExecutionContext te
             }
             """;
 
-        await VerifyCS.VerifyAnalyzerAsync(
+        string fixedCode =
+            """
+            using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+            public class OuterClass
+            {
+                [TestClass]
+                public class MyTestClass
+                {
+                }
+            }
+            """;
+
+        await VerifyCS.VerifyCodeFixAsync(
             code,
-            VerifyCS.Diagnostic(TestClassShouldBeValidAnalyzer.PublicRule)
+            VerifyCS.Diagnostic(TestClassShouldBeValidAnalyzer.TestClassShouldBeValidRule)
                 .WithLocation(0)
-                .WithArguments("MyTestClass"));
+                .WithArguments("MyTestClass"),
+            fixedCode);
     }
 
+    [TestMethod]
     public async Task WhenClassIsInternalAndNotTestClass_NoDiagnostic()
     {
-        var code = """
+        string code = """
             using Microsoft.VisualStudio.TestTools.UnitTesting;
 
             internal class MyTestClass
@@ -78,12 +132,13 @@ public sealed class TestClassShouldBeValidAnalyzerTests(ITestExecutionContext te
             }
             """;
 
-        await VerifyCS.VerifyAnalyzerAsync(code);
+        await VerifyCS.VerifyCodeFixAsync(code, code);
     }
 
+    [TestMethod]
     public async Task WhenClassIsPublicAndTestClassAsInnerOfInternalClass_Diagnostic()
     {
-        var code = """
+        string code = """
             using Microsoft.VisualStudio.TestTools.UnitTesting;
 
             internal class OuterClass
@@ -97,14 +152,15 @@ public sealed class TestClassShouldBeValidAnalyzerTests(ITestExecutionContext te
 
         await VerifyCS.VerifyAnalyzerAsync(
             code,
-            VerifyCS.Diagnostic(TestClassShouldBeValidAnalyzer.PublicRule)
+            VerifyCS.Diagnostic(TestClassShouldBeValidAnalyzer.TestClassShouldBeValidRule)
                 .WithLocation(0)
                 .WithArguments("MyTestClass"));
     }
 
+    [TestMethod]
     public async Task WhenClassIsGeneric_NoDiagnostic()
     {
-        var code = """
+        string code = """
             using Microsoft.VisualStudio.TestTools.UnitTesting;
 
             [TestClass]
@@ -113,12 +169,13 @@ public sealed class TestClassShouldBeValidAnalyzerTests(ITestExecutionContext te
             }
             """;
 
-        await VerifyCS.VerifyAnalyzerAsync(code);
+        await VerifyCS.VerifyCodeFixAsync(code, code);
     }
 
+    [TestMethod]
     public async Task WhenDiscoverInternalsAndTypeIsInternal_NoDiagnostic()
     {
-        var code = """
+        string code = """
             using Microsoft.VisualStudio.TestTools.UnitTesting;
 
             [assembly: DiscoverInternals]
@@ -129,12 +186,14 @@ public sealed class TestClassShouldBeValidAnalyzerTests(ITestExecutionContext te
             }
             """;
 
-        await VerifyCS.VerifyAnalyzerAsync(code);
+        await VerifyCS.VerifyCodeFixAsync(code, code);
     }
 
+    [TestMethod]
     public async Task WhenDiscoverInternalsAndTypeIsPrivate_Diagnostic()
     {
-        var code = """
+        // NOTE: As we are fixing the modifier, we still prefer to make it public, even if discover internals is set.
+        string code = """
             using Microsoft.VisualStudio.TestTools.UnitTesting;
 
             [assembly: DiscoverInternals]
@@ -148,16 +207,32 @@ public sealed class TestClassShouldBeValidAnalyzerTests(ITestExecutionContext te
             }
             """;
 
-        await VerifyCS.VerifyAnalyzerAsync(
+        string fixedCode = """
+            using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+            [assembly: DiscoverInternals]
+
+            public class A
+            {
+                [TestClass]
+                public class MyTestClass
+                {
+                }
+            }
+            """;
+
+        await VerifyCS.VerifyCodeFixAsync(
             code,
-            VerifyCS.Diagnostic(TestClassShouldBeValidAnalyzer.PublicOrInternalRule)
+            VerifyCS.Diagnostic(TestClassShouldBeValidAnalyzer.TestClassShouldBeValidRule)
                 .WithLocation(0)
-                .WithArguments("MyTestClass"));
+                .WithArguments("MyTestClass"),
+            fixedCode);
     }
 
+    [TestMethod]
     public async Task WhenClassIsStaticAndEmpty_NoDiagnostic()
     {
-        var code = """
+        string code = """
             using Microsoft.VisualStudio.TestTools.UnitTesting;
 
             [TestClass]
@@ -166,12 +241,13 @@ public sealed class TestClassShouldBeValidAnalyzerTests(ITestExecutionContext te
             }
             """;
 
-        await VerifyCS.VerifyAnalyzerAsync(code);
+        await VerifyCS.VerifyCodeFixAsync(code, code);
     }
 
+    [TestMethod]
     public async Task WhenClassIsStaticAndContainsAssemblyInitialize_NoDiagnostic()
     {
-        var code = """
+        string code = """
             using Microsoft.VisualStudio.TestTools.UnitTesting;
 
             [TestClass]
@@ -184,12 +260,13 @@ public sealed class TestClassShouldBeValidAnalyzerTests(ITestExecutionContext te
             }
             """;
 
-        await VerifyCS.VerifyAnalyzerAsync(code);
+        await VerifyCS.VerifyCodeFixAsync(code, code);
     }
 
+    [TestMethod]
     public async Task WhenClassIsStaticAndContainsAssemblyCleanup_NoDiagnostic()
     {
-        var code = """
+        string code = """
             using Microsoft.VisualStudio.TestTools.UnitTesting;
 
             [TestClass]
@@ -202,12 +279,13 @@ public sealed class TestClassShouldBeValidAnalyzerTests(ITestExecutionContext te
             }
             """;
 
-        await VerifyCS.VerifyAnalyzerAsync(code);
+        await VerifyCS.VerifyCodeFixAsync(code, code);
     }
 
+    [TestMethod]
     public async Task WhenClassIsStaticAndContainsClassInitialize_Diagnostic()
     {
-        var code = """
+        string code = """
             using Microsoft.VisualStudio.TestTools.UnitTesting;
 
             [TestClass]
@@ -220,16 +298,31 @@ public sealed class TestClassShouldBeValidAnalyzerTests(ITestExecutionContext te
             }
             """;
 
-        await VerifyCS.VerifyAnalyzerAsync(
+        string fixedCode = """
+            using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+            [TestClass]
+            public class MyTestClass
+            {
+                [ClassInitialize]
+                public static void ClassInit(TestContext testContext)
+                {
+                }
+            }
+            """;
+
+        await VerifyCS.VerifyCodeFixAsync(
             code,
-            VerifyCS.Diagnostic(TestClassShouldBeValidAnalyzer.NotStaticRule)
+            VerifyCS.Diagnostic(TestClassShouldBeValidAnalyzer.TestClassShouldBeValidRule)
                 .WithLocation(0)
-                .WithArguments("MyTestClass"));
+                .WithArguments("MyTestClass"),
+            fixedCode);
     }
 
+    [TestMethod]
     public async Task WhenClassIsStaticAndContainsClassCleanup_Diagnostic()
     {
-        var code = """
+        string code = """
             using Microsoft.VisualStudio.TestTools.UnitTesting;
 
             [TestClass]
@@ -241,17 +334,30 @@ public sealed class TestClassShouldBeValidAnalyzerTests(ITestExecutionContext te
                 }
             }
             """;
+        string fixedCode = """
+            using Microsoft.VisualStudio.TestTools.UnitTesting;
 
-        await VerifyCS.VerifyAnalyzerAsync(
+            [TestClass]
+            public class MyTestClass
+            {
+                [ClassCleanup]
+                public static void ClassCleanup()
+                {
+                }
+            }
+            """;
+        await VerifyCS.VerifyCodeFixAsync(
             code,
-            VerifyCS.Diagnostic(TestClassShouldBeValidAnalyzer.NotStaticRule)
+            VerifyCS.Diagnostic(TestClassShouldBeValidAnalyzer.TestClassShouldBeValidRule)
                 .WithLocation(0)
-                .WithArguments("MyTestClass"));
+                .WithArguments("MyTestClass"),
+            fixedCode);
     }
 
+    [TestMethod]
     public async Task WhenClassIsStaticAndContainsTestInitialize_Diagnostic()
     {
-        var code = """
+        string code = """
             using Microsoft.VisualStudio.TestTools.UnitTesting;
 
             [TestClass]
@@ -263,17 +369,31 @@ public sealed class TestClassShouldBeValidAnalyzerTests(ITestExecutionContext te
                 }
             }
             """;
+        string fixedCode = """
+            using Microsoft.VisualStudio.TestTools.UnitTesting;
 
-        await VerifyCS.VerifyAnalyzerAsync(
+            [TestClass]
+            public class MyTestClass
+            {
+                [TestInitialize]
+                public static void TestInit()
+                {
+                }
+            }
+            """;
+
+        await VerifyCS.VerifyCodeFixAsync(
             code,
-            VerifyCS.Diagnostic(TestClassShouldBeValidAnalyzer.NotStaticRule)
+            VerifyCS.Diagnostic(TestClassShouldBeValidAnalyzer.TestClassShouldBeValidRule)
                 .WithLocation(0)
-                .WithArguments("MyTestClass"));
+                .WithArguments("MyTestClass"),
+            fixedCode);
     }
 
+    [TestMethod]
     public async Task WhenClassIsStaticAndContainsTestCleanup_Diagnostic()
     {
-        var code = """
+        string code = """
             using Microsoft.VisualStudio.TestTools.UnitTesting;
 
             [TestClass]
@@ -285,17 +405,31 @@ public sealed class TestClassShouldBeValidAnalyzerTests(ITestExecutionContext te
                 }
             }
             """;
+        string fixedCode = """
+            using Microsoft.VisualStudio.TestTools.UnitTesting;
 
-        await VerifyCS.VerifyAnalyzerAsync(
+            [TestClass]
+            public class MyTestClass
+            {
+                [TestCleanup]
+                public static void TestCleanup()
+                {
+                }
+            }
+            """;
+
+        await VerifyCS.VerifyCodeFixAsync(
             code,
-            VerifyCS.Diagnostic(TestClassShouldBeValidAnalyzer.NotStaticRule)
+            VerifyCS.Diagnostic(TestClassShouldBeValidAnalyzer.TestClassShouldBeValidRule)
                 .WithLocation(0)
-                .WithArguments("MyTestClass"));
+                .WithArguments("MyTestClass"),
+            fixedCode);
     }
 
+    [TestMethod]
     public async Task WhenClassIsStaticAndContainsTestMethod_Diagnostic()
     {
-        var code = """
+        string code = """
             using Microsoft.VisualStudio.TestTools.UnitTesting;
 
             [TestClass]
@@ -307,11 +441,108 @@ public sealed class TestClassShouldBeValidAnalyzerTests(ITestExecutionContext te
                 }
             }
             """;
+        string fixedCode = """
+            using Microsoft.VisualStudio.TestTools.UnitTesting;
 
-        await VerifyCS.VerifyAnalyzerAsync(
+            [TestClass]
+            public class MyTestClass
+            {
+                [TestMethod]
+                public static void TestMethod()
+                {
+                }
+            }
+            """;
+
+        await VerifyCS.VerifyCodeFixAsync(
             code,
-            VerifyCS.Diagnostic(TestClassShouldBeValidAnalyzer.NotStaticRule)
+            VerifyCS.Diagnostic(TestClassShouldBeValidAnalyzer.TestClassShouldBeValidRule)
                 .WithLocation(0)
-                .WithArguments("MyTestClass"));
+                .WithArguments("MyTestClass"),
+            fixedCode);
+    }
+
+    [TestMethod]
+    public async Task WhenClassIsInternalSealed_Diagnostic()
+    {
+        string code = """
+            using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+            namespace MyNamespace
+            {
+                [TestClass]
+                internal sealed class {|#0:MyTestClass|}
+                {
+                    [TestMethod]
+                    public void TestMethod()
+                    {
+                    }
+                }
+            }
+            """;
+        string fixedCode = """
+            using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+            namespace MyNamespace
+            {
+                [TestClass]
+                public sealed class MyTestClass
+                {
+                    [TestMethod]
+                    public void TestMethod()
+                    {
+                    }
+                }
+            }
+            """;
+
+        await VerifyCS.VerifyCodeFixAsync(
+            code,
+            VerifyCS.Diagnostic(TestClassShouldBeValidAnalyzer.TestClassShouldBeValidRule)
+                .WithLocation(0)
+                .WithArguments("MyTestClass"),
+            fixedCode);
+    }
+
+    [TestMethod]
+    public async Task WhenClassIsInternalStatic_Diagnostic()
+    {
+        string code = """
+            using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+            namespace MyNamespace
+            {
+                [TestClass]
+                internal static class {|#0:MyTestClass|}
+                {
+                    [TestMethod]
+                    public static void TestMethod()
+                    {
+                    }
+                }
+            }
+            """;
+        string fixedCode = """
+            using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+            namespace MyNamespace
+            {
+                [TestClass]
+                public class MyTestClass
+                {
+                    [TestMethod]
+                    public static void TestMethod()
+                    {
+                    }
+                }
+            }
+            """;
+
+        await VerifyCS.VerifyCodeFixAsync(
+            code,
+            VerifyCS.Diagnostic(TestClassShouldBeValidAnalyzer.TestClassShouldBeValidRule)
+                .WithLocation(0)
+                .WithArguments("MyTestClass"),
+            fixedCode);
     }
 }

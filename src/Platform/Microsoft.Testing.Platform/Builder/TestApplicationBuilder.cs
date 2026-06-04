@@ -2,21 +2,20 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using Microsoft.Testing.Internal.Framework;
+using Microsoft.Testing.Platform.AI;
 using Microsoft.Testing.Platform.Capabilities.TestFramework;
 using Microsoft.Testing.Platform.CommandLine;
 using Microsoft.Testing.Platform.Configurations;
 using Microsoft.Testing.Platform.Extensions.TestFramework;
-using Microsoft.Testing.Platform.Extensions.TestHostOrchestrator;
 using Microsoft.Testing.Platform.Helpers;
 using Microsoft.Testing.Platform.Hosts;
 using Microsoft.Testing.Platform.Logging;
-using Microsoft.Testing.Platform.OutputDevice;
 using Microsoft.Testing.Platform.Resources;
-using Microsoft.Testing.Platform.ServerMode;
 using Microsoft.Testing.Platform.Services;
 using Microsoft.Testing.Platform.Telemetry;
 using Microsoft.Testing.Platform.TestHost;
 using Microsoft.Testing.Platform.TestHostControllers;
+using Microsoft.Testing.Platform.TestHostOrchestrator;
 using Microsoft.Testing.Platform.Tools;
 
 namespace Microsoft.Testing.Platform.Builder;
@@ -26,64 +25,73 @@ namespace Microsoft.Testing.Platform.Builder;
 /// </summary>
 internal sealed class TestApplicationBuilder : ITestApplicationBuilder
 {
-    private readonly string[] _args;
     private readonly DateTimeOffset _createBuilderStart;
     private readonly ApplicationLoggingState _loggingState;
     private readonly TestApplicationOptions _testApplicationOptions;
     private readonly IUnhandledExceptionsHandler _unhandledExceptionsHandler;
     private readonly TestHostBuilder _testHostBuilder;
-    private ITestHost? _testHost;
-    private Func<ITestFrameworkCapabilities, IServiceProvider, ITestFramework>? _testFrameworkAdapterFactory;
+    private IHost? _host;
+    private Func<ITestFrameworkCapabilities, IServiceProvider, ITestFramework>? _testFrameworkFactory;
     private Func<IServiceProvider, ITestFrameworkCapabilities>? _testFrameworkCapabilitiesFactory;
 
     internal TestApplicationBuilder(
-        string[] args,
         ApplicationLoggingState loggingState,
         DateTimeOffset createBuilderStart,
         TestApplicationOptions testApplicationOptions,
-        IUnhandledExceptionsHandler unhandledExceptionsHandler)
+        IUnhandledExceptionsHandler unhandledExceptionsHandler,
+        string[] args)
     {
-        _testHostBuilder = new TestHostBuilder(new SystemFileSystem(), new SystemRuntimeFeature(), new SystemEnvironment(), new SystemProcessHandler(), new CurrentTestApplicationModuleInfo(new SystemEnvironment(), new SystemProcessHandler()));
-        _args = args;
+        _testHostBuilder = new TestHostBuilder(new SystemFileSystem(), new SystemRuntimeFeature(), new SystemEnvironment(), new SystemProcessHandler(), new CurrentTestApplicationModuleInfo(new SystemEnvironment(), new SystemProcessHandler(), args));
         _createBuilderStart = createBuilderStart;
         _loggingState = loggingState;
         _testApplicationOptions = testApplicationOptions;
         _unhandledExceptionsHandler = unhandledExceptionsHandler;
     }
 
+    public IChatClientManager ChatClientManager => _testHostBuilder.ChatClientManager;
+
     public ITestHostManager TestHost => _testHostBuilder.TestHost;
 
     public ITestHostControllersManager TestHostControllers => _testHostBuilder.TestHostControllers;
 
+    [Experimental("TPEXP", UrlFormat = "https://aka.ms/testingplatform/diagnostics#{0}")]
+    ITestHostOrchestratorManager ITestApplicationBuilder.TestHostOrchestrator => _testHostBuilder.TestHostOrchestrator;
+
+    // Binary backward compatibility: old extensions access this property on the concrete class.
+    internal Extensions.TestHostOrchestrator.ITestHostOrchestratorManager TestHostOrchestrator => (Extensions.TestHostOrchestrator.ITestHostOrchestratorManager)_testHostBuilder.TestHostOrchestrator;
+
     public ICommandLineManager CommandLine => _testHostBuilder.CommandLine;
 
-    internal IServerModeManager ServerMode => _testHostBuilder.ServerMode;
+    [Experimental("TPEXP", UrlFormat = "https://aka.ms/testingplatform/diagnostics#{0}")]
+    public IConfigurationManager Configuration => _testHostBuilder.Configuration;
 
-    internal ITestHostOrchestratorManager TestHostControllersManager => _testHostBuilder.TestHostOrchestratorManager;
+    [Experimental("TPEXP", UrlFormat = "https://aka.ms/testingplatform/diagnostics#{0}")]
+    public ILoggingManager Logging => _testHostBuilder.Logging;
 
-    internal IConfigurationManager Configuration => _testHostBuilder.Configuration;
-
-    internal ILoggingManager Logging => _testHostBuilder.Logging;
-
-    internal IPlatformOutputDeviceManager OutputDisplay => _testHostBuilder.OutputDisplay;
-
-    internal ITelemetryManager TelemetryManager => _testHostBuilder.Telemetry;
+    internal ITelemetryManager Telemetry => _testHostBuilder.Telemetry;
 
     internal IToolsManager Tools => _testHostBuilder.Tools;
 
     public ITestApplicationBuilder RegisterTestFramework(
         Func<IServiceProvider, ITestFrameworkCapabilities> capabilitiesFactory,
-        Func<ITestFrameworkCapabilities, IServiceProvider, ITestFramework> adapterFactory)
+        Func<ITestFrameworkCapabilities, IServiceProvider, ITestFramework> frameworkFactory)
     {
-        ArgumentGuard.IsNotNull(adapterFactory);
-        ArgumentGuard.IsNotNull(capabilitiesFactory);
+        if (frameworkFactory is null)
+        {
+            throw new ArgumentNullException(nameof(frameworkFactory));
+        }
 
-        if (_testFrameworkAdapterFactory is not null)
+        if (capabilitiesFactory is null)
+        {
+            throw new ArgumentNullException(nameof(capabilitiesFactory));
+        }
+
+        if (_testFrameworkFactory is not null)
         {
             throw new InvalidOperationException(PlatformResources.TestApplicationBuilderFrameworkAdapterFactoryAlreadyRegisteredErrorMessage);
         }
 
-        _testFrameworkAdapterFactory = adapterFactory;
+        _testFrameworkFactory = frameworkFactory;
 
         if (_testFrameworkCapabilitiesFactory is not null)
         {
@@ -93,30 +101,25 @@ internal sealed class TestApplicationBuilder : ITestApplicationBuilder
         _testFrameworkCapabilitiesFactory = capabilitiesFactory;
 
         _testHostBuilder.TestFramework
-            = new TestFrameworkManager(_testFrameworkAdapterFactory, _testFrameworkCapabilitiesFactory);
+            = new TestFrameworkManager(_testFrameworkFactory, _testFrameworkCapabilitiesFactory);
 
         return this;
     }
 
     public async Task<ITestApplication> BuildAsync()
     {
-        if (_testFrameworkAdapterFactory is null)
+        if (_testFrameworkFactory is null)
         {
             throw new InvalidOperationException(PlatformResources.TestApplicationBuilderTestFrameworkNotRegistered);
         }
 
-        if (_testHost is not null)
+        if (_host is not null)
         {
             throw new InvalidOperationException(PlatformResources.TestApplicationBuilderApplicationAlreadyRegistered);
         }
 
-        _testHost = await _testHostBuilder.BuildAsync(
-            _args,
-            _loggingState,
-            _testApplicationOptions,
-            _unhandledExceptionsHandler,
-            _createBuilderStart);
+        _host = await _testHostBuilder.BuildAsync(_loggingState, _testApplicationOptions, _unhandledExceptionsHandler, _createBuilderStart).ConfigureAwait(false);
 
-        return new TestApplication(_testHost);
+        return new TestApplication(_host);
     }
 }

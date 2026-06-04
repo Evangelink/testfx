@@ -12,6 +12,9 @@ using MSTest.Analyzers.Helpers;
 
 namespace MSTest.Analyzers;
 
+/// <summary>
+/// MSTEST0022: <inheritdoc cref="Resources.PreferTestCleanupOverDisposeTitle"/>.
+/// </summary>
 [DiagnosticAnalyzer(LanguageNames.CSharp, LanguageNames.VisualBasic)]
 public sealed class PreferTestCleanupOverDisposeAnalyzer : DiagnosticAnalyzer
 {
@@ -25,11 +28,14 @@ public sealed class PreferTestCleanupOverDisposeAnalyzer : DiagnosticAnalyzer
         null,
         Category.Design,
         DiagnosticSeverity.Info,
-        isEnabledByDefault: false);
+        isEnabledByDefault: false,
+        disableInAllMode: true);
 
+    /// <inheritdoc />
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; }
         = ImmutableArray.Create(Rule);
 
+    /// <inheritdoc />
     public override void Initialize(AnalysisContext context)
     {
         context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
@@ -37,22 +43,28 @@ public sealed class PreferTestCleanupOverDisposeAnalyzer : DiagnosticAnalyzer
 
         context.RegisterCompilationStartAction(context =>
         {
-            if (context.Compilation.TryGetOrCreateTypeByMetadataName(WellKnownTypeNames.SystemIDisposable, out var idisposableSymbol))
+            if (context.Compilation.TryGetOrCreateTypeByMetadataName(WellKnownTypeNames.SystemIDisposable, out INamedTypeSymbol? idisposableSymbol) &&
+                context.Compilation.TryGetOrCreateTypeByMetadataName(WellKnownTypeNames.MicrosoftVisualStudioTestToolsUnitTestingTestClassAttribute, out INamedTypeSymbol? testClassAttributeSymbol))
             {
-                var iasyncDisposableSymbol = context.Compilation.GetOrCreateTypeByMetadataName(WellKnownTypeNames.SystemIAsyncDisposable);
-                var valueTaskSymbol = context.Compilation.GetOrCreateTypeByMetadataName(WellKnownTypeNames.SystemThreadingTasksValueTask);
-                context.RegisterSymbolAction(context => AnalyzeSymbol(context, idisposableSymbol, iasyncDisposableSymbol, valueTaskSymbol), SymbolKind.Method);
+                INamedTypeSymbol? iasyncDisposableSymbol = context.Compilation.GetOrCreateTypeByMetadataName(WellKnownTypeNames.SystemIAsyncDisposable);
+                INamedTypeSymbol? valueTaskSymbol = context.Compilation.GetOrCreateTypeByMetadataName(WellKnownTypeNames.SystemThreadingTasksValueTask);
+                context.RegisterSymbolAction(context => AnalyzeSymbol(context, testClassAttributeSymbol, idisposableSymbol, iasyncDisposableSymbol, valueTaskSymbol), SymbolKind.Method);
             }
         });
     }
 
-    private static void AnalyzeSymbol(SymbolAnalysisContext context, INamedTypeSymbol idisposableSymbol, INamedTypeSymbol? iasyncDisposableSymbol,
+    private static void AnalyzeSymbol(
+        SymbolAnalysisContext context,
+        INamedTypeSymbol testClassAttributeSymbol,
+        INamedTypeSymbol idisposableSymbol,
+        INamedTypeSymbol? iasyncDisposableSymbol,
         INamedTypeSymbol? valueTaskSymbol)
     {
-        IMethodSymbol methodSymbol = (IMethodSymbol)context.Symbol;
+        var methodSymbol = (IMethodSymbol)context.Symbol;
 
-        if (methodSymbol.IsAsyncDisposeImplementation(iasyncDisposableSymbol, valueTaskSymbol)
-            || methodSymbol.IsDisposeImplementation(idisposableSymbol))
+        if (methodSymbol.ContainingType.GetAttributes().Any(x => x.AttributeClass.Inherits(testClassAttributeSymbol)) &&
+            (methodSymbol.IsAsyncDisposeImplementation(iasyncDisposableSymbol, valueTaskSymbol)
+            || methodSymbol.IsDisposeImplementation(idisposableSymbol)))
         {
             context.ReportDiagnostic(methodSymbol.CreateDiagnostic(Rule));
         }

@@ -1,9 +1,6 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System.Collections;
-using System.Diagnostics.CodeAnalysis;
-
 using Microsoft.Testing.Platform.Helpers;
 
 namespace Microsoft.Testing.Platform.Configurations;
@@ -18,10 +15,9 @@ internal sealed class EnvironmentVariablesConfigurationProvider : IConfiguration
     private const string SqlServerPrefix = "SQLCONNSTR_";
     private const string CustomConnectionStringPrefix = "CUSTOMCONNSTR_";
 
-    private readonly string _prefix;
     private readonly string _normalizedPrefix;
 
-    private readonly Dictionary<string, string?> _data = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, string?> _data = [with(StringComparer.OrdinalIgnoreCase)];
 
     private readonly IEnvironment _environmentVariables;
 
@@ -32,9 +28,7 @@ internal sealed class EnvironmentVariablesConfigurationProvider : IConfiguration
 
     public EnvironmentVariablesConfigurationProvider(IEnvironment environmentVariables, string prefix)
     {
-        _prefix = prefix;
-        _normalizedPrefix = string.Empty;
-        _normalizedPrefix = Normalize(_prefix);
+        _normalizedPrefix = Normalize(prefix);
         _environmentVariables = environmentVariables;
     }
 
@@ -80,7 +74,8 @@ internal sealed class EnvironmentVariablesConfigurationProvider : IConfiguration
 
     public bool TryGet(string key, out string? value)
     {
-        ArgumentGuard.IsNotNullOrEmpty(key, nameof(key));
+        _ = key ?? throw new ArgumentNullException(nameof(key));
+        Ensure.NotEmpty(key);
         return _data.TryGetValue(key, out value);
     }
 

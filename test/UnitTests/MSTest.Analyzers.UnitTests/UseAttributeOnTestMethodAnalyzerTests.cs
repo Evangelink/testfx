@@ -2,38 +2,33 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using Microsoft.CodeAnalysis;
-using Microsoft.Testing.Internal.Framework;
-using Microsoft.Testing.TestInfrastructure;
 
 using VerifyCS = MSTest.Analyzers.Test.CSharpCodeFixVerifier<
     MSTest.Analyzers.UseAttributeOnTestMethodAnalyzer,
-    Microsoft.CodeAnalysis.Testing.EmptyCodeFixProvider>;
+    MSTest.Analyzers.UseAttributeOnTestMethodFixer>;
 
 namespace MSTest.Analyzers.Test;
 
-[TestGroup]
-public sealed class UseAttributeOnTestMethodAnalyzerTests(ITestExecutionContext testExecutionContext) : TestBase(testExecutionContext)
+[TestClass]
+public sealed class UseAttributeOnTestMethodAnalyzerTests
 {
-    private static readonly List<(DiagnosticDescriptor Rule, string AttributeUsageExample)> RuleUsageExamples = new()
-    {
+    private static readonly List<(DiagnosticDescriptor Rule, string AttributeUsageExample)> RuleUsageExamples =
+    [
         (UseAttributeOnTestMethodAnalyzer.OwnerRule, """Owner("owner")"""),
         (UseAttributeOnTestMethodAnalyzer.PriorityRule, "Priority(1)"),
+        (UseAttributeOnTestMethodAnalyzer.DescriptionRule, """Description("description")"""),
         (UseAttributeOnTestMethodAnalyzer.TestPropertyRule, """TestProperty("name", "value")"""),
         (UseAttributeOnTestMethodAnalyzer.WorkItemRule, "WorkItem(100)"),
-        (UseAttributeOnTestMethodAnalyzer.DescriptionRule, """Description("description")"""),
-        (UseAttributeOnTestMethodAnalyzer.ExpectedExceptionRule, "ExpectedException(null)"),
-        (UseAttributeOnTestMethodAnalyzer.CssIterationRule, "CssIteration(null)"),
-        (UseAttributeOnTestMethodAnalyzer.CssProjectStructureRule, "CssProjectStructure(null)"),
-    };
+    ];
 
     internal static IEnumerable<(DiagnosticDescriptor Rule, string AttributeUsageExample)> GetAttributeUsageExampleAndRuleTuples()
         => RuleUsageExamples.Select(tuple => (tuple.Rule, tuple.AttributeUsageExample));
 
-    internal static IEnumerable<string> GetAttributeUsageExamples()
-        => RuleUsageExamples.Select(tuple => tuple.AttributeUsageExample);
+    internal static IEnumerable<object[]> GetAttributeUsageExamples()
+        => RuleUsageExamples.Select(tuple => new object[] { tuple.AttributeUsageExample });
 
     // This generates all possible combinations of any two tuples (Rule, AttributeUsageExample) with the exception of the
-    // combaination where the two tuples are equal. The result is flattened in a new tuple created from the elements of the
+    // combination where the two tuples are equal. The result is flattened in a new tuple created from the elements of the
     // previous two tuples.
     internal static IEnumerable<(DiagnosticDescriptor Rule1, string AttributeUsageExample1, DiagnosticDescriptor Rule2, string AttributeUsageExample2)> GetAttributeUsageExampleAndRuleTuplesForTwoAttributes()
         => RuleUsageExamples
@@ -41,10 +36,11 @@ public sealed class UseAttributeOnTestMethodAnalyzerTests(ITestExecutionContext 
             .Where(tuples => !tuples.tuple1.AttributeUsageExample.Equals(tuples.tuple2.AttributeUsageExample, StringComparison.Ordinal))
             .Select(tuples => (tuples.tuple1.Rule, tuples.tuple1.AttributeUsageExample, tuples.tuple2.Rule, tuples.tuple2.AttributeUsageExample));
 
-    [ArgumentsProvider(nameof(GetAttributeUsageExamples))]
+    [DynamicData(nameof(GetAttributeUsageExamples), DynamicDataSourceType.Method)]
+    [TestMethod]
     public async Task WhenMethodIsMarkedWithTestMethodAndTestAttributes_NoDiagnosticAsync(string attributeUsageExample)
     {
-        var code = $$"""
+        string code = $$"""
             using Microsoft.VisualStudio.TestTools.UnitTesting;
 
             [TestClass]
@@ -58,13 +54,14 @@ public sealed class UseAttributeOnTestMethodAnalyzerTests(ITestExecutionContext 
             }
             """;
 
-        await VerifyCS.VerifyAnalyzerAsync(code);
+        await VerifyCS.VerifyCodeFixAsync(code, code);
     }
 
-    [ArgumentsProvider(nameof(GetAttributeUsageExampleAndRuleTuples))]
+    [DynamicData(nameof(GetAttributeUsageExampleAndRuleTuples), DynamicDataSourceType.Method)]
+    [TestMethod]
     public async Task WhenMethodIsMarkedWithTestAttributeButNotWithTestMethod_DiagnosticAsync(DiagnosticDescriptor rule, string attributeUsageExample)
     {
-        var code = $$"""
+        string code = $$"""
             using Microsoft.VisualStudio.TestTools.UnitTesting;
 
             [TestClass]
@@ -77,17 +74,32 @@ public sealed class UseAttributeOnTestMethodAnalyzerTests(ITestExecutionContext 
             }
             """;
 
-        await VerifyCS.VerifyAnalyzerAsync(code, VerifyCS.Diagnostic(rule).WithLocation(0));
+        string fixedCode = $$"""
+            using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+            [TestClass]
+            public class MyTestClass
+            {
+                [{{attributeUsageExample}}]
+                [TestMethod]
+                public void TestMethod()
+                {
+                }
+            }
+            """;
+
+        await VerifyCS.VerifyCodeFixAsync(code, VerifyCS.Diagnostic(rule).WithLocation(0), fixedCode);
     }
 
-    [ArgumentsProvider(nameof(GetAttributeUsageExampleAndRuleTuplesForTwoAttributes))]
+    [DynamicData(nameof(GetAttributeUsageExampleAndRuleTuplesForTwoAttributes), DynamicDataSourceType.Method)]
+    [TestMethod]
     public async Task WhenMethodIsMarkedWithMultipleTestAttributesButNotWithTestMethod_DiagnosticOnEachAttributeAsync(
         DiagnosticDescriptor rule1,
         string attributeUsageExample1,
         DiagnosticDescriptor rule2,
         string attributeUsageExample2)
     {
-        var code = $$"""
+        string code = $$"""
             using Microsoft.VisualStudio.TestTools.UnitTesting;
 
             [TestClass]
@@ -101,13 +113,29 @@ public sealed class UseAttributeOnTestMethodAnalyzerTests(ITestExecutionContext 
             }
             """;
 
-        await VerifyCS.VerifyAnalyzerAsync(code, VerifyCS.Diagnostic(rule1).WithLocation(0), VerifyCS.Diagnostic(rule2).WithLocation(1));
+        string fixedCode = $$"""
+            using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+            [TestClass]
+            public class MyTestClass
+            {
+                [{{attributeUsageExample1}}]
+                [{{attributeUsageExample2}}]
+                [TestMethod]
+                public void TestMethod()
+                {
+                }
+            }
+            """;
+
+        await VerifyCS.VerifyCodeFixAsync(code, [VerifyCS.Diagnostic(rule1).WithLocation(0), VerifyCS.Diagnostic(rule2).WithLocation(1)], fixedCode);
     }
 
-    [ArgumentsProvider(nameof(GetAttributeUsageExamples))]
+    [DynamicData(nameof(GetAttributeUsageExamples), DynamicDataSourceType.Method)]
+    [TestMethod]
     public async Task WhenMethodIsMarkedWithTestAttributeAndCustomTestMethod_NoDiagnosticAsync(string attributeUsageExample)
     {
-        var code = $$"""
+        string code = $$"""
             using System;
             using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -127,6 +155,87 @@ public sealed class UseAttributeOnTestMethodAnalyzerTests(ITestExecutionContext 
             }
             """;
 
-        await VerifyCS.VerifyAnalyzerAsync(code);
+        await VerifyCS.VerifyCodeFixAsync(code, code);
+    }
+
+    [TestMethod]
+    public async Task WhenMethodWithMultiLineBody_PreservesIndentation()
+    {
+        string code = """
+            using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+            [TestClass]
+            public class MyTestClass
+            {
+                [{|#0:Owner("owner")|}]
+                public void TestMethod()
+                {
+                    var result = SomeMethod(
+                        1,
+                        2,
+                        3);
+                }
+
+                private int SomeMethod(int a, int b, int c) => a + b + c;
+            }
+            """;
+
+        string fixedCode = """
+            using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+            [TestClass]
+            public class MyTestClass
+            {
+                [Owner("owner")]
+                [TestMethod]
+                public void TestMethod()
+                {
+                    var result = SomeMethod(
+                        1,
+                        2,
+                        3);
+                }
+
+                private int SomeMethod(int a, int b, int c) => a + b + c;
+            }
+            """;
+
+        await VerifyCS.VerifyCodeFixAsync(code, VerifyCS.Diagnostic(UseAttributeOnTestMethodAnalyzer.OwnerRule).WithLocation(0), fixedCode);
+    }
+
+    [TestMethod]
+    public async Task WhenMethodIsMarkedWithIgnoreButNotWithTestMethod_UsesConcreteConditionAttributeInDiagnosticAsync()
+    {
+        string code = """
+            using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+            [TestClass]
+            public class MyTestClass
+            {
+                [{|#0:Ignore|}]
+                public void TestMethod()
+                {
+                }
+            }
+            """;
+
+        string fixedCode = """
+            using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+            [TestClass]
+            public class MyTestClass
+            {
+                [Ignore]
+                [TestMethod]
+                public void TestMethod()
+                {
+                }
+            }
+            """;
+
+        await VerifyCS.VerifyCodeFixAsync(
+            code,
+            VerifyCS.Diagnostic(UseAttributeOnTestMethodAnalyzer.ConditionBaseRule).WithLocation(0).WithArguments("IgnoreAttribute"),
+            fixedCode);
     }
 }

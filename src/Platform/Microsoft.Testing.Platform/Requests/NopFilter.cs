@@ -3,6 +3,7 @@
 
 namespace Microsoft.Testing.Platform.Requests;
 
-internal sealed class NopFilter : ITestExecutionFilter
-{
-}
+/// <summary>
+/// Represents a filter that does nothing.
+/// </summary>
+public sealed class NopFilter : ITestExecutionFilter;

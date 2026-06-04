@@ -1,7 +1,8 @@
 ---
 name: Feature request
-about: Suggest a new feature/idea for MSTest
-labels: [feature-request, need-triage]
+about: Suggest a new feature/idea for Microsoft.Testing.Platform or MSTest
+labels: [needs/triage]
+type: Feature
 ---
 
 ## Summary

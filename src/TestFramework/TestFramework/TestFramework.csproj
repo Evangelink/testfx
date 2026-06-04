@@ -2,37 +2,53 @@
 
   <PropertyGroup>
     <TargetFrameworks>netstandard2.0;$(NetFrameworkMinimum);$(SupportedNetFrameworks)</TargetFrameworks>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <UseAssemblyVersion14>true</UseAssemblyVersion14>
   </PropertyGroup>
 
   <PropertyGroup>
     <RootNamespace>Microsoft.VisualStudio.TestTools.UnitTesting</RootNamespace>
-    <AssemblyName>Microsoft.VisualStudio.TestPlatform.TestFramework</AssemblyName>
-    <DefineConstants>TRACE</DefineConstants>
+    <AssemblyName>MSTest.TestFramework</AssemblyName>
+    <DefineConstants>$(DefineConstants);TRACE</DefineConstants>
+
+    <!-- TestFramework.Extensions.csproj is what we actually package as "MSTest.TestFramework". -->
+    <!-- Without changing PackageId here, NuGet will view this as a circular reference -->
+    <PackageId>NotPublishable</PackageId>
+    <IsPackable>false</IsPackable>
+    <DefineConstants>$(DefineConstants);EXCLUDE_RANGE_INDEX_POLYFILL;EXCLUDE_OS_POLYFILL</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>
     <AdditionalFiles Include="PublicAPI\PublicAPI.Shipped.txt" />
     <AdditionalFiles Include="PublicAPI\PublicAPI.Unshipped.txt" />
+
+    <AdditionalFiles Include="PublicAPI\net\PublicAPI.Shipped.txt" Condition="$([MSBuild]::IsTargetFrameworkCompatible('$(TargetFramework)', 'netcoreapp3.1'))" />
+    <AdditionalFiles Include="PublicAPI\net\PublicAPI.Unshipped.txt" Condition="$([MSBuild]::IsTargetFrameworkCompatible('$(TargetFramework)', 'netcoreapp3.1'))" />
   </ItemGroup>
 
   <ItemGroup>
     <Compile Include="..\..\Platform\Microsoft.Testing.Platform\Helpers\RoslynHashCode.cs" Link="Internal\RoslynHashCode.cs" />
-    <Compile Include="..\..\Platform\Microsoft.Testing.Platform\Helpers\SystemPolyfills.cs" Link="Internal\SystemPolyfills.cs" />
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Update="Resources\FrameworkMessages.Designer.cs">
-      <AutoGen>True</AutoGen>
-      <DesignTime>True</DesignTime>
-      <DependentUpon>FrameworkMessages.resx</DependentUpon>
-    </Compile>
-    <EmbeddedResource Update="Resources\FrameworkMessages.resx">
-      <Generator>ResXFileCodeGenerator</Generator>
-      <LastGenOutput>FrameworkMessages.Designer.cs</LastGenOutput>
-      <CustomToolNamespace>Microsoft.VisualStudio.TestTools.UnitTesting</CustomToolNamespace>
-      <SubType>Designer</SubType>
-    </EmbeddedResource>
+    <Compile Include="$(RepoRoot)src/Polyfills/**/*.cs" Link="Polyfills\%(RecursiveDir)%(Filename)%(Extension)" />
   </ItemGroup>
+
+  <PropertyGroup>
+    <!-- Enable AOT analyzer warnings to make sure we don't call APIs that would fail when we use source generator mode together with NativeAOT. -->
+    <IsAotCompatible Condition="$([MSBuild]::IsTargetFrameworkCompatible('$(TargetFramework)', 'net7.0'))">$(EnableAotAnalyzers)</IsAotCompatible>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="DynamicProxyGenAssembly2" Key="$(MoqPublicKey)" />
+    <InternalsVisibleTo Include="MSTestAdapter.PlatformServices" Key="$(VsPublicKey)" />
+    <InternalsVisibleTo Include="Microsoft.VisualStudio.TestPlatform.MSTestAdapter.UnitTests" Key="$(VsPublicKey)" />
+    <InternalsVisibleTo Include="MSTest.TestFramework.Extensions" Key="$(VsPublicKey)" />
+    <InternalsVisibleTo Include="Microsoft.VisualStudio.TestPlatform.TestFramework.UnitTests" Key="$(VsPublicKey)" />
+    <InternalsVisibleTo Include="MSTestAdapter.PlatformServices.UnitTests" Key="$(VsPublicKey)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Polyfills" />
+    <Using Include="$(RootNamespace).Resources" />
+  </ItemGroup>
+
 </Project>

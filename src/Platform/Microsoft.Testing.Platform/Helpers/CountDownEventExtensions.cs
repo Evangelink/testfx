@@ -6,22 +6,48 @@ namespace Microsoft.Testing.Platform.Helpers;
 internal static class CountDownEventExtensions
 {
     public static async Task<bool> WaitAsync(this CountdownEvent countdownEvent, CancellationToken cancellationToken)
-        => await countdownEvent.WaitAsync(uint.MaxValue, cancellationToken);
+        => await countdownEvent.WaitAsync(uint.MaxValue, cancellationToken).ConfigureAwait(false);
 
     public static async Task<bool> WaitAsync(this CountdownEvent countdownEvent, TimeSpan timeout, CancellationToken cancellationToken)
-        => await countdownEvent.WaitAsync((uint)timeout.TotalMilliseconds, cancellationToken);
+        => await countdownEvent.WaitAsync((uint)timeout.TotalMilliseconds, cancellationToken).ConfigureAwait(false);
 
     internal static async Task<bool> WaitAsync(this CountdownEvent countdownEvent, uint millisecondsTimeOutInterval, CancellationToken cancellationToken)
+        => OperatingSystem.IsBrowser()
+            ? await countdownEvent.WaitBrowserAsync(millisecondsTimeOutInterval, cancellationToken).ConfigureAwait(false)
+            : await countdownEvent.WaitNonBrowserAsync(millisecondsTimeOutInterval, cancellationToken).ConfigureAwait(false);
+
+    private static async Task<bool> WaitBrowserAsync(this CountdownEvent countdownEvent, uint millisecondsTimeOutInterval, CancellationToken cancellationToken)
+    {
+        const int pollIntervalMs = 10;
+        uint elapsedMs = 0;
+        bool hasTimeout = millisecondsTimeOutInterval != uint.MaxValue;
+
+        while (countdownEvent.CurrentCount > 0)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (hasTimeout && elapsedMs >= millisecondsTimeOutInterval)
+            {
+                return false;
+            }
+
+            await Task.Delay(pollIntervalMs, cancellationToken).ConfigureAwait(false);
+            elapsedMs += pollIntervalMs;
+        }
+
+        return true;
+    }
+
+    [UnsupportedOSPlatform("browser")]
+    private static async Task<bool> WaitNonBrowserAsync(this CountdownEvent countdownEvent, uint millisecondsTimeOutInterval, CancellationToken cancellationToken)
     {
         RegisteredWaitHandle? registeredHandle = null;
         CancellationTokenRegistration tokenRegistration = default;
         try
         {
-            var tcs = new TaskCompletionSource<bool>();
+            TaskCompletionSource<bool> tcs = new();
 
-            // https://learn.microsoft.com/dotnet/api/system.threading.threadpool.registerwaitforsingleobject?view=net-7.0
-#pragma warning disable SA1115 // Parameter should follow comma
-
+            // https://learn.microsoft.com/dotnet/api/system.threading.threadpool.registerwaitforsingleobject
             // timedOut: true if the WaitHandle timed out; false if it was signaled.
             // executeOnlyOnce set to true to indicate that the thread will no longer wait on the waitObject
             // parameter after the delegate has been called;
@@ -32,12 +58,11 @@ internal static class CountDownEventExtensions
                 state: tcs,
                 millisecondsTimeOutInterval: millisecondsTimeOutInterval,
                 executeOnlyOnce: true);
-#pragma warning restore SA1115 // Parameter should follow comma
 
             // Register the cancellation callback
             tokenRegistration = cancellationToken.Register(state => ((TaskCompletionSource<bool>)state!).TrySetCanceled(), tcs);
 
-            return await tcs.Task;
+            return await tcs.Task.ConfigureAwait(false);
         }
         finally
         {
@@ -46,7 +71,7 @@ internal static class CountDownEventExtensions
             // signaled, stop future execution of the callback method
             // by unregistering the WaitHandle.
             registeredHandle?.Unregister(null);
-            await DisposeHelper.DisposeAsync(tokenRegistration);
+            await DisposeHelper.DisposeAsync(tokenRegistration).ConfigureAwait(false);
         }
     }
 }

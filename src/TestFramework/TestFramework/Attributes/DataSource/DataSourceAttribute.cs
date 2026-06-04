@@ -1,19 +1,27 @@
-// Copyright (c) Microsoft Corporation. All rights reserved.
+﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
-
-using System.Diagnostics.CodeAnalysis;
 
 namespace Microsoft.VisualStudio.TestTools.UnitTesting;
 
 /// <summary>
 /// Specifies connection string, table name and row access method for data driven testing.
 /// </summary>
-/// <example>
+/// <remarks>
+/// <list type="bullet">
+/// <item><description>This works only on .NET Framework and is not supported on .NET Core or later.</description></item>
+/// <item>
+/// <description>
+/// The following shows example usages for this attribute:
+/// <code>
 /// [DataSource("Provider=SQLOLEDB.1;Data Source=source;Integrated Security=SSPI;Initial Catalog=EqtCoverage;Persist Security Info=False", "MyTable")]
 /// [DataSource("dataSourceNameFromConfigFile")].
-/// </example>
+/// </code>
+/// </description>
+/// </item>
+/// </list>
+/// </remarks>
 [SuppressMessage("Microsoft.Design", "CA1019:DefineAccessorsForAttributeArguments", Justification = "Compat")]
-[AttributeUsage(AttributeTargets.Method, AllowMultiple = false)]
+[AttributeUsage(AttributeTargets.Method, Inherited = false)]
 public sealed class DataSourceAttribute : Attribute
 {
     // DefaultProviderName needs not to be constant so that clients do not need
@@ -70,10 +78,7 @@ public sealed class DataSourceAttribute : Attribute
     /// Initializes a new instance of the <see cref="DataSourceAttribute"/> class.  This instance will be initialized with a data provider and connection string associated with the setting name.
     /// </summary>
     /// <param name="dataSourceSettingName">The name of a data source found in the &lt;microsoft.visualstudio.qualitytools&gt; section in the app.config file.</param>
-    public DataSourceAttribute(string dataSourceSettingName)
-    {
-        DataSourceSettingName = dataSourceSettingName;
-    }
+    public DataSourceAttribute(string dataSourceSettingName) => DataSourceSettingName = dataSourceSettingName;
 
     // Different providers use different connection strings and provider itself is a part of connection string.
 
@@ -100,7 +105,7 @@ public sealed class DataSourceAttribute : Attribute
     /// </summary>
     ///
     /// <returns>
-    /// One of the <see cref="Microsoft.VisualStudio.TestTools.UnitTesting.DataAccessMethod"/> values. If the <see cref="DataSourceAttribute"/> is not initialized, this will return the default value <see cref="Microsoft.VisualStudio.TestTools.UnitTesting.DataAccessMethod.Random"/>.
+    /// One of the <see cref="UnitTesting.DataAccessMethod"/> values. If the <see cref="DataSourceAttribute"/> is not initialized, this will return the default value <see cref="DataAccessMethod.Random"/>.
     /// </returns>
     public DataAccessMethod DataAccessMethod { get; }
 

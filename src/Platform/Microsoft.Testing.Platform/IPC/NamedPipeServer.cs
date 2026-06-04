@@ -1,33 +1,36 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-#if NET
-using System.Buffers;
-#endif
-using System.Globalization;
 using System.IO.Pipes;
-using System.Runtime.InteropServices;
 
+using Microsoft.CodeAnalysis;
 using Microsoft.Testing.Platform.Helpers;
 using Microsoft.Testing.Platform.Logging;
 
-#if !PLATFORM_MSBUILD
 using Microsoft.Testing.Platform.Resources;
-#endif
 
 namespace Microsoft.Testing.Platform.IPC;
 
+[Embedded]
+#if !MTP_MSBUILD_TASKS
+[UnsupportedOSPlatform("browser")]
+#endif
 internal sealed class NamedPipeServer : NamedPipeBase, IServer
 {
+    private const PipeOptions AsyncCurrentUserPipeOptions = PipeOptions.Asynchronous
+#if NET
+        | PipeOptions.CurrentUserOnly
+#endif
+        ;
+
+    private static bool IsUnix => Path.DirectorySeparatorChar == '/';
+
     private readonly Func<IRequest, Task<IResponse>> _callback;
     private readonly IEnvironment _environment;
     private readonly NamedPipeServerStream _namedPipeServerStream;
     private readonly ILogger _logger;
     private readonly ITask _task;
     private readonly CancellationToken _cancellationToken;
-    private readonly MemoryStream _serializationBuffer = new();
-    private readonly MemoryStream _messageBuffer = new();
-    private readonly byte[] _readBuffer = new byte[250000];
     private Task? _loopTask;
     private bool _disposed;
 
@@ -62,8 +65,12 @@ internal sealed class NamedPipeServer : NamedPipeBase, IServer
         int maxNumberOfServerInstances,
         CancellationToken cancellationToken)
     {
-        ArgumentGuard.IsNotNull(pipeNameDescription);
-        _namedPipeServerStream = new((PipeName = pipeNameDescription).Name, PipeDirection.InOut, maxNumberOfServerInstances);
+        if (pipeNameDescription is null)
+        {
+            throw new ArgumentNullException(nameof(pipeNameDescription));
+        }
+
+        _namedPipeServerStream = new((PipeName = pipeNameDescription).Name, PipeDirection.InOut, maxNumberOfServerInstances, PipeTransmissionMode.Byte, AsyncCurrentUserPipeOptions);
         _callback = callback;
         _environment = environment;
         _logger = logger;
@@ -71,31 +78,37 @@ internal sealed class NamedPipeServer : NamedPipeBase, IServer
         _cancellationToken = cancellationToken;
     }
 
-    public PipeNameDescription PipeName { get; private set; }
+    public PipeNameDescription PipeName { get; }
 
     public bool WasConnected { get; private set; }
 
     public async Task WaitConnectionAsync(CancellationToken cancellationToken)
     {
-        await _logger.LogDebugAsync($"Waiting for connection for the pipe name {PipeName.Name}");
-        await _namedPipeServerStream.WaitForConnectionAsync(cancellationToken);
+        // NOTE: _cancellationToken field is usually the "test session" cancellation token.
+        // And cancellationToken parameter may have hang mitigating timeout.
+        // The parameter should only be used for the call of WaitForConnectionAsync and Task.Run call.
+        // NOTE: The cancellation token passed to Task.Run will only have effect before the task is started by runtime.
+        // Once it starts, it won't be considered.
+        // Then, for the internal loop, we should use _cancellationToken, because we don't know for how long the loop will run.
+        // So what we pass to InternalLoopAsync shouldn't have any timeout (it's usually linked to Ctrl+C).
+        await _logger.LogDebugAsync($"Waiting for connection for the pipe name {PipeName.Name}").ConfigureAwait(false);
+        await _namedPipeServerStream.WaitForConnectionAsync(cancellationToken).ConfigureAwait(false);
         WasConnected = true;
-        await _logger.LogDebugAsync($"Client connected to {PipeName.Name}");
+        await _logger.LogDebugAsync($"Client connected to {PipeName.Name}").ConfigureAwait(false);
         _loopTask = _task.Run(
             async () =>
         {
             try
             {
-                await InternalLoopAsync(_cancellationToken);
+                await InternalLoopAsync(_cancellationToken).ConfigureAwait(false);
             }
             catch (OperationCanceledException ex) when (ex.CancellationToken == _cancellationToken)
             {
-                // We are being cancelled, so we don't need to wait anymore
-                return;
+                // We are being canceled, so we don't need to wait anymore
             }
             catch (Exception ex)
             {
-                await _logger.LogErrorAsync($"Exception on pipe: {PipeName.Name}", ex);
+                await _logger.LogErrorAsync($"Exception on pipe: {PipeName.Name}", ex).ConfigureAwait(false);
                 _environment.FailFast($"[NamedPipeServer] Unhandled exception:{_environment.NewLine}{ex}", ex);
             }
         }, cancellationToken);
@@ -109,171 +122,51 @@ internal sealed class NamedPipeServer : NamedPipeBase, IServer
     /// </summary>
     private async Task InternalLoopAsync(CancellationToken cancellationToken)
     {
-        int currentMessageSize = 0;
-        int missingBytesToReadOfWholeMessage = 0;
         while (true)
         {
-            int missingBytesToReadOfCurrentChunk = 0;
-            int currentReadIndex = 0;
-#if NET
-            int currentReadBytes = await _namedPipeServerStream.ReadAsync(_readBuffer.AsMemory(currentReadIndex, _readBuffer.Length), cancellationToken);
-#else
-            int currentReadBytes = await _namedPipeServerStream.ReadAsync(_readBuffer, currentReadIndex, _readBuffer.Length, cancellationToken);
-#endif
-            if (currentReadBytes == 0)
+            // Read the next request; null means the client disconnected
+            object? requestObject = await ReadNextMessageAsync(_namedPipeServerStream, cancellationToken).ConfigureAwait(false);
+            if (requestObject is null)
             {
-                // The client has disconnected
+                await _logger.LogDebugAsync($"Client disconnected from pipe '{PipeName.Name}', exiting read loop").ConfigureAwait(false);
                 return;
             }
 
-            // Reset the current chunk size
-            missingBytesToReadOfCurrentChunk = currentReadBytes;
+            // Dispatch the request and obtain the response
+            IResponse response = await _callback((IRequest)requestObject).ConfigureAwait(false);
 
-            // If currentRequestSize is 0, we need to read the message size
-            if (currentMessageSize == 0)
+            // Serialize and send the response
+            INamedPipeSerializer responseNamedPipeSerializer = GetSerializer(response.GetType());
+            bool clientDisconnected = false;
+            try
             {
-                // We need to read the message size, first 4 bytes
-                currentMessageSize = BitConverter.ToInt32(_readBuffer, 0);
-                missingBytesToReadOfCurrentChunk = currentReadBytes - sizeof(int);
-                missingBytesToReadOfWholeMessage = currentMessageSize;
-                currentReadIndex = sizeof(int);
+                await WriteMessageAsync(_namedPipeServerStream, responseNamedPipeSerializer, response, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is IOException or ObjectDisposedException)
+            {
+                // The client disconnected while we were writing the reply. Treat it as a graceful disconnect
+                // (symmetric with the read-side EOF handling above) so the server loop exits without crashing
+                // the host.
+                await _logger.LogDebugAsync($"Pipe {PipeName.Name} broken while writing reply; treating as client disconnect: {ex.Message}").ConfigureAwait(false);
+                clientDisconnected = true;
             }
 
-            if (missingBytesToReadOfCurrentChunk > 0)
+            if (clientDisconnected)
             {
-                // We need to read the rest of the message
-#if NET
-                await _messageBuffer.WriteAsync(_readBuffer.AsMemory(currentReadIndex, missingBytesToReadOfCurrentChunk), cancellationToken);
-#else
-                await _messageBuffer.WriteAsync(_readBuffer, currentReadIndex, missingBytesToReadOfCurrentChunk, cancellationToken);
-#endif
-                missingBytesToReadOfWholeMessage -= missingBytesToReadOfCurrentChunk;
-            }
-
-            // If we have read all the message, we can deserialize it
-            if (missingBytesToReadOfWholeMessage == 0)
-            {
-                // Deserialize the message
-                _messageBuffer.Position = 0;
-
-                // Get the serializer id
-                int serializerId = BitConverter.ToInt32(_messageBuffer.GetBuffer(), 0);
-
-                // Get the serializer
-                INamedPipeSerializer requestNamedPipeSerializer = GetSerializer(serializerId);
-
-                // Deserialize the message
-                _messageBuffer.Position += sizeof(int); // Skip the serializer id
-                var deserializedObject = (IRequest)requestNamedPipeSerializer.Deserialize(_messageBuffer);
-
-                // Call the callback
-                IResponse response = await _callback(deserializedObject);
-
-                // Write the message size
-                _messageBuffer.Position = 0;
-
-                // Get the response serializer
-                INamedPipeSerializer responseNamedPipeSerializer = GetSerializer(response.GetType());
-
-                // Serialize the response
-                responseNamedPipeSerializer.Serialize(response, _serializationBuffer);
-
-                // The length of the message is the size of the message plus one byte to store the serializer id
-                // Space for the message
-                int sizeOfTheWholeMessage = (int)_serializationBuffer.Position;
-
-                // Space for the serializer id
-                sizeOfTheWholeMessage += sizeof(int);
-
-                // Write the message size
-#if NET
-                byte[] bytes = ArrayPool<byte>.Shared.Rent(sizeof(int));
-                try
-                {
-                    ApplicationStateGuard.Ensure(BitConverter.TryWriteBytes(bytes, sizeOfTheWholeMessage), PlatformResources.UnexpectedExceptionDuringByteConversionErrorMessage);
-
-                    await _messageBuffer.WriteAsync(bytes.AsMemory(0, sizeof(int)), cancellationToken);
-                }
-                finally
-                {
-                    ArrayPool<byte>.Shared.Return(bytes);
-                }
-#else
-                await _messageBuffer.WriteAsync(BitConverter.GetBytes(sizeOfTheWholeMessage), 0, sizeof(int), cancellationToken);
-#endif
-
-                // Write the serializer id
-#if NET
-                bytes = ArrayPool<byte>.Shared.Rent(sizeof(int));
-                try
-                {
-                    ApplicationStateGuard.Ensure(BitConverter.TryWriteBytes(bytes, responseNamedPipeSerializer.Id), PlatformResources.UnexpectedExceptionDuringByteConversionErrorMessage);
-
-                    await _messageBuffer.WriteAsync(bytes.AsMemory(0, sizeof(int)), cancellationToken);
-                }
-                finally
-                {
-                    ArrayPool<byte>.Shared.Return(bytes);
-                }
-#else
-                await _messageBuffer.WriteAsync(BitConverter.GetBytes(responseNamedPipeSerializer.Id), 0, sizeof(int), cancellationToken);
-#endif
-
-                // Write the message
-#if NET
-                await _messageBuffer.WriteAsync(_serializationBuffer.GetBuffer().AsMemory(0, (int)_serializationBuffer.Position), cancellationToken);
-#else
-                await _messageBuffer.WriteAsync(_serializationBuffer.GetBuffer(), 0, (int)_serializationBuffer.Position, cancellationToken);
-#endif
-
-                // Send the message
-                try
-                {
-#if NET
-                    await _namedPipeServerStream.WriteAsync(_messageBuffer.GetBuffer().AsMemory(0, (int)_messageBuffer.Position), cancellationToken);
-#else
-                    await _namedPipeServerStream.WriteAsync(_messageBuffer.GetBuffer(), 0, (int)_messageBuffer.Position, cancellationToken);
-#endif
-                    await _namedPipeServerStream.FlushAsync(cancellationToken);
-                    if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-                    {
-                        _namedPipeServerStream.WaitForPipeDrain();
-                    }
-                }
-                finally
-                {
-                    // Reset the buffers
-                    _messageBuffer.Position = 0;
-                    _serializationBuffer.Position = 0;
-                }
-
-                // Reset the control variables
-                currentMessageSize = 0;
-                missingBytesToReadOfWholeMessage = 0;
+                return;
             }
         }
     }
 
     public static PipeNameDescription GetPipeName(string name)
     {
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        if (!IsUnix)
         {
-            return new PipeNameDescription($"testingplatform.pipe.{name.Replace('\\', '.')}", false);
+            return new PipeNameDescription($"testingplatform.pipe.{name.Replace('\\', '.')}");
         }
 
-        string directoryId = Path.Combine(Path.GetTempPath(), name);
-        Directory.CreateDirectory(directoryId);
-        return new PipeNameDescription(
-            !Directory.Exists(directoryId)
-                ? throw new DirectoryNotFoundException(string.Format(
-                    CultureInfo.InvariantCulture,
-#if PLATFORM_MSBUILD
-                    $"Directory: {directoryId} doesn't exist.",
-#else
-                    PlatformResources.CouldNotFindDirectoryErrorMessage,
-#endif
-                    directoryId))
-                : Path.Combine(directoryId, ".p"), true);
+        // Similar to https://github.com/dotnet/roslyn/blob/99bf83c7bc52fa1ff27cf792db38755d5767c004/src/Compilers/Shared/NamedPipeUtil.cs#L26-L42
+        return new PipeNameDescription(Path.Combine("/tmp", name));
     }
 
     public void Dispose()
@@ -289,22 +182,19 @@ internal sealed class NamedPipeServer : NamedPipeBase, IServer
             // This is unexpected and we throw an exception.
             ApplicationStateGuard.Ensure(_loopTask is not null);
 
-            // To close gracefully we need to ensure that the client closed the stream line 103.
+            // To close gracefully we need to ensure that the client closed the stream in the InternalLoopAsync method (there is comment `// The client has disconnected`).
             if (!_loopTask.Wait(TimeoutHelper.DefaultHangTimeSpanTimeout))
             {
+                _logger.LogError($"NamedPipeServer.Dispose: '{nameof(InternalLoopAsync)}' for pipe '{PipeName.Name}' did not complete within {TimeoutHelper.DefaultHangTimeSpanTimeout}. WasConnected={WasConnected}, LoopTaskStatus={_loopTask.Status}.");
                 throw new InvalidOperationException(string.Format(
                     CultureInfo.InvariantCulture,
-#if PLATFORM_MSBUILD
-                    "'{0}' didn't exit as expected",
-#else
                     PlatformResources.InternalLoopAsyncDidNotExitSuccessfullyErrorMessage,
-#endif
                     nameof(InternalLoopAsync)));
             }
         }
 
         _namedPipeServerStream.Dispose();
-        PipeName.Dispose();
+        DisposeBuffers();
 
         _disposed = true;
     }
@@ -325,17 +215,21 @@ internal sealed class NamedPipeServer : NamedPipeBase, IServer
 
             try
             {
-                // To close gracefully we need to ensure that the client closed the stream line 103.
-                await _loopTask.WaitAsync(TimeoutHelper.DefaultHangTimeSpanTimeout);
+                // To close gracefully we need to ensure that the client closed the stream in the InternalLoopAsync method (there is comment `// The client has disconnected`).
+                await _loopTask.WaitAsync(TimeoutHelper.DefaultHangTimeSpanTimeout, _cancellationToken).ConfigureAwait(false);
             }
             catch (TimeoutException)
             {
-                throw new InvalidOperationException(string.Format(CultureInfo.InvariantCulture, PlatformResources.InternalLoopAsyncDidNotExitSuccessfullyErrorMessage, nameof(InternalLoopAsync)));
+                await _logger.LogErrorAsync($"NamedPipeServer.DisposeAsync: '{nameof(InternalLoopAsync)}' for pipe '{PipeName.Name}' did not complete within {TimeoutHelper.DefaultHangTimeSpanTimeout}. WasConnected={WasConnected}, LoopTaskStatus={_loopTask.Status}.").ConfigureAwait(false);
+                throw new InvalidOperationException(string.Format(
+                    CultureInfo.InvariantCulture,
+                    PlatformResources.InternalLoopAsyncDidNotExitSuccessfullyErrorMessage,
+                    nameof(InternalLoopAsync)));
             }
         }
 
         _namedPipeServerStream.Dispose();
-        PipeName.Dispose();
+        DisposeBuffers();
 
         _disposed = true;
     }

@@ -1,21 +1,19 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using Microsoft.Testing.Internal.Framework;
-using Microsoft.Testing.TestInfrastructure;
-
 using VerifyCS = MSTest.Analyzers.Test.CSharpCodeFixVerifier<
     MSTest.Analyzers.TestClassShouldHaveTestMethodAnalyzer,
     Microsoft.CodeAnalysis.Testing.EmptyCodeFixProvider>;
 
 namespace MSTest.Analyzers.Test;
 
-[TestGroup]
-public sealed class TestClassShouldHaveTestMethodAnalyzerTests(ITestExecutionContext testExecutionContext) : TestBase(testExecutionContext)
+[TestClass]
+public sealed class TestClassShouldHaveTestMethodAnalyzerTests
 {
+    [TestMethod]
     public async Task WhenTestClassHasTestMethod_NoDiagnostic()
     {
-        var code = """
+        string code = """
             using Microsoft.VisualStudio.TestTools.UnitTesting;
 
             [TestClass]
@@ -31,9 +29,10 @@ public sealed class TestClassShouldHaveTestMethodAnalyzerTests(ITestExecutionCon
         await VerifyCS.VerifyAnalyzerAsync(code);
     }
 
+    [TestMethod]
     public async Task WhenStaticTestClassWithAssemblyCleanup_DoesNotHaveTestMethod_NoDiagnostic()
     {
-        var code = """
+        string code = """
             using Microsoft.VisualStudio.TestTools.UnitTesting;
 
             [TestClass]
@@ -49,9 +48,10 @@ public sealed class TestClassShouldHaveTestMethodAnalyzerTests(ITestExecutionCon
         await VerifyCS.VerifyAnalyzerAsync(code);
     }
 
+    [TestMethod]
     public async Task WhenStaticTestClassWithAssemblyInitialization_DoesNotHaveTestMethod_NoDiagnostic()
     {
-        var code = """
+        string code = """
             using Microsoft.VisualStudio.TestTools.UnitTesting;
 
             [TestClass]
@@ -67,9 +67,10 @@ public sealed class TestClassShouldHaveTestMethodAnalyzerTests(ITestExecutionCon
         await VerifyCS.VerifyAnalyzerAsync(code);
     }
 
+    [TestMethod]
     public async Task WhenTestClassDoesNotHaveTestMethod_Diagnostic()
     {
-        var code = """
+        string code = """
             using Microsoft.VisualStudio.TestTools.UnitTesting;
 
             [TestClass]
@@ -85,9 +86,10 @@ public sealed class TestClassShouldHaveTestMethodAnalyzerTests(ITestExecutionCon
                 .WithArguments("MyTestClass"));
     }
 
+    [TestMethod]
     public async Task WhenStaticTestClassWithoutAssemblyAttributes_DoesNotHaveTestMethod_Diagnostic()
     {
-        var code = """
+        string code = """
             using Microsoft.VisualStudio.TestTools.UnitTesting;
 
             [TestClass]
@@ -102,9 +104,10 @@ public sealed class TestClassShouldHaveTestMethodAnalyzerTests(ITestExecutionCon
                 .WithArguments("MyTestClass"));
     }
 
+    [TestMethod]
     public async Task WhenTestClassWithoutAssemblyAttributesAndTestMethod_InheritsFromAbstractClassHasTestMethod_NoDiagnostic()
     {
-        var code = """
+        string code = """
             using Microsoft.VisualStudio.TestTools.UnitTesting;
 
             public abstract class BaseClass
@@ -121,9 +124,10 @@ public sealed class TestClassShouldHaveTestMethodAnalyzerTests(ITestExecutionCon
         await VerifyCS.VerifyAnalyzerAsync(code);
     }
 
+    [TestMethod]
     public async Task WhenTestClassWithoutAssemblyAttributesAndTestMethod_InheritsFromClassHasTestMethod_NoDiagnostic()
     {
-        var code = """
+        string code = """
             using Microsoft.VisualStudio.TestTools.UnitTesting;
 
             public class BaseClass
@@ -140,9 +144,10 @@ public sealed class TestClassShouldHaveTestMethodAnalyzerTests(ITestExecutionCon
         await VerifyCS.VerifyAnalyzerAsync(code);
     }
 
+    [TestMethod]
     public async Task WhenTestClassWithoutAssemblyAttributesAndTestMethod_InheritsFromTestClassHasTestMethod_NoDiagnostic()
     {
-        var code = """
+        string code = """
             using Microsoft.VisualStudio.TestTools.UnitTesting;
 
             [TestClass]
@@ -160,9 +165,10 @@ public sealed class TestClassShouldHaveTestMethodAnalyzerTests(ITestExecutionCon
         await VerifyCS.VerifyAnalyzerAsync(code);
     }
 
+    [TestMethod]
     public async Task WhenTestClassWithoutAssemblyAttributesAndTestMethod_InheritsFromAbstractTestClassHasTestMethod_NoDiagnostic()
     {
-        var code = """
+        string code = """
             using Microsoft.VisualStudio.TestTools.UnitTesting;
 
             [TestClass]
@@ -180,9 +186,10 @@ public sealed class TestClassShouldHaveTestMethodAnalyzerTests(ITestExecutionCon
         await VerifyCS.VerifyAnalyzerAsync(code);
     }
 
+    [TestMethod]
     public async Task WhenTestClassWithoutAssemblyAttributesAndTestMethod_InheritsFromBaseBaseClassHasTestMethod_NoDiagnostic()
     {
-        var code = """
+        string code = """
             using Microsoft.VisualStudio.TestTools.UnitTesting;
 
             public class BaseBase
@@ -203,9 +210,10 @@ public sealed class TestClassShouldHaveTestMethodAnalyzerTests(ITestExecutionCon
         await VerifyCS.VerifyAnalyzerAsync(code);
     }
 
+    [TestMethod]
     public async Task WhenTestClassWithoutAssemblyAttributesAndTestMethod_InheritsFromClassDoesNotHaveTestMethod_Diagnostic()
     {
-        var code = """
+        string code = """
             using Microsoft.VisualStudio.TestTools.UnitTesting;
 
             public class BaseClass
@@ -224,9 +232,10 @@ public sealed class TestClassShouldHaveTestMethodAnalyzerTests(ITestExecutionCon
                 .WithArguments("Derived"));
     }
 
+    [TestMethod]
     public async Task WhenTestClassWithoutAssemblyAttributesAndTestMethod_InheritsFromClassHasAssemblyInitialize_Diagnostic()
     {
-        var code = """
+        string code = """
             using Microsoft.VisualStudio.TestTools.UnitTesting;
 
             public class BaseClass
@@ -249,9 +258,10 @@ public sealed class TestClassShouldHaveTestMethodAnalyzerTests(ITestExecutionCon
                 .WithArguments("Derived"));
     }
 
+    [TestMethod]
     public async Task WhenTestClassWithoutAssemblyAttributesAndTestMethod_InheritsFromBaseBaseClassHasAssemblyCleanup_Diagnostic()
     {
-        var code = """
+        string code = """
             using Microsoft.VisualStudio.TestTools.UnitTesting;
 
             public class BaseBase
@@ -276,5 +286,66 @@ public sealed class TestClassShouldHaveTestMethodAnalyzerTests(ITestExecutionCon
             VerifyCS.Diagnostic(TestClassShouldHaveTestMethodAnalyzer.TestClassShouldHaveTestMethodRule)
                 .WithLocation(0)
                 .WithArguments("Derived"));
+    }
+
+    [TestMethod]
+    public async Task WhenStaticTestClassWithGlobalTestInitialize_DoesNotHaveTestMethod_NoDiagnostic()
+    {
+        string code = """
+            using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+            [TestClass]
+            public static class MyTestClass
+            {
+                [GlobalTestInitialize]
+                public static void GlobalTestInitialize(TestContext context)
+                {
+                }
+            }
+            """;
+
+        await VerifyCS.VerifyAnalyzerAsync(code);
+    }
+
+    [TestMethod]
+    public async Task WhenStaticTestClassWithGlobalTestCleanup_DoesNotHaveTestMethod_NoDiagnostic()
+    {
+        string code = """
+            using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+            [TestClass]
+            public static class MyTestClass
+            {
+                [GlobalTestCleanup]
+                public static void GlobalTestCleanup(TestContext context)
+                {
+                }
+            }
+            """;
+
+        await VerifyCS.VerifyAnalyzerAsync(code);
+    }
+
+    [TestMethod]
+    public async Task WhenNonStaticTestClassWithGlobalTestInitialize_DoesNotHaveTestMethod_Diagnostic()
+    {
+        string code = """
+            using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+            [TestClass]
+            public class {|#0:MyTestClass|}
+            {
+                [GlobalTestInitialize]
+                public static void GlobalTestInitialize(TestContext context)
+                {
+                }
+            }
+            """;
+
+        await VerifyCS.VerifyAnalyzerAsync(
+            code,
+            VerifyCS.Diagnostic(TestClassShouldHaveTestMethodAnalyzer.TestClassShouldHaveTestMethodRule)
+                .WithLocation(0)
+                .WithArguments("MyTestClass"));
     }
 }

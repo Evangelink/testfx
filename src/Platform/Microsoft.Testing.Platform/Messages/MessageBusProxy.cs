@@ -1,11 +1,8 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System.Diagnostics.CodeAnalysis;
-
+using Microsoft.Testing.Platform.Extensions;
 using Microsoft.Testing.Platform.Extensions.Messages;
-using Microsoft.Testing.Platform.Extensions.TestHost;
-using Microsoft.Testing.Platform.Helpers;
 
 namespace Microsoft.Testing.Platform.Messages;
 
@@ -19,31 +16,28 @@ internal sealed class MessageBusProxy : BaseMessageBus, IMessageBus
     public override async Task InitAsync()
     {
         EnsureMessageBusAvailable();
-        await InitAsync();
+        await _messageBus.InitAsync().ConfigureAwait(false);
     }
 
     public void SetBuiltMessageBus(BaseMessageBus messageBus)
-    {
-        ArgumentGuard.IsNotNull(messageBus);
-        _messageBus = messageBus;
-    }
+        => _messageBus = messageBus ?? throw new ArgumentNullException(nameof(messageBus));
 
     public override async Task PublishAsync(IDataProducer dataProducer, IData data)
     {
         EnsureMessageBusAvailable();
-        await _messageBus.PublishAsync(dataProducer, data);
+        await _messageBus.PublishAsync(dataProducer, data).ConfigureAwait(false);
     }
 
     public override async Task DrainDataAsync()
     {
         EnsureMessageBusAvailable();
-        await _messageBus.DrainDataAsync();
+        await _messageBus.DrainDataAsync().ConfigureAwait(false);
     }
 
     public override async Task DisableAsync()
     {
         EnsureMessageBusAvailable();
-        await _messageBus.DisableAsync();
+        await _messageBus.DisableAsync().ConfigureAwait(false);
     }
 
     [MemberNotNull(nameof(_messageBus))]
@@ -51,7 +45,7 @@ internal sealed class MessageBusProxy : BaseMessageBus, IMessageBus
     {
         if (_messageBus is null)
         {
-            throw new InvalidOperationException("The message bus has not been built yet or is no more usable at this stage.");
+            throw new InvalidOperationException(Resources.PlatformResources.MessageBusNotReady);
         }
     }
 

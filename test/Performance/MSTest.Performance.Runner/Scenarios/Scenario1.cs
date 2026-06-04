@@ -1,10 +1,6 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System.Globalization;
-using System.Text;
-using System.Xml.Linq;
-
 using Microsoft.Testing.TestInfrastructure;
 
 namespace MSTest.Performance.Runner.Steps;
@@ -40,39 +36,51 @@ internal class Scenario1 : IStep<NoInputOutput, SingleProject>
     public async Task<SingleProject> ExecuteAsync(NoInputOutput payload, IContext context)
     {
         Console.WriteLine($"Creating Scenario1 {_numberOfClass} classes, {_methodsPerClass} methods per class, ExecutionScope {_executionScope} with {_workers} workers");
-        XDocument versionsPropFileDoc = XDocument.Load(Path.Combine(RootFinder.Find(), "eng", "Versions.props"));
+        var versionsPropFileDoc = XDocument.Load(Path.Combine(RootFinder.Find(), "eng", "Versions.props"));
         string microsoftNETTestSdkVersion = versionsPropFileDoc.Descendants("MicrosoftNETTestSdkVersion").Single().Value;
         string msTestVersion = ExtractVersionFromPackage(Constants.ArtifactsPackagesShipping, MSTestTestFrameworkPackageNamePrefix);
 
         StringBuilder stringBuilder = new();
         for (int i = 0; i < _numberOfClass; i++)
         {
-            stringBuilder.AppendLine(CultureInfo.InvariantCulture, $@"
-[TestClass]
-public class UnitTest{i}
-{{");
+            stringBuilder.AppendLine(
+                CultureInfo.InvariantCulture,
+                $$"""
+
+                  [TestClass]
+                  public class UnitTest{{i}}
+                  {
+                  """);
             for (int k = 1; k < _methodsPerClass + 1; k++)
             {
                 if (k % 2 == 0)
                 {
-                    stringBuilder.AppendLine(CultureInfo.InvariantCulture, $@"
-        [TestMethod]
-        [System.Runtime.CompilerServices.MethodImplAttribute(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
-        public System.Threading.Tasks.Task TestMethod{k}()
-        {{
-            return System.Threading.Tasks.Task.CompletedTask;
-        }}
-");
+                    stringBuilder.AppendLine(
+                        CultureInfo.InvariantCulture,
+                        $$"""
+
+                                  [TestMethod]
+                                  [System.Runtime.CompilerServices.MethodImplAttribute(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+                                  public System.Threading.Tasks.Task TestMethod{{k}}()
+                                  {
+                                      return System.Threading.Tasks.Task.CompletedTask;
+                                  }
+
+                          """);
                 }
                 else
                 {
-                    stringBuilder.AppendLine(CultureInfo.InvariantCulture, $@"
-        [TestMethod]
-        [System.Runtime.CompilerServices.MethodImplAttribute(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
-        public void TestMethod{k}()
-        {{
-        }}
-");
+                    stringBuilder.AppendLine(
+                        CultureInfo.InvariantCulture,
+                        $$"""
+
+                                  [TestMethod]
+                                  [System.Runtime.CompilerServices.MethodImplAttribute(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+                                  public void TestMethod{{k}}()
+                                  {
+                                  }
+
+                          """);
                 }
             }
 
@@ -94,12 +102,12 @@ public class UnitTest{i}
             addPublicFeeds: true);
 
         context.AddDisposable(generator);
-        return new SingleProject(new string[] { "net8.0" }, generator, nameof(Scenario1));
+        return new SingleProject(["net9.0"], generator, nameof(Scenario1));
     }
 
     private static string ExtractVersionFromPackage(string rootFolder, string packagePrefixName)
     {
-        var matches = Directory.GetFiles(rootFolder, packagePrefixName + "*" + NuGetPackageExtensionName, SearchOption.TopDirectoryOnly);
+        string[] matches = Directory.GetFiles(rootFolder, packagePrefixName + "*" + NuGetPackageExtensionName, SearchOption.TopDirectoryOnly);
 
         if (matches.Length > 1)
         {
@@ -115,16 +123,8 @@ public class UnitTest{i}
             throw new InvalidOperationException($"Was expecting to find a single NuGet package named '{packagePrefixName}' in '{rootFolder}' but found {matches.Length}.");
         }
 
-        var packageFullName = Path.GetFileName(matches[0]);
+        string packageFullName = Path.GetFileName(matches[0]);
         return packageFullName.Substring(packagePrefixName.Length, packageFullName.Length - packagePrefixName.Length - NuGetPackageExtensionName.Length);
-    }
-
-    private static string ExtractVersionFromVersionPropsFile(XDocument versionPropsXmlDocument, string entryName)
-    {
-        var matches = versionPropsXmlDocument.Descendants(entryName).ToArray();
-        return matches.Length != 1
-            ? throw new InvalidOperationException($"Was expecting to find a single entry for '{entryName}' but found {matches.Length}.")
-            : matches[0].Value;
     }
 
     protected const string CurrentMSTestSourceCode = """

@@ -5,18 +5,20 @@ using Microsoft.MSTestV2.CLIAutomation;
 
 namespace MSTest.IntegrationTests;
 
+[TestClass]
 public class FSharpTestProjectTests : CLITestBase
 {
     private const string TestAssetName = "FSharpTestProject";
 
-    public void TestFSharpTestsWithSpaceAndDotInName()
+    [TestMethod]
+    public async Task TestFSharpTestsWithSpaceAndDotInName()
     {
         // Arrange
-        var assemblyPath = GetAssetFullPath(TestAssetName, targetFramework: "net472");
+        string assemblyPath = GetAssetFullPath(TestAssetName, targetFramework: "net472");
 
         // Act
-        var testCases = DiscoverTests(assemblyPath);
-        var testResults = RunTests(testCases);
+        System.Collections.Immutable.ImmutableArray<Microsoft.VisualStudio.TestPlatform.ObjectModel.TestCase> testCases = DiscoverTests(assemblyPath);
+        System.Collections.Immutable.ImmutableArray<Microsoft.VisualStudio.TestPlatform.ObjectModel.TestResult> testResults = await RunTestsAsync(testCases);
 
         // Assert
         VerifyE2E.TestsPassed(testResults, "Test method passing with a . in it");

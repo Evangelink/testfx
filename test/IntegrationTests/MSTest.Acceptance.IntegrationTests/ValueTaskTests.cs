@@ -6,42 +6,31 @@ using Microsoft.Testing.Platform.Acceptance.IntegrationTests.Helpers;
 
 namespace MSTest.Acceptance.IntegrationTests;
 
-[TestGroup]
-public sealed class ValueTaskTests : AcceptanceTestBase
+[TestClass]
+public sealed class ValueTaskTests : AcceptanceTestBase<ValueTaskTests.TestAssetFixture>
 {
-    private readonly TestAssetFixture _testAssetFixture;
-
-    public ValueTaskTests(ITestExecutionContext testExecutionContext, TestAssetFixture testAssetFixture)
-        : base(testExecutionContext)
+    [TestMethod]
+    [DynamicData(nameof(TargetFrameworks.AllForDynamicData), typeof(TargetFrameworks))]
+    public async Task CanUseValueTaskForAllKnownLocations(string tfm)
     {
-        _testAssetFixture = testAssetFixture;
-    }
-
-    public async Task CanUseValueTaskForAllKnownLocations()
-    {
-        TestHost testHost = TestHost.LocateFrom(_testAssetFixture.ProjectPath, TestAssetFixture.ProjectName, TargetFrameworks.NetCurrent.Arguments);
-        TestHostResult testHostResult = await testHost.ExecuteAsync();
+        var testHost = TestHost.LocateFrom(AssetFixture.ProjectPath, TestAssetFixture.ProjectName, tfm);
+        TestHostResult testHostResult = await testHost.ExecuteAsync(cancellationToken: TestContext.CancellationToken);
 
         // Assert
-        testHostResult.AssertExitCodeIs(0);
-        testHostResult.AssertOutputContains("Passed! - Failed: 0, Passed: 2, Skipped: 0, Total: 2");
+        testHostResult.AssertExitCodeIs(2);
+        testHostResult.AssertOutputContainsSummary(failed: 1, passed: 2, skipped: 1);
     }
 
-    [TestFixture(TestFixtureSharingStrategy.PerTestGroup)]
-    public sealed class TestAssetFixture(AcceptanceFixture acceptanceFixture) : TestAssetFixtureBase(acceptanceFixture.NuGetGlobalPackagesFolder)
+    public sealed class TestAssetFixture() : TestAssetFixtureBase()
     {
         public const string ProjectName = "TestValueTask";
 
         public string ProjectPath => GetAssetPath(ProjectName);
 
-        public override IEnumerable<(string ID, string Name, string Code)> GetAssetsToGenerate()
-        {
-            yield return (ProjectName, ProjectName,
+        public override (string ID, string Name, string Code) GetAssetsToGenerate() => (ProjectName, ProjectName,
                 SourceCode
-                .PatchTargetFrameworks(TargetFrameworks.NetCurrent)
-                .PatchCodeWithReplace("$MicrosoftTestingPlatformVersion$", MicrosoftTestingPlatformVersion)
+                .PatchTargetFrameworks(TargetFrameworks.All)
                 .PatchCodeWithReplace("$MSTestVersion$", MSTestVersion));
-        }
 
         private const string SourceCode = """
 #file TestValueTask.csproj
@@ -56,7 +45,6 @@ public sealed class ValueTaskTests : AcceptanceTestBase
   <ItemGroup>
     <PackageReference Include="MSTest.TestAdapter" Version="$MSTestVersion$" />
     <PackageReference Include="MSTest.TestFramework" Version="$MSTestVersion$" />
-    <PackageReference Include="Microsoft.Testing.Platform" Version="$MicrosoftTestingPlatformVersion$" />
   </ItemGroup>
 
 </Project>
@@ -68,30 +56,54 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 [TestClass]
 public class UnitTest1
 {
+    private static ValueTask CompletedTask =>
+#if !NET5_0_OR_GREATER
+        // ValueTask.CompletedTask is only available in .NET 5 and later
+        default;
+#else
+        ValueTask.CompletedTask;
+#endif
+
     [AssemblyInitialize]
-    public static ValueTask AssemblyInitialize(TestContext testContext) => ValueTask.CompletedTask;
+    public static ValueTask AssemblyInitialize(TestContext testContext) => CompletedTask;
 
     [AssemblyCleanup]
-    public static ValueTask AssemblyCleanup() => ValueTask.CompletedTask;
+    public static ValueTask AssemblyCleanup() => CompletedTask;
 
     [ClassInitialize]
-    public static ValueTask ClassInitialize(TestContext testContext) => ValueTask.CompletedTask;
+    public static ValueTask ClassInitialize(TestContext testContext) => CompletedTask;
 
     [ClassCleanup]
-    public static ValueTask ClassCleanup() => ValueTask.CompletedTask;
+    public static ValueTask ClassCleanup() => CompletedTask;
 
     [TestInitialize]
-    public ValueTask TestInit() => ValueTask.CompletedTask;
+    public ValueTask TestInit() => CompletedTask;
 
     [TestCleanup]
-    public ValueTask TestCleanup() => ValueTask.CompletedTask;
+    public ValueTask TestCleanup() => CompletedTask;
 
     [TestMethod]
-    public async ValueTask TestMethod1() => await ValueTask.CompletedTask;
+    public async ValueTask TestMethod1() => await CompletedTask;
 
     [TestMethod]
-    public ValueTask TestMethod2() => ValueTask.CompletedTask;
+    public ValueTask TestMethod2() => CompletedTask;
+
+    [TestMethod]
+    public async ValueTask FailedTestMethod()
+    {
+        await CompletedTask;
+        Assert.Fail();
+    }
+
+    [TestMethod]
+    public async ValueTask InconclusiveTestMethod()
+    {
+        await CompletedTask;
+        Assert.Inconclusive();
+    }
 }
 """;
     }
+
+    public TestContext TestContext { get; set; }
 }

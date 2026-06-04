@@ -2,17 +2,18 @@
 
   <PropertyGroup>
     <TargetFramework>$(NetFrameworkMinimum)</TargetFramework>
+    <UseInternalTestFramework>true</UseInternalTestFramework>
+    <OutputType>Exe</OutputType>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="$(RepoRoot)src\Adapter\MSTestAdapter.PlatformServices\MSTestAdapter.PlatformServices.csproj" />
     <ProjectReference Include="$(RepoRoot)test\IntegrationTests\TestAssets\SampleFrameworkExtensions\SampleFrameworkExtensions.csproj" />
-    <ProjectReference Include="$(RepoRoot)test\Utilities\TestFramework.ForTestingMSTest\TestFramework.ForTestingMSTest.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Moq" />
-    <PackageReference Include="FluentAssertions" />
+    <PackageReference Include="AwesomeAssertions" />
     <PackageReference Include="StrongNamer" />
   </ItemGroup>
 

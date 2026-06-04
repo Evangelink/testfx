@@ -1,8 +1,6 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-#nullable enable
-
 using System.Collections.Immutable;
 
 using Microsoft.VisualStudio.TestPlatform.ObjectModel;
@@ -16,7 +14,6 @@ public class DiscoveryEventsHandler : ITestDiscoveryEventsHandler
     private readonly ImmutableArray<string>.Builder _testsBuilder = ImmutableArray.CreateBuilder<string>();
     private readonly ImmutableDictionary<TestMessageLevel, ImmutableArray<string?>.Builder>.Builder _messagesBuilder = ImmutableDictionary.CreateBuilder<TestMessageLevel, ImmutableArray<string?>.Builder>();
     private ImmutableArray<string>? _tests;
-    private ImmutableDictionary<TestMessageLevel, ImmutableArray<string?>>? _messages;
 
     /// <summary>
     /// Gets a list of Discovered tests.
@@ -26,7 +23,9 @@ public class DiscoveryEventsHandler : ITestDiscoveryEventsHandler
     /// <summary>
     /// Gets the list of messages received from the discovery process.
     /// </summary>
-    public ImmutableDictionary<TestMessageLevel, ImmutableArray<string?>> Messages => _messages ??= _messagesBuilder.ToImmutableDictionary(x => x.Key, x => x.Value.ToImmutable());
+    [field: MaybeNull]
+    [field: AllowNull]
+    public ImmutableDictionary<TestMessageLevel, ImmutableArray<string?>> Messages => field ??= _messagesBuilder.ToImmutableDictionary(x => x.Key, x => x.Value.ToImmutable());
 
     public void HandleDiscoveredTests(IEnumerable<TestCase>? discoveredTestCases)
     {

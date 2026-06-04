@@ -1,3 +1,0 @@
-# `IConfiguration`
-
-Soon.

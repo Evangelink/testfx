@@ -2,16 +2,20 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 #if !WINDOWS_UWP
-using System.Globalization;
-using System.Xml;
 
+using Microsoft.VisualStudio.TestPlatform.MSTest.TestAdapter;
+using Microsoft.VisualStudio.TestPlatform.MSTestAdapter.PlatformServices.Interface;
 using Microsoft.VisualStudio.TestPlatform.ObjectModel;
 using Microsoft.VisualStudio.TestPlatform.ObjectModel.Utilities;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace Microsoft.VisualStudio.TestPlatform.MSTestAdapter.PlatformServices;
 
-public class MSTestAdapterSettings
+/// <summary>
+/// The MSTest settings.
+/// </summary>
+#pragma warning disable CA1852 // Seal internal types - Inherited in test
+internal class MSTestAdapterSettings
 {
     /// <summary>
     /// Initializes a new instance of the <see cref="MSTestAdapterSettings"/> class.
@@ -22,6 +26,7 @@ public class MSTestAdapterSettings
         DeploymentEnabled = true;
         DeployTestSourceDependencies = true;
         SearchDirectories = [];
+        Configuration = null;
     }
 
     /// <summary>
@@ -44,6 +49,8 @@ public class MSTestAdapterSettings
     /// </summary>
     protected List<RecursiveDirectoryPath> SearchDirectories { get; private set; }
 
+    internal static IConfiguration? Configuration { get; set; }
+
     /// <summary>
     /// Convert the parameter xml to TestSettings.
     /// </summary>
@@ -51,7 +58,10 @@ public class MSTestAdapterSettings
     /// <returns>An instance of the <see cref="MSTestAdapterSettings"/> class.</returns>
     public static MSTestAdapterSettings ToSettings(XmlReader reader)
     {
-        ValidateArg.NotNull(reader, "reader");
+        if (reader is null)
+        {
+            throw new ArgumentNullException(nameof(reader));
+        }
 
         // Expected format of the xml is: -
         //
@@ -125,19 +135,95 @@ public class MSTestAdapterSettings
         return settings;
     }
 
+    private static void ParseBooleanSetting(IConfiguration configuration, string key, Action<bool> setSetting)
+    {
+        if (configuration[$"mstest:{key}"] is not string value)
+        {
+            return;
+        }
+
+        if (bool.TryParse(value, out bool result))
+        {
+            setSetting(result);
+        }
+    }
+
+    internal static MSTestAdapterSettings ToSettings(IConfiguration configuration)
+    {
+        // Expected format of the json is: -
+        //
+        // "mstest" : {
+        //  "deployment" : {
+        //       "enabled": true / false,
+        //       "deployTestSourceDependencies": true / false,
+        //       "deleteDeploymentDirectoryAfterTestRunIsComplete": true / false
+        //  },
+        //  ... remaining settings
+        // }
+        MSTestAdapterSettings settings = MSTestSettingsProvider.Settings;
+        Configuration = configuration;
+        ParseBooleanSetting(configuration, "deployment:enabled", value => settings.DeploymentEnabled = value);
+        ParseBooleanSetting(configuration, "deployment:deployTestSourceDependencies", value => settings.DeployTestSourceDependencies = value);
+        ParseBooleanSetting(configuration, "deployment:deleteDeploymentDirectoryAfterTestRunIsComplete", value => settings.DeleteDeploymentDirectoryAfterTestRunIsComplete = value);
+
+        settings.ReadAssemblyResolutionPath(configuration);
+
+        return settings;
+    }
+
+    /// <summary>
+    /// Determines if the AppDomain are disabled based of the runsettings.
+    /// </summary>
+    /// <param name="settingsXml">The XML runsettings content.</param>
+    /// <returns><c>true</c> if AppDomains are disabled; <c>false</c> otherwise.</returns>
     public static bool IsAppDomainCreationDisabled(string? settingsXml)
     {
-        if (StringEx.IsNullOrEmpty(settingsXml))
+        // Expected format of the json is: -
+        // "mstest" : {
+        //  "execution": {
+        //    "disableAppDomain": true,
+        //  }
+        // }
+        if (StringEx.IsNullOrEmpty(settingsXml) && Configuration is null)
         {
             return false;
         }
 
-        StringReader stringReader = new(settingsXml);
-        XmlReader reader = XmlReader.Create(stringReader, XmlRunSettingsUtilities.ReaderSettings);
+        bool disableAppDomain = true;
+        // HACK: When running VSTest, and VSTest didn't create TestHostAppDomain (default behavior), we must be enabling appdomain in MSTest.
+        // Otherwise, we will not merge app.config properly, nor we will have correct BaseDirectory of current domain.
+        // This detects if we run in testhost.*.exe or in vstest.console.exe.This covers all: running with vstest.console.exe because there we can run in both modes, running with dotnet test or VS, because there we can run only in testhost(in isolation).
+#if NETFRAMEWORK
+        if (AppDomain.CurrentDomain.Id == 1 &&
+            (AppDomain.CurrentDomain.FriendlyName.StartsWith("testhost.", StringComparison.Ordinal) ||
+             AppDomain.CurrentDomain.FriendlyName.StartsWith("vstest.console.", StringComparison.Ordinal)) &&
+            AppDomain.CurrentDomain.FriendlyName.EndsWith(".exe", StringComparison.Ordinal))
+        {
+            disableAppDomain = false;
+        }
+#endif
 
-        return reader.ReadToFollowing("DisableAppDomain")
-            && bool.TryParse(reader.ReadInnerXml(), out var disableAppDomain)
-            && disableAppDomain;
+        if (!StringEx.IsNullOrEmpty(settingsXml))
+        {
+            StringReader stringReader = new(settingsXml);
+            var reader = XmlReader.Create(stringReader, XmlRunSettingsUtilities.ReaderSettings);
+            var xmlDoc = new XmlDocument() { XmlResolver = null };
+            xmlDoc.Load(reader);
+
+            if (bool.TryParse(xmlDoc["RunSettings"]?["RunConfiguration"]?["DisableAppDomain"]?.InnerText, out bool result))
+            {
+                disableAppDomain = result;
+            }
+        }
+
+        string? isAppDomainDisabled = Configuration?["mstest:execution:disableAppDomain"];
+        if (!StringEx.IsNullOrEmpty(isAppDomainDisabled) &&
+            bool.TryParse(isAppDomainDisabled, out bool resultFromConfiguration))
+        {
+            disableAppDomain = resultFromConfiguration;
+        }
+
+        return disableAppDomain;
     }
 
     /// <summary>
@@ -171,10 +257,10 @@ public class MSTestAdapterSettings
     /// <param name="path">The path to be expanded.</param>
     /// <param name="baseDirectory">The base directory for the path which is not rooted path.</param>
     /// <returns>The expanded path.</returns>
-    internal string? ResolveEnvironmentVariableAndReturnFullPathIfExist(string path, string baseDirectory)
+    internal string? ResolveEnvironmentVariableAndReturnFullPathIfExist(string? path, string? baseDirectory)
     {
         // Trim beginning and trailing white space from the path.
-        path = path.Trim(' ', '\t');
+        path = path?.Trim(' ', '\t');
 
         if (StringEx.IsNullOrEmpty(path))
         {
@@ -195,11 +281,11 @@ public class MSTestAdapterSettings
             }
             else
             {
-                warningMessage = $"The Directory: {path}, has following problem: {"This is not an absolute path. A base directory should be provided for this to be used as a relative path."}";
+                warningMessage = $"The Directory: {path}, has following problem: This is not an absolute path. A base directory should be provided for this to be used as a relative path.";
 
-                if (EqtTrace.IsWarningEnabled)
+                if (PlatformServiceProvider.Instance.AdapterTraceLogger.IsWarningEnabled)
                 {
-                    EqtTrace.Warning(warningMessage);
+                    PlatformServiceProvider.Instance.AdapterTraceLogger.Warning(warningMessage);
                 }
 
                 return null;
@@ -222,9 +308,9 @@ public class MSTestAdapterSettings
         {
             warningMessage = $"The Directory: {path}, has following problem: {warningMessage}";
 
-            if (EqtTrace.IsWarningEnabled)
+            if (PlatformServiceProvider.Instance.AdapterTraceLogger.IsWarningEnabled)
             {
-                EqtTrace.Warning(warningMessage);
+                PlatformServiceProvider.Instance.AdapterTraceLogger.Warning(warningMessage);
             }
 
             return null;
@@ -236,7 +322,10 @@ public class MSTestAdapterSettings
         }
 
         // generate warning that path does not exist.
-        EqtTrace.WarningIf(EqtTrace.IsWarningEnabled, $"The Directory: {path}, does not exist.");
+        if (PlatformServiceProvider.Instance.AdapterTraceLogger.IsWarningEnabled)
+        {
+            PlatformServiceProvider.Instance.AdapterTraceLogger.Warning($"The Directory: {path}, does not exist.");
+        }
 
         return null;
     }
@@ -247,10 +336,7 @@ public class MSTestAdapterSettings
     /// <param name="path">path.</param>
     /// <returns>True if directory exists.</returns>
     /// <remarks>Only present for unit testing scenarios.</remarks>
-    protected virtual bool DoesDirectoryExist(string path)
-    {
-        return Directory.Exists(path);
-    }
+    protected virtual bool DoesDirectoryExist(string path) => Directory.Exists(path);
 
     /// <summary>
     /// Expands any environment variables in the path provided.
@@ -258,14 +344,14 @@ public class MSTestAdapterSettings
     /// <param name="path">path.</param>
     /// <returns>expanded string.</returns>
     /// <remarks>Only present for unit testing scenarios.</remarks>
-    protected virtual string ExpandEnvironmentVariables(string path)
-    {
-        return Environment.ExpandEnvironmentVariables(path);
-    }
+    protected virtual string ExpandEnvironmentVariables(string path) => Environment.ExpandEnvironmentVariables(path);
 
     private void ReadAssemblyResolutionPath(XmlReader reader)
     {
-        ValidateArg.NotNull(reader, "reader");
+        if (reader is null)
+        {
+            throw new ArgumentNullException(nameof(reader));
+        }
 
         // Expected format of the xml is: -
         //
@@ -291,7 +377,7 @@ public class MSTestAdapterSettings
                     if (!StringEx.IsNullOrEmpty(path))
                     {
                         // Do we have to look in sub directory for dependent dll.
-                        var includeSubDirectories = string.Equals(recursiveAttribute, "true", StringComparison.OrdinalIgnoreCase);
+                        bool includeSubDirectories = string.Equals(recursiveAttribute, "true", StringComparison.OrdinalIgnoreCase);
                         SearchDirectories.Add(new RecursiveDirectoryPath(path, includeSubDirectories));
                     }
                 }
@@ -308,6 +394,33 @@ public class MSTestAdapterSettings
 
         // go to the end of the element.
         reader.ReadEndElement();
+    }
+
+    private void ReadAssemblyResolutionPath(IConfiguration configuration)
+    {
+        // Expected format of the json is: -
+        //
+        // "mstest" : {
+        //    "assemblyResolution" : [
+        //        { "path" : "..." , includeSubDirectories: "true" } ,
+        //        { "path" : "..." , includeSubDirectories: "true" } ,
+        //        { "path" : "..." , includeSubDirectories: "true" } ,
+        //        ...
+        //     ]
+        //  ... remaining settings
+        // }
+        int index = 0;
+        while (configuration[$"mstest:assemblyResolution:{index}:path"] is string path)
+        {
+            if (!StringEx.IsNullOrEmpty(path))
+            {
+                // Default includeSubDirectories to false if not provided
+                bool includeSubDirectories = false;
+                ParseBooleanSetting(configuration, $"assemblyResolution:{index++}:includeSubDirectories", value => includeSubDirectories = value);
+
+                SearchDirectories.Add(new RecursiveDirectoryPath(path, includeSubDirectories));
+            }
+        }
     }
 }
 #endif

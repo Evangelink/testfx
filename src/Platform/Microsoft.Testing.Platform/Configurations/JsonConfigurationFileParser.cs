@@ -1,8 +1,6 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System.Diagnostics.CodeAnalysis;
-using System.Globalization;
 using System.Text.Json;
 
 using Microsoft.Testing.Platform.Resources;
@@ -17,8 +15,8 @@ namespace Microsoft.Testing.Platform.Configurations;
 [ExcludeFromCodeCoverage]
 internal sealed class JsonConfigurationFileParser
 {
-    private readonly Dictionary<string, string?> _singleValueData = new(StringComparer.OrdinalIgnoreCase);
-    private readonly Dictionary<string, string?> _propertyToAllChildren = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, string?> _singleValueData = [with(StringComparer.OrdinalIgnoreCase)];
+    private readonly Dictionary<string, string?> _propertyToAllChildren = [with(StringComparer.OrdinalIgnoreCase)];
     private readonly Stack<string> _paths = new();
 
     private JsonConfigurationFileParser()
@@ -30,22 +28,19 @@ internal sealed class JsonConfigurationFileParser
 
     private (Dictionary<string, string?> SingleValueData, Dictionary<string, string?> PropertyToAllChildren) ParseStream(Stream input)
     {
-        var jsonDocumentOptions = new JsonDocumentOptions
+        JsonDocumentOptions jsonDocumentOptions = new()
         {
             CommentHandling = JsonCommentHandling.Skip,
             AllowTrailingCommas = true,
         };
 
-        using (var reader = new StreamReader(input))
-        using (var doc = JsonDocument.Parse(reader.ReadToEnd(), jsonDocumentOptions))
+        using var doc = JsonDocument.Parse(input, jsonDocumentOptions);
+        if (doc.RootElement.ValueKind != JsonValueKind.Object)
         {
-            if (doc.RootElement.ValueKind != JsonValueKind.Object)
-            {
-                throw new FormatException(string.Format(CultureInfo.CurrentCulture, PlatformResources.JsonConfigurationFileParserTopLevelElementIsNotAnObjectErrorMessage, doc.RootElement.ValueKind));
-            }
-
-            VisitObjectElement(doc.RootElement);
+            throw new FormatException(string.Format(CultureInfo.CurrentCulture, PlatformResources.JsonConfigurationFileParserTopLevelElementIsNotAnObjectErrorMessage, doc.RootElement.ValueKind));
         }
+
+        VisitObjectElement(doc.RootElement);
 
         return (_singleValueData, _propertyToAllChildren);
     }

@@ -1,12 +1,9 @@
-// Copyright (c) Microsoft Corporation. All rights reserved.
+﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 #if NETFRAMEWORK
-using System.Collections;
 using System.Data;
 using System.Data.Common;
-using System.Diagnostics;
-using System.Globalization;
 using System.Security;
 
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -27,10 +24,7 @@ internal abstract class TestDataConnection : IDisposable
     // List of places to look for files when substituting |DataDirectory|
     private readonly List<string> _dataFolders;
 
-    protected internal TestDataConnection(List<string> dataFolders)
-    {
-        _dataFolders = dataFolders;
-    }
+    protected internal TestDataConnection(List<string> dataFolders) => _dataFolders = dataFolders;
 
     /// <summary>
     /// Gets the connection.
@@ -86,10 +80,7 @@ internal abstract class TestDataConnection : IDisposable
     // It is critical that is class be disposed of properly, otherwise
     // data connections may be left open. In general it is best to use create instances
     // in a "using"
-    public virtual void Dispose()
-    {
-        GC.SuppressFinalize(this);
-    }
+    public virtual void Dispose() => GC.SuppressFinalize(this);
 
     internal static bool PathNeedsFixup(string path)
     {
@@ -157,10 +148,7 @@ internal abstract class TestDataConnection : IDisposable
         }
     }
 
-    protected string? FixPath(string path)
-    {
-        return FixPath(path, _dataFolders);
-    }
+    protected string? FixPath(string path) => FixPath(path, _dataFolders);
 }
 
 #endif

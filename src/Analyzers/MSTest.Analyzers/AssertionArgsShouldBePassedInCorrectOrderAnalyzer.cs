@@ -14,16 +14,18 @@ using MSTest.Analyzers.RoslynAnalyzerHelpers;
 
 namespace MSTest.Analyzers;
 
+/// <summary>
+/// MSTEST0017: <inheritdoc cref="Resources.AssertionArgsShouldBePassedInCorrectOrderTitle"/>.
+/// </summary>
 [DiagnosticAnalyzer(LanguageNames.CSharp, LanguageNames.VisualBasic)]
 public sealed class AssertionArgsShouldBePassedInCorrectOrderAnalyzer : DiagnosticAnalyzer
 {
-    private static readonly ImmutableArray<string> SupportedMethodNames = ImmutableArray.Create(new[]
-    {
+    private static readonly ImmutableArray<string> SupportedMethodNames = ImmutableArray.Create([
         "AreEqual",
         "AreNotEqual",
         "AreSame",
-        "AreNotSame",
-    });
+        "AreNotSame"
+    ]);
 
     private static readonly LocalizableResourceString Title = new(nameof(Resources.AssertionArgsShouldBePassedInCorrectOrderTitle), Resources.ResourceManager, typeof(Resources));
     private static readonly LocalizableResourceString Description = new(nameof(Resources.AssertionArgsShouldBePassedInCorrectOrderDescription), Resources.ResourceManager, typeof(Resources));
@@ -35,12 +37,14 @@ public sealed class AssertionArgsShouldBePassedInCorrectOrderAnalyzer : Diagnost
         MessageFormat,
         Description,
         Category.Usage,
-        DiagnosticSeverity.Info,
+        DiagnosticSeverity.Warning,
         isEnabledByDefault: true);
 
+    /// <inheritdoc />
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; }
         = ImmutableArray.Create(Rule);
 
+    /// <inheritdoc />
     public override void Initialize(AnalysisContext context)
     {
         context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
@@ -48,16 +52,22 @@ public sealed class AssertionArgsShouldBePassedInCorrectOrderAnalyzer : Diagnost
 
         context.RegisterCompilationStartAction(context =>
         {
-            if (context.Compilation.TryGetOrCreateTypeByMetadataName(WellKnownTypeNames.MicrosoftVisualStudioTestToolsUnitTestingAssert, out var assertSymbol))
+            if (context.Compilation.TryGetOrCreateTypeByMetadataName(WellKnownTypeNames.MicrosoftVisualStudioTestToolsUnitTestingAssert, out INamedTypeSymbol? assertSymbol))
             {
                 context.RegisterOperationAction(context => AnalyzeOperation(context, assertSymbol), OperationKind.Invocation);
             }
         });
     }
 
+    private static bool IsConstant(IArgumentOperation argumentOperation)
+    {
+        IOperation operation = argumentOperation.Value.WalkDownBuiltInConversion();
+        return operation.ConstantValue.HasValue || operation.Kind == OperationKind.TypeOf;
+    }
+
     private static void AnalyzeOperation(OperationAnalysisContext context, INamedTypeSymbol assertSymbol)
     {
-        IInvocationOperation invocationOperation = (IInvocationOperation)context.Operation;
+        var invocationOperation = (IInvocationOperation)context.Operation;
 
         // This is not an invocation of the expected assertion methods.
         if (!SupportedMethodNames.Contains(invocationOperation.TargetMethod.Name)
@@ -67,30 +77,50 @@ public sealed class AssertionArgsShouldBePassedInCorrectOrderAnalyzer : Diagnost
             return;
         }
 
-        // If the actual value is a constant or a literal, then the arguments are in the wrong order.
-        if (actualArgument.Value.Kind == OperationKind.Literal
-            || actualArgument.Value.ConstantValue.HasValue)
+        // If "expected" is already constant, we shouldn't report any diagnostics and we don't care about "actual".
+        if (IsConstant(expectedArgument))
+        {
+            return;
+        }
+
+        // If the actual value is a constant or a literal and expected is not, then the arguments are in the wrong order.
+        // Note that we don't report if both are literals or constants, as there is no real fix for this.
+        // If both are literals or constants, the assert will always pass or always fail.
+        if (IsConstant(actualArgument))
         {
             context.ReportDiagnostic(invocationOperation.CreateDiagnostic(Rule));
             return;
         }
 
-        if (actualArgument.Value.GetReferencedMemberOrLocalOrParameter() is { } actualSymbol)
-        {
-            if (actualSymbol.Name.StartsWith("expected", StringComparison.Ordinal)
-                || actualSymbol.Name.StartsWith("_expected", StringComparison.Ordinal)
-                || actualSymbol.Name.StartsWith("Expected", StringComparison.Ordinal))
-            {
-                context.ReportDiagnostic(invocationOperation.CreateDiagnostic(Rule));
-                return;
-            }
-        }
+        ISymbol? actualSymbol = actualArgument.Value.GetReferencedMemberOrLocalOrParameter();
+        ISymbol? expectedSymbol = expectedArgument.Value.GetReferencedMemberOrLocalOrParameter();
+        bool actualIsExpected = actualSymbol is not null && NameIsExpected(actualSymbol.Name);
+        bool expectedIsExpected = expectedSymbol is not null && NameIsExpected(expectedSymbol.Name);
 
-        if (expectedArgument.Value.GetReferencedMemberOrLocalOrParameter() is { } expectedSymbol
-            && expectedSymbol.Name.StartsWith("actual", StringComparison.Ordinal))
+        // If both arguments have names indicating it's "expected", don't report a diagnostic.
+        if (actualIsExpected && !expectedIsExpected)
         {
             context.ReportDiagnostic(invocationOperation.CreateDiagnostic(Rule));
+            return;
         }
+
+        bool expectedIsActual = expectedSymbol is not null && NameIsActual(expectedSymbol.Name);
+        bool actualIsActual = actualSymbol is not null && NameIsActual(actualSymbol.Name);
+
+        // If both arguments have names indicating it's "actual", don't report a diagnostic.
+        if (expectedIsActual && !actualIsActual)
+        {
+            context.ReportDiagnostic(invocationOperation.CreateDiagnostic(Rule));
+            return;
+        }
+
+        static bool NameIsExpected(string name)
+            => name.StartsWith("expected", StringComparison.Ordinal) ||
+                name.StartsWith("_expected", StringComparison.Ordinal) ||
+                name.StartsWith("Expected", StringComparison.Ordinal);
+
+        static bool NameIsActual(string name)
+            => name.StartsWith("actual", StringComparison.Ordinal);
     }
 
     private static (IArgumentOperation ExpectedArgument, IArgumentOperation ActualArgument)? FindExpectedAndActualArguments(IInvocationOperation invocationOperation)

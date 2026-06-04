@@ -1,10 +1,9 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-#if NET462
+#if NETFRAMEWORK
 
-using System.Reflection;
-using System.Xml;
+using AwesomeAssertions;
 
 using TestFramework.ForTestingMSTest;
 
@@ -19,23 +18,23 @@ public class XmlUtilitiesTests : TestContainer
     public void AddAssemblyRedirectionShouldAddRedirectionToAnEmptyXml()
     {
         _testableXmlUtilities.ConfigXml = @"<?xml version=""1.0"" encoding=""utf-8"" ?>";
-        var assemblyName = Assembly.GetExecutingAssembly().GetName();
+        AssemblyName assemblyName = Assembly.GetExecutingAssembly().GetName();
 
-        var configBytes = _testableXmlUtilities.AddAssemblyRedirection(
+        byte[] configBytes = _testableXmlUtilities.AddAssemblyRedirection(
             "foo.xml",
             assemblyName,
             "99.99.99.99",
             assemblyName.Version.ToString());
 
         // Assert.
-        var expectedXml = """
+        string expectedXml = $$"""
             <?xml version="1.0" encoding="utf-8"?>
             <configuration>
                 <runtime>
                     <assemblyBinding xmlns="urn:schemas-microsoft-com:asm.v1">
                         <dependentAssembly>
                             <assemblyIdentity name="MSTestAdapter.PlatformServices.UnitTests" publicKeyToken="b03f5f7f11d50a3a" culture="neutral" />
-                            <bindingRedirect oldVersion="99.99.99.99" newVersion="14.0.0.0" />
+                            <bindingRedirect oldVersion="99.99.99.99" newVersion="{{assemblyName.Version}}" />
                         </dependentAssembly>
                     </assemblyBinding>
                 </runtime>
@@ -43,7 +42,7 @@ public class XmlUtilitiesTests : TestContainer
             """;
         var doc = new XmlDocument();
         doc.LoadXml(expectedXml);
-        byte[] expectedConfigBytes = null;
+        byte[] expectedConfigBytes;
 
         using (var ms = new MemoryStream())
         {
@@ -51,7 +50,7 @@ public class XmlUtilitiesTests : TestContainer
             expectedConfigBytes = ms.ToArray();
         }
 
-        Verify(expectedConfigBytes.SequenceEqual(configBytes));
+        configBytes.SequenceEqual(expectedConfigBytes).Should().BeTrue();
     }
 
     public void AddAssemblyRedirectionShouldAddRedirectionToAnEmptyConfig()
@@ -59,23 +58,23 @@ public class XmlUtilitiesTests : TestContainer
         _testableXmlUtilities.ConfigXml = @"<?xml version=""1.0"" encoding=""utf-8"" ?>
 <configuration>
 </configuration>";
-        var assemblyName = Assembly.GetExecutingAssembly().GetName();
+        AssemblyName assemblyName = Assembly.GetExecutingAssembly().GetName();
 
-        var configBytes = _testableXmlUtilities.AddAssemblyRedirection(
+        byte[] configBytes = _testableXmlUtilities.AddAssemblyRedirection(
             "foo.xml",
             assemblyName,
             "99.99.99.99",
             assemblyName.Version.ToString());
 
         // Assert.
-        var expectedXml = """
+        string expectedXml = $$"""
             <?xml version="1.0" encoding="utf-8"?>
             <configuration>
                 <runtime>
                     <assemblyBinding xmlns="urn:schemas-microsoft-com:asm.v1">
                         <dependentAssembly>
                             <assemblyIdentity name="MSTestAdapter.PlatformServices.UnitTests" publicKeyToken="b03f5f7f11d50a3a" culture="neutral" />
-                            <bindingRedirect oldVersion="99.99.99.99" newVersion="14.0.0.0" />
+                            <bindingRedirect oldVersion="99.99.99.99" newVersion="{{assemblyName.Version}}" />
                         </dependentAssembly>
                     </assemblyBinding>
                 </runtime>
@@ -83,7 +82,7 @@ public class XmlUtilitiesTests : TestContainer
             """;
         var doc = new XmlDocument();
         doc.LoadXml(expectedXml);
-        byte[] expectedConfigBytes = null;
+        byte[] expectedConfigBytes;
 
         using (var ms = new MemoryStream())
         {
@@ -91,7 +90,7 @@ public class XmlUtilitiesTests : TestContainer
             expectedConfigBytes = ms.ToArray();
         }
 
-        Verify(expectedConfigBytes.SequenceEqual(configBytes));
+        configBytes.SequenceEqual(expectedConfigBytes).Should().BeTrue();
     }
 
     public void AddAssemblyRedirectionShouldAddRedirectionToAConfigWithARuntimeSectionOnly()
@@ -101,23 +100,23 @@ public class XmlUtilitiesTests : TestContainer
 <runtime>
 </runtime>
 </configuration>";
-        var assemblyName = Assembly.GetExecutingAssembly().GetName();
+        AssemblyName assemblyName = Assembly.GetExecutingAssembly().GetName();
 
-        var configBytes = _testableXmlUtilities.AddAssemblyRedirection(
+        byte[] configBytes = _testableXmlUtilities.AddAssemblyRedirection(
             "foo.xml",
             assemblyName,
             "99.99.99.99",
             assemblyName.Version.ToString());
 
         // Assert.
-        var expectedXml = """
+        string expectedXml = $$"""
             <?xml version="1.0" encoding="utf-8"?>
             <configuration>
                 <runtime>
                     <assemblyBinding xmlns="urn:schemas-microsoft-com:asm.v1">
                         <dependentAssembly>
                             <assemblyIdentity name="MSTestAdapter.PlatformServices.UnitTests" publicKeyToken="b03f5f7f11d50a3a" culture="neutral" />
-                            <bindingRedirect oldVersion="99.99.99.99" newVersion="14.0.0.0" />
+                            <bindingRedirect oldVersion="99.99.99.99" newVersion="{{assemblyName.Version}}" />
                         </dependentAssembly>
                     </assemblyBinding>
                 </runtime>
@@ -127,7 +126,7 @@ public class XmlUtilitiesTests : TestContainer
 #pragma warning disable CA3075 // Insecure DTD processing in XML
         doc.LoadXml(expectedXml);
 #pragma warning restore CA3075 // Insecure DTD processing in XML
-        byte[] expectedConfigBytes = null;
+        byte[] expectedConfigBytes;
 
         using (var ms = new MemoryStream())
         {
@@ -135,7 +134,7 @@ public class XmlUtilitiesTests : TestContainer
             expectedConfigBytes = ms.ToArray();
         }
 
-        Verify(expectedConfigBytes.SequenceEqual(configBytes));
+        configBytes.SequenceEqual(expectedConfigBytes).Should().BeTrue();
     }
 
     public void AddAssemblyRedirectionShouldAddRedirectionToAConfigWithRedirections()
@@ -153,16 +152,16 @@ public class XmlUtilitiesTests : TestContainer
                 </runtime>
             </configuration>
             """;
-        var assemblyName = Assembly.GetExecutingAssembly().GetName();
+        AssemblyName assemblyName = Assembly.GetExecutingAssembly().GetName();
 
-        var configBytes = _testableXmlUtilities.AddAssemblyRedirection(
+        byte[] configBytes = _testableXmlUtilities.AddAssemblyRedirection(
             "foo.xml",
             assemblyName,
             "99.99.99.99",
             assemblyName.Version.ToString());
 
         // Assert.
-        var expectedXml = """
+        string expectedXml = $$"""
             <?xml version="1.0" encoding="utf-8"?>
             <configuration>
                 <runtime>
@@ -173,7 +172,7 @@ public class XmlUtilitiesTests : TestContainer
                         </dependentAssembly>
                         <dependentAssembly>
                             <assemblyIdentity name="MSTestAdapter.PlatformServices.UnitTests" publicKeyToken="b03f5f7f11d50a3a" culture="neutral" />
-                            <bindingRedirect oldVersion="99.99.99.99" newVersion="14.0.0.0" />
+                            <bindingRedirect oldVersion="99.99.99.99" newVersion="{{assemblyName.Version}}" />
                         </dependentAssembly>
                     </assemblyBinding>
                 </runtime>
@@ -181,7 +180,7 @@ public class XmlUtilitiesTests : TestContainer
             """;
         var doc = new XmlDocument();
         doc.LoadXml(expectedXml);
-        byte[] expectedConfigBytes = null;
+        byte[] expectedConfigBytes;
 
         using (var ms = new MemoryStream())
         {
@@ -189,7 +188,7 @@ public class XmlUtilitiesTests : TestContainer
             expectedConfigBytes = ms.ToArray();
         }
 
-        Verify(expectedConfigBytes.SequenceEqual(configBytes));
+        configBytes.SequenceEqual(expectedConfigBytes).Should().BeTrue();
     }
 }
 #endif

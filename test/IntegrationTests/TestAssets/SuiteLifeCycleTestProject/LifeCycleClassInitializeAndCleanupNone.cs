@@ -1,8 +1,5 @@
-// Copyright (c) Microsoft Corporation. All rights reserved.
+﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
-
-using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
 
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -17,13 +14,11 @@ public class LifeCycleClassInitializeAndCleanupNone
     : IDisposable
 #endif
 {
-    private static TestContext s_testContext;
+    public TestContext TestContext { get; set; } = null!;
 
-    public TestContext TestContext { get; set; }
-
-    public LifeCycleClassInitializeAndCleanupNone()
+    public LifeCycleClassInitializeAndCleanupNone(TestContext testContext)
     {
-        s_testContext.WriteLine("LifeCycleClassInitializeAndCleanupNone.ctor was called");
+        testContext.WriteLine("LifeCycleClassInitializeAndCleanupNone.ctor was called");
         Console.WriteLine("Console: LifeCycleClassInitializeAndCleanupNone.ctor was called");
         Trace.WriteLine("Trace: LifeCycleClassInitializeAndCleanupNone.ctor was called");
         Debug.WriteLine("Debug: LifeCycleClassInitializeAndCleanupNone.ctor was called");
@@ -32,8 +27,7 @@ public class LifeCycleClassInitializeAndCleanupNone
     [ClassInitialize(InheritanceBehavior.None)]
     public static void ClassInitialize(TestContext testContext)
     {
-        s_testContext = testContext;
-        s_testContext.WriteLine("LifeCycleClassInitializeAndCleanupNone.ClassInitialize was called");
+        testContext.WriteLine("LifeCycleClassInitializeAndCleanupNone.ClassInitialize was called");
         Console.WriteLine("Console: LifeCycleClassInitializeAndCleanupNone.ClassInitialize was called");
         Trace.WriteLine("Trace: LifeCycleClassInitializeAndCleanupNone.ClassInitialize was called");
         Debug.WriteLine("Debug: LifeCycleClassInitializeAndCleanupNone.ClassInitialize was called");
@@ -86,9 +80,9 @@ public class LifeCycleClassInitializeAndCleanupNone
 #endif
 
     [ClassCleanup(InheritanceBehavior.None)]
-    public static void ClassCleanup()
+    public static void ClassCleanup(TestContext testContext)
     {
-        s_testContext.WriteLine("LifeCycleClassInitializeAndCleanupNone.ClassCleanup was called");
+        testContext.WriteLine("LifeCycleClassInitializeAndCleanupNone.ClassCleanup was called");
         Console.WriteLine("Console: LifeCycleClassInitializeAndCleanupNone.ClassCleanup was called");
         Trace.WriteLine("Trace: LifeCycleClassInitializeAndCleanupNone.ClassCleanup was called");
         Debug.WriteLine("Debug: LifeCycleClassInitializeAndCleanupNone.ClassCleanup was called");

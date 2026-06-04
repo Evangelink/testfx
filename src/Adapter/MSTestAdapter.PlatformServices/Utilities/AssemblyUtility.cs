@@ -1,15 +1,11 @@
-// Copyright (c) Microsoft Corporation. All rights reserved.
+﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 #if !WINDOWS_UWP
 
 #if NETFRAMEWORK
-using System.Diagnostics;
-using System.Globalization;
-using System.Reflection;
-
+using Microsoft.VisualStudio.TestPlatform.MSTest.TestAdapter;
 using Microsoft.VisualStudio.TestPlatform.MSTestAdapter.PlatformServices.Deployment;
-using Microsoft.VisualStudio.TestPlatform.ObjectModel;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 #endif
 
@@ -18,34 +14,34 @@ namespace Microsoft.VisualStudio.TestPlatform.MSTestAdapter.PlatformServices.Uti
 /// <summary>
 /// Utility for assembly specific functionality.
 /// </summary>
+[SuppressMessage("Performance", "CA1852: Seal internal types", Justification = "Overrides required for testability")]
 internal class AssemblyUtility
 #if NETFRAMEWORK
     : IAssemblyUtility
 #endif
 {
-#if NETFRAMEWORK
-    private static Dictionary<string, object?>? s_cultures;
-#endif
     private readonly string[] _assemblyExtensions = [".dll", ".exe"];
 
 #if NETFRAMEWORK
     /// <summary>
-    /// Gets all supported culture names in Keys. The Values are always null.
+    /// Gets all supported culture names in Keys.
     /// </summary>
-    private static Dictionary<string, object?> Cultures
+    [field: AllowNull]
+    [field: MaybeNull]
+    private static HashSet<string> Cultures
     {
         get
         {
-            if (s_cultures == null)
+            if (field == null)
             {
-                s_cultures = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
-                foreach (var info in CultureInfo.GetCultures(CultureTypes.AllCultures))
+                field = [with(StringComparer.OrdinalIgnoreCase)];
+                foreach (CultureInfo? info in CultureInfo.GetCultures(CultureTypes.AllCultures))
                 {
-                    s_cultures.Add(info.Name, null);
+                    field.Add(info.Name);
                 }
             }
 
-            return s_cultures;
+            return field;
         }
     }
 
@@ -54,20 +50,14 @@ internal class AssemblyUtility
     /// </summary>
     /// <param name="assemblyPath">The path of the file that contains the manifest of the assembly.</param>
     /// <returns>The loaded assembly.</returns>
-    public Assembly ReflectionOnlyLoadFrom(string assemblyPath)
-    {
-        return Assembly.ReflectionOnlyLoadFrom(assemblyPath);
-    }
+    public Assembly ReflectionOnlyLoadFrom(string assemblyPath) => Assembly.ReflectionOnlyLoadFrom(assemblyPath);
 
     /// <summary>
     /// Loads an assembly into the reflection-only context, given its display name.
     /// </summary>
     /// <param name="assemblyString">The display name of the assembly, as returned by the System.Reflection.AssemblyName.FullName property.</param>
     /// <returns>The loaded assembly.</returns>
-    public Assembly ReflectionOnlyLoad(string assemblyString)
-    {
-        return Assembly.ReflectionOnlyLoad(assemblyString);
-    }
+    public Assembly ReflectionOnlyLoad(string assemblyString) => Assembly.ReflectionOnlyLoad(assemblyString);
 #endif
 
     /// <summary>
@@ -78,17 +68,7 @@ internal class AssemblyUtility
     /// <remarks> Path.GetExtension() returns extension with leading dot. </remarks>
     /// <returns> True if this is an assembly extension. </returns>
     internal bool IsAssemblyExtension(string extensionWithLeadingDot)
-    {
-        foreach (var realExtension in _assemblyExtensions)
-        {
-            if (string.Equals(extensionWithLeadingDot, realExtension, StringComparison.OrdinalIgnoreCase))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
+        => _assemblyExtensions.Contains(extensionWithLeadingDot, StringComparer.OrdinalIgnoreCase);
 
 #if NETFRAMEWORK
     /// <summary>
@@ -131,10 +111,11 @@ internal class AssemblyUtility
     {
         if (!IsAssemblyExtension(Path.GetExtension(assemblyPath)) || !IsAssembly(assemblyPath))
         {
-            EqtTrace.ErrorIf(
-                    EqtTrace.IsErrorEnabled,
-                    "AssemblyUtilities.GetSatelliteAssemblies: the specified file '{0}' is not managed assembly.",
-                    assemblyPath);
+            if (PlatformServiceProvider.Instance.AdapterTraceLogger.IsErrorEnabled)
+            {
+                PlatformServiceProvider.Instance.AdapterTraceLogger.Error("AssemblyUtilities.GetSatelliteAssemblies: the specified file '{0}' is not managed assembly.", assemblyPath);
+            }
+
             Debug.Fail("AssemblyUtilities.GetSatelliteAssemblies: the file '" + assemblyPath + "' is not an assembly.");
 
             // If e.g. this is unmanaged dll, we don't care about the satellites.
@@ -142,13 +123,14 @@ internal class AssemblyUtility
         }
 
         assemblyPath = Path.GetFullPath(assemblyPath);
-        var assemblyDir = Path.GetDirectoryName(assemblyPath);
+        string assemblyFileName = Path.GetFileName(assemblyPath);
+        string assemblyDir = Path.GetDirectoryName(assemblyPath);
         var satellites = new List<string>();
 
         // Directory.Exists for 266 dirs takes 9ms while Path.GetDirectories can take up to 80ms on 10k dirs.
-        foreach (string dir in Cultures.Keys)
+        foreach (string dir in Cultures)
         {
-            var dirPath = Path.Combine(assemblyDir, dir);
+            string dirPath = Path.Combine(assemblyDir, dir);
             if (!Directory.Exists(dirPath))
             {
                 continue;
@@ -157,11 +139,11 @@ internal class AssemblyUtility
             // Check if the satellite exists in this dir.
             // We check filenames like: MyAssembly.dll -> MyAssembly.resources.dll.
             // Surprisingly, but both DLL and EXE are found by resource manager.
-            foreach (var extension in _assemblyExtensions)
+            foreach (string extension in _assemblyExtensions)
             {
                 // extension contains leading dot.
-                string satellite = Path.ChangeExtension(Path.GetFileName(assemblyPath), "resources" + extension);
-                string satellitePath = Path.Combine(assemblyDir, Path.Combine(dir, satellite));
+                string satellite = Path.ChangeExtension(assemblyFileName, "resources" + extension);
+                string satellitePath = Path.Combine(assemblyDir, dir, satellite);
 
                 // We don't use Assembly.LoadFrom/Assembly.GetSatelliteAssemblies because this is rather slow
                 // (1620ms for 266 cultures when directories do not exist).
@@ -170,10 +152,11 @@ internal class AssemblyUtility
                     // If the satellite found is not a managed assembly we do not report it as a reference.
                     if (!IsAssembly(satellitePath))
                     {
-                        EqtTrace.ErrorIf(
-                            EqtTrace.IsErrorEnabled,
-                            "AssemblyUtilities.GetSatelliteAssemblies: found assembly '{0}' installed as satellite but it's not managed assembly.",
-                            satellitePath);
+                        if (PlatformServiceProvider.Instance.AdapterTraceLogger.IsErrorEnabled)
+                        {
+                            PlatformServiceProvider.Instance.AdapterTraceLogger.Error("AssemblyUtilities.GetSatelliteAssemblies: found assembly '{0}' installed as satellite but it's not managed assembly.", satellitePath);
+                        }
+
                         continue;
                     }
 
@@ -197,17 +180,23 @@ internal class AssemblyUtility
     {
         DebugEx.Assert(!StringEx.IsNullOrEmpty(assemblyPath), "assemblyPath");
 
-        EqtTrace.InfoIf(EqtTrace.IsInfoEnabled, "AssemblyDependencyFinder.GetDependentAssemblies: start.");
+        if (PlatformServiceProvider.Instance.AdapterTraceLogger.IsInfoEnabled)
+        {
+            PlatformServiceProvider.Instance.AdapterTraceLogger.Info("AssemblyDependencyFinder.GetDependentAssemblies: start.");
+        }
 
         AppDomainSetup setupInfo = new();
-        var dllDirectory = Path.GetDirectoryName(Path.GetFullPath(assemblyPath));
+        string dllDirectory = Path.GetDirectoryName(Path.GetFullPath(assemblyPath));
         setupInfo.ApplicationBase = dllDirectory;
 
         DebugEx.Assert(StringEx.IsNullOrEmpty(configFile) || File.Exists(configFile), $"Config file is specified but does not exist: {configFile}");
 
         AppDomainUtilities.SetConfigurationFile(setupInfo, configFile);
 
-        EqtTrace.InfoIf(EqtTrace.IsInfoEnabled, "AssemblyDependencyFinder.GetDependentAssemblies: Using config file: '{0}'.", setupInfo.ConfigurationFile);
+        if (PlatformServiceProvider.Instance.AdapterTraceLogger.IsInfoEnabled)
+        {
+            PlatformServiceProvider.Instance.AdapterTraceLogger.Info("AssemblyDependencyFinder.GetDependentAssemblies: Using config file: '{0}'.", setupInfo.ConfigurationFile);
+        }
 
         setupInfo.LoaderOptimization = LoaderOptimization.MultiDomainHost;
 
@@ -226,32 +215,35 @@ internal class AssemblyUtility
             _ = string.Format(CultureInfo.InvariantCulture, Resource.CannotFindFile, string.Empty);
 
             appDomain = AppDomain.CreateDomain("Dependency finder domain", null, setupInfo);
-            if (EqtTrace.IsInfoEnabled)
+            if (PlatformServiceProvider.Instance.AdapterTraceLogger.IsInfoEnabled)
             {
-                EqtTrace.Info("AssemblyDependencyFinder.GetDependentAssemblies: Created AppDomain.");
+                PlatformServiceProvider.Instance.AdapterTraceLogger.Info("AssemblyDependencyFinder.GetDependentAssemblies: Created AppDomain.");
             }
 
-            var assemblyResolverType = typeof(AssemblyResolver);
+            Type assemblyResolverType = typeof(AssemblyResolver);
 
-            EqtTrace.SetupRemoteEqtTraceListeners(appDomain);
+            PlatformServiceProvider.Instance.AdapterTraceLogger.SetupRemoteEqtTraceListeners(appDomain);
 
             // This has to be LoadFrom, otherwise we will have to use AssemblyResolver to find self.
-            using AssemblyResolver resolver =
+            using var resolver =
                     (AssemblyResolver)AppDomainUtilities.CreateInstance(
                                                 appDomain,
                                                 assemblyResolverType,
-                                                new object[] { GetResolutionPaths() });
+                                                [GetResolutionPaths()]);
 
             // This has to be Load, otherwise Serialization of argument types will not work correctly.
-            AssemblyLoadWorker worker =
+            var worker =
                 (AssemblyLoadWorker)AppDomainUtilities.CreateInstance(appDomain, typeof(AssemblyLoadWorker), null);
 
-            EqtTrace.InfoIf(EqtTrace.IsInfoEnabled, "AssemblyDependencyFinder.GetDependentAssemblies: loaded the worker.");
+            if (PlatformServiceProvider.Instance.AdapterTraceLogger.IsInfoEnabled)
+            {
+                PlatformServiceProvider.Instance.AdapterTraceLogger.Info("AssemblyDependencyFinder.GetDependentAssemblies: loaded the worker.");
+            }
 
-            var allDependencies = worker.GetFullPathToDependentAssemblies(assemblyPath, out warnings);
+            IReadOnlyCollection<string> allDependencies = worker.GetFullPathToDependentAssemblies(assemblyPath, out warnings);
             var dependenciesFromDllDirectory = new List<string>();
-            var dllDirectoryUppercase = dllDirectory.ToUpperInvariant();
-            foreach (var dependency in allDependencies)
+            string dllDirectoryUppercase = dllDirectory.ToUpperInvariant();
+            foreach (string dependency in allDependencies)
             {
 #pragma warning disable CA1862 // Use the 'StringComparison' method overloads to perform case-insensitive string comparisons
                 if (dependency.ToUpperInvariant().Contains(dllDirectoryUppercase))
@@ -267,9 +259,17 @@ internal class AssemblyUtility
         {
             if (appDomain != null)
             {
-                EqtTrace.InfoIf(EqtTrace.IsInfoEnabled, "AssemblyDependencyFinder.GetDependentAssemblies: unloading AppDomain...");
+                if (PlatformServiceProvider.Instance.AdapterTraceLogger.IsInfoEnabled)
+                {
+                    PlatformServiceProvider.Instance.AdapterTraceLogger.Info("AssemblyDependencyFinder.GetDependentAssemblies: unloading AppDomain...");
+                }
+
                 AppDomain.Unload(appDomain);
-                EqtTrace.InfoIf(EqtTrace.IsInfoEnabled, "AssemblyDependencyFinder.GetDependentAssemblies: unloading AppDomain succeeded.");
+
+                if (PlatformServiceProvider.Instance.AdapterTraceLogger.IsInfoEnabled)
+                {
+                    PlatformServiceProvider.Instance.AdapterTraceLogger.Info("AssemblyDependencyFinder.GetDependentAssemblies: unloading AppDomain succeeded.");
+                }
             }
         }
     }
@@ -280,24 +280,15 @@ internal class AssemblyUtility
     /// <returns> The <see cref="IList{T}"/> of resolution paths. </returns>
     internal static IList<string> GetResolutionPaths()
     {
-        // Use dictionary to ensure we get a list of unique paths, but keep a list as the
-        // dictionary does not guarantee order.
-        Dictionary<string, object?> resolutionPathsDictionary = new(StringComparer.OrdinalIgnoreCase);
-        List<string> resolutionPaths = [];
+        string baseDirectory = AppDomain.CurrentDomain.BaseDirectory;
 
-        // Add the path of the currently executing assembly (use Uri(CodeBase).LocalPath as Location can be on shadow dir).
-        string currentlyExecutingAssembly = Path.GetDirectoryName(Path.GetFullPath(new Uri(Assembly.GetExecutingAssembly().CodeBase).LocalPath));
-        resolutionPaths.Add(currentlyExecutingAssembly);
-        resolutionPathsDictionary[currentlyExecutingAssembly] = null;
+        // Use the path of the currently executing assembly (use Uri(CodeBase).LocalPath as Location can be on shadow dir).
+        string executingAssembly = Path.GetDirectoryName(Path.GetFullPath(new Uri(Assembly.GetExecutingAssembly().CodeBase).LocalPath))!;
 
         // Add the application base for this domain.
-        if (!resolutionPathsDictionary.ContainsKey(AppDomain.CurrentDomain.BaseDirectory))
-        {
-            resolutionPaths.Add(AppDomain.CurrentDomain.BaseDirectory);
-            resolutionPathsDictionary[AppDomain.CurrentDomain.BaseDirectory] = null;
-        }
-
-        return resolutionPaths;
+        return string.Equals(executingAssembly, baseDirectory, StringComparison.OrdinalIgnoreCase) ?
+            [executingAssembly] :
+            [executingAssembly, baseDirectory];
     }
 #endif
 }

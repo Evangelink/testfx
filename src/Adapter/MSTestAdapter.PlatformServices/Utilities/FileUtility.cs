@@ -1,24 +1,20 @@
-// Copyright (c) Microsoft Corporation. All rights reserved.
+﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 #if !WINDOWS_UWP
 
-using System.Globalization;
-
+using Microsoft.VisualStudio.TestPlatform.MSTest.TestAdapter;
 using Microsoft.VisualStudio.TestPlatform.MSTestAdapter.PlatformServices.Extensions;
-using Microsoft.VisualStudio.TestPlatform.ObjectModel;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace Microsoft.VisualStudio.TestPlatform.MSTestAdapter.PlatformServices.Utilities;
 
+[SuppressMessage("Performance", "CA1852: Seal internal types", Justification = "Overrides required for mocking")]
 internal class FileUtility
 {
     private readonly AssemblyUtility _assemblyUtility;
 
-    public FileUtility()
-    {
-        _assemblyUtility = new AssemblyUtility();
-    }
+    public FileUtility() => _assemblyUtility = new AssemblyUtility();
 
     public virtual void CreateDirectoryIfNotExists(string directory)
     {
@@ -87,7 +83,7 @@ internal class FileUtility
     /// Returns empty string on error when specified to continue the run on error,
     /// throw on error when specified to abort the run on error.
     /// </returns>
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes", Justification = "Requirement is to handle all kinds of user exceptions and message appropriately.")]
+    [SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes", Justification = "Requirement is to handle all kinds of user exceptions and message appropriately.")]
     public virtual string CopyFileOverwrite(string source, string destination, out string? warning)
     {
         DebugEx.Assert(!StringEx.IsNullOrEmpty(source), "source should not be null.");
@@ -152,7 +148,11 @@ internal class FileUtility
         }
         catch (ArgumentException ex)
         {
-            EqtTrace.WarningIf(EqtTrace.IsWarningEnabled, "Error while trying to locate pdb for deployed assembly '{0}': {1}", destinationFile, ex);
+            if (PlatformServiceProvider.Instance.AdapterTraceLogger.IsWarningEnabled)
+            {
+                PlatformServiceProvider.Instance.AdapterTraceLogger.Warning("Error while trying to locate pdb for deployed assembly '{0}': {1}", destinationFile, ex);
+            }
+
             return null;
         }
 
@@ -171,53 +171,43 @@ internal class FileUtility
         }
         else if (!string.Equals(pdbSource, value, StringComparison.OrdinalIgnoreCase))
         {
-            EqtTrace.WarningIf(
-                EqtTrace.IsWarningEnabled,
-                "Conflict during copying PDBs for line number info: '{0}' and '{1}' are from different origins although they might be the same.",
-                pdbSource,
-                value);
+            if (PlatformServiceProvider.Instance.AdapterTraceLogger.IsWarningEnabled)
+            {
+                PlatformServiceProvider.Instance.AdapterTraceLogger.Warning(
+                    "Conflict during copying PDBs for line number info: '{0}' and '{1}' are from different origins although they might be the same.",
+                    pdbSource,
+                    value);
+            }
         }
 
         return null;
     }
 
-    public virtual List<string> AddFilesFromDirectory(string directoryPath, bool ignoreIOExceptions)
-    {
-        return AddFilesFromDirectory(directoryPath, null, ignoreIOExceptions);
-    }
+    public virtual List<string> AddFilesFromDirectory(string directoryPath, bool ignoreIOExceptions) => AddFilesFromDirectory(directoryPath, null, ignoreIOExceptions);
 
     public virtual List<string> AddFilesFromDirectory(string directoryPath, Func<string, bool>? ignoreDirectory, bool ignoreIOExceptions)
     {
-        var fileContents = new List<string>();
+        var files = new List<string>();
 
         try
         {
-            var files = GetFilesInADirectory(directoryPath);
-            fileContents.AddRange(files);
+            files.AddRange(GetFilesInADirectory(directoryPath));
         }
-        catch (IOException)
+        catch (IOException) when (ignoreIOExceptions)
         {
-            if (!ignoreIOExceptions)
-            {
-                throw;
-            }
         }
 
-        foreach (var subDirectoryPath in GetDirectoriesInADirectory(directoryPath))
+        foreach (string subDirectoryPath in GetDirectoriesInADirectory(directoryPath))
         {
             if (ignoreDirectory != null && ignoreDirectory(subDirectoryPath))
             {
                 continue;
             }
 
-            var subDirectoryContents = AddFilesFromDirectory(subDirectoryPath, ignoreDirectory, true);
-            if (subDirectoryContents?.Count > 0)
-            {
-                fileContents.AddRange(subDirectoryContents);
-            }
+            files.AddRange(AddFilesFromDirectory(subDirectoryPath, ignoreDirectory, true));
         }
 
-        return fileContents;
+        return files;
     }
 
     public static string TryConvertPathToRelative(string path, string rootDir)
@@ -237,10 +227,10 @@ internal class FileUtility
     /// them.
     /// </summary>
     /// <param name="filePath">The root directory to clear.</param>
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes", Justification = "Requirement is to handle all kinds of user exceptions and message appropriately.")]
+    [SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes", Justification = "Requirement is to handle all kinds of user exceptions and message appropriately.")]
     public virtual void DeleteDirectories(string filePath)
     {
-        Validate.IsFalse(StringEx.IsNullOrWhiteSpace(filePath), "Invalid filePath provided");
+        Ensure.NotNullOrWhiteSpace(filePath);
         try
         {
             var root = new DirectoryInfo(filePath);
@@ -248,34 +238,22 @@ internal class FileUtility
         }
         catch (Exception ex)
         {
-            EqtTrace.ErrorIf(EqtTrace.IsErrorEnabled, "DeploymentManager.DeleteDirectories failed for the directory '{0}': {1}", filePath, ex);
+            if (PlatformServiceProvider.Instance.AdapterTraceLogger.IsErrorEnabled)
+            {
+                PlatformServiceProvider.Instance.AdapterTraceLogger.Error("DeploymentManager.DeleteDirectories failed for the directory '{0}': {1}", filePath, ex);
+            }
         }
     }
 
-    public virtual bool DoesDirectoryExist(string deploymentDirectory)
-    {
-        return Directory.Exists(deploymentDirectory);
-    }
+    public virtual bool DoesDirectoryExist(string deploymentDirectory) => Directory.Exists(deploymentDirectory);
 
-    public virtual bool DoesFileExist(string testSource)
-    {
-        return File.Exists(testSource);
-    }
+    public virtual bool DoesFileExist(string testSourceHandler) => File.Exists(testSourceHandler);
 
-    public virtual void SetAttributes(string path, FileAttributes fileAttributes)
-    {
-        File.SetAttributes(path, fileAttributes);
-    }
+    public virtual void SetAttributes(string path, FileAttributes fileAttributes) => File.SetAttributes(path, fileAttributes);
 
-    public virtual string[] GetFilesInADirectory(string directoryPath)
-    {
-        return Directory.GetFiles(directoryPath);
-    }
+    public virtual string[] GetFilesInADirectory(string directoryPath) => Directory.GetFiles(directoryPath);
 
-    public virtual string[] GetDirectoriesInADirectory(string directoryPath)
-    {
-        return Directory.GetDirectories(directoryPath);
-    }
+    public virtual string[] GetDirectoriesInADirectory(string directoryPath) => Directory.GetDirectories(directoryPath);
 
     /// <summary>
     /// Returns either PDB file name from inside compiled binary or null if this cannot be done.
@@ -283,14 +261,14 @@ internal class FileUtility
     /// </summary>
     /// <param name="path">path to symbols file.</param>
     /// <returns>Pdb file name or null if non-existent.</returns>
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes", Justification = "Requirement is to handle all kinds of user exceptions and message appropriately.")]
+    [SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes", Justification = "Requirement is to handle all kinds of user exceptions and message appropriately.")]
     private static string? GetSymbolsFileName(string? path)
     {
         if (StringEx.IsNullOrEmpty(path) || path.IndexOfAny(Path.GetInvalidPathChars()) != -1)
         {
-            if (EqtTrace.IsWarningEnabled)
+            if (PlatformServiceProvider.Instance.AdapterTraceLogger.IsWarningEnabled)
             {
-                EqtTrace.Warning("Path is either null or invalid. Path = '{0}'", path);
+                PlatformServiceProvider.Instance.AdapterTraceLogger.Warning("Path is either null or invalid. Path = '{0}'", path);
             }
 
             return null;
@@ -299,9 +277,9 @@ internal class FileUtility
         string pdbFile = Path.ChangeExtension(path, ".pdb");
         if (File.Exists(pdbFile))
         {
-            if (EqtTrace.IsInfoEnabled)
+            if (PlatformServiceProvider.Instance.AdapterTraceLogger.IsInfoEnabled)
             {
-                EqtTrace.Info("Pdb file found for path '{0}'", path);
+                PlatformServiceProvider.Instance.AdapterTraceLogger.Info("Pdb file found for path '{0}'", path);
             }
 
             return pdbFile;

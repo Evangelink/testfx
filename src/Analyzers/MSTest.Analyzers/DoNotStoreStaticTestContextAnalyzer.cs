@@ -13,6 +13,9 @@ using MSTest.Analyzers.Helpers;
 
 namespace MSTest.Analyzers;
 
+/// <summary>
+/// MSTEST0024: <inheritdoc cref="Resources.DoNotStoreStaticTestContextAnalyzerTitle"/>.
+/// </summary>
 [DiagnosticAnalyzer(LanguageNames.CSharp, LanguageNames.VisualBasic)]
 public sealed class DoNotStoreStaticTestContextAnalyzer : DiagnosticAnalyzer
 {
@@ -25,12 +28,14 @@ public sealed class DoNotStoreStaticTestContextAnalyzer : DiagnosticAnalyzer
         MessageFormat,
         null,
         Category.Usage,
-        DiagnosticSeverity.Info,
+        DiagnosticSeverity.Warning,
         isEnabledByDefault: true);
 
+    /// <inheritdoc />
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; }
         = ImmutableArray.Create(Rule);
 
+    /// <inheritdoc />
     public override void Initialize(AnalysisContext context)
     {
         context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
@@ -38,7 +43,7 @@ public sealed class DoNotStoreStaticTestContextAnalyzer : DiagnosticAnalyzer
 
         context.RegisterCompilationStartAction(context =>
         {
-            if (context.Compilation.TryGetOrCreateTypeByMetadataName(WellKnownTypeNames.MicrosoftVisualStudioTestToolsUnitTestingTestContext, out var testContextSymbol))
+            if (context.Compilation.TryGetOrCreateTypeByMetadataName(WellKnownTypeNames.MicrosoftVisualStudioTestToolsUnitTestingTestContext, out INamedTypeSymbol? testContextSymbol))
             {
                 context.RegisterOperationAction(context => AnalyzeOperation(context, testContextSymbol), OperationKind.SimpleAssignment);
             }
@@ -47,11 +52,9 @@ public sealed class DoNotStoreStaticTestContextAnalyzer : DiagnosticAnalyzer
 
     private static void AnalyzeOperation(OperationAnalysisContext context, INamedTypeSymbol testContextSymbol)
     {
-        ISimpleAssignmentOperation assignmentOperation = (ISimpleAssignmentOperation)context.Operation;
+        var assignmentOperation = (ISimpleAssignmentOperation)context.Operation;
 
-        if (assignmentOperation.Target is IMemberReferenceOperation memberReferenceOperation
-            && memberReferenceOperation.Instance is null
-            && assignmentOperation.Value is IParameterReferenceOperation parameterReferenceOperation
+        if (assignmentOperation is { Target: IMemberReferenceOperation { Instance: null }, Value: IParameterReferenceOperation parameterReferenceOperation }
             && SymbolEqualityComparer.Default.Equals(parameterReferenceOperation.Type, testContextSymbol))
         {
             context.ReportDiagnostic(assignmentOperation.CreateDiagnostic(Rule));

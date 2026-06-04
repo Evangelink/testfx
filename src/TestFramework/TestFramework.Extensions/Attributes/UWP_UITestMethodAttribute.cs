@@ -2,7 +2,6 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 #if WINDOWS_UWP
-using System.Runtime.CompilerServices;
 
 namespace Microsoft.VisualStudio.TestTools.UnitTesting.AppContainer;
 
@@ -12,6 +11,14 @@ namespace Microsoft.VisualStudio.TestTools.UnitTesting.AppContainer;
 public class UITestMethodAttribute : TestMethodAttribute
 {
     /// <summary>
+    /// Initializes a new instance of the <see cref="UITestMethodAttribute"/> class.
+    /// </summary>
+    public UITestMethodAttribute([CallerFilePath] string callerFilePath = "", [CallerLineNumber] int callerLineNumber = -1)
+        : base(callerFilePath, callerLineNumber)
+    {
+    }
+
+    /// <summary>
     /// Executes the test method on the UI Thread.
     /// </summary>
     /// <param name="testMethod">
@@ -20,25 +27,26 @@ public class UITestMethodAttribute : TestMethodAttribute
     /// <returns>
     /// An array of <see cref="TestResult"/> instances.
     /// </returns>
-    /// Throws <exception cref="NotSupportedException"> when run on an async test method.
-    /// </exception>
-    public override TestResult[] Execute(ITestMethod testMethod)
+    public override async Task<TestResult[]> ExecuteAsync(ITestMethod testMethod)
     {
-        var attribute = testMethod.GetAttributes<AsyncStateMachineAttribute>(false);
-        if (attribute.Length > 0)
-        {
-            throw new NotSupportedException(FrameworkMessages.AsyncUITestMethodNotSupported);
-        }
-
-        TestResult? result = null;
-        Windows.ApplicationModel.Core.CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(
+        var tcs = new TaskCompletionSource<TestResult>();
+#pragma warning disable VSTHRD101 // Avoid unsupported async delegates
+        await Windows.ApplicationModel.Core.CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(
             Windows.UI.Core.CoreDispatcherPriority.Normal,
-            () =>
+            async () =>
             {
-                result = testMethod.Invoke(null);
-            }).AsTask().GetAwaiter().GetResult();
+                try
+                {
+                    tcs.SetResult(await testMethod.InvokeAsync(null).ConfigureAwait(false));
+                }
+                catch (Exception ex)
+                {
+                    tcs.SetException(ex);
+                }
+            });
+#pragma warning restore VSTHRD101 // Avoid unsupported async delegates
 
-        return [result!];
+        return [await tcs.Task.ConfigureAwait(false)];
     }
 }
 #endif

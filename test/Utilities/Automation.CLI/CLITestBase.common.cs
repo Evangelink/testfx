@@ -1,15 +1,11 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System.Xml;
-
-using FluentAssertions;
-
-using TestFramework.ForTestingMSTest;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 
 namespace Microsoft.MSTestV2.CLIAutomation;
 
-public partial class CLITestBase : TestContainer
+public abstract partial class CLITestBase
 {
     private const string Configuration =
 #if DEBUG
@@ -18,15 +14,13 @@ public partial class CLITestBase : TestContainer
         "Release";
 #endif
 
-#pragma warning disable IDE0051 // Remove unused private members
-    private const string TestPlatformCLIPackageName = "Microsoft.TestPlatform";
-#pragma warning restore IDE0051 // Remove unused private members
     private const string DefaultTargetFramework = "net462";
+    internal const string TestPlatformCLIPackageName = "Microsoft.TestPlatform";
 
     protected static XmlDocument ReadCPMFile()
     {
-        var cpmFilePath = Path.Combine(GetArtifactsBinFolderPath(), "..", "..", "Directory.Packages.props");
-        using var fileStream = File.OpenRead(cpmFilePath);
+        string cpmFilePath = Path.Combine(GetArtifactsBinFolderPath(), "..", "..", "Directory.Packages.props");
+        using FileStream fileStream = File.OpenRead(cpmFilePath);
 #pragma warning disable CA3075 // Insecure DTD processing in XML
         using var xmlTextReader = new XmlTextReader(fileStream) { Namespaces = false };
 #pragma warning restore CA3075 // Insecure DTD processing in XML
@@ -36,55 +30,44 @@ public partial class CLITestBase : TestContainer
         return versionPropsXml;
     }
 
-    protected static string GetTestPlatformVersion()
-    {
-        var cpmXml = ReadCPMFile();
-        var testSdkVersion = cpmXml.DocumentElement.SelectSingleNode($"PropertyGroup/MicrosoftNETTestSdkVersion");
-
-        return testSdkVersion.InnerText;
-    }
-
     protected static string GetArtifactsBinFolderPath()
     {
-        var assemblyLocation = System.Reflection.Assembly.GetExecutingAssembly().Location;
+        string assemblyLocation = Assembly.GetExecutingAssembly().Location;
 
-        var artifactsBinFolder = Path.GetFullPath(Path.Combine(assemblyLocation, @"..\..\..\.."));
-        Directory.Exists(artifactsBinFolder).Should().BeTrue();
+        string artifactsBinFolder = Path.GetFullPath(Path.Combine(assemblyLocation, @"..\..\..\.."));
+        Assert.IsTrue(Directory.Exists(artifactsBinFolder));
 
         return artifactsBinFolder;
     }
 
     protected static string GetArtifactsTestResultsFolderPath()
     {
-        var assemblyLocation = System.Reflection.Assembly.GetExecutingAssembly().Location;
+        string assemblyLocation = Assembly.GetExecutingAssembly().Location;
 
-        var artifactsFolder = Path.GetFullPath(Path.Combine(assemblyLocation, @"..\..\..\..\.."));
-        Directory.Exists(artifactsFolder).Should().BeTrue();
+        string artifactsFolder = Path.GetFullPath(Path.Combine(assemblyLocation, @"..\..\..\..\.."));
+        Assert.IsTrue(Directory.Exists(artifactsFolder));
 
-        var testResultsFolder = Path.Combine(artifactsFolder, "TestResults", Configuration);
+        string testResultsFolder = Path.Combine(artifactsFolder, "TestResults", Configuration);
         Directory.CreateDirectory(testResultsFolder);
 
         return testResultsFolder;
     }
 
-    protected static string GetAssetFullPath(string assetName, string configuration = null, string targetFramework = null)
+    protected static string GetAssetFullPath(string assetName, string? configuration = null, string? targetFramework = null)
     {
         configuration ??= Configuration;
         targetFramework ??= DefaultTargetFramework;
-        var assetPath = Path.GetFullPath(Path.Combine(GetArtifactsBinFolderPath(), assetName, configuration, targetFramework, assetName + ".dll"));
-        File.Exists(assetPath).Should().BeTrue($"asset '{assetPath}' should exist");
+        string assetPath = Path.GetFullPath(Path.Combine(GetArtifactsBinFolderPath(), assetName, configuration, targetFramework, assetName + ".dll"));
+        Assert.IsTrue(File.Exists(assetPath), $"asset '{assetPath}' should exist");
 
         return assetPath;
     }
 
     /// <summary>
-    /// Gets the RunSettingXml having testadapterpath filled in specified by argument.
-    /// Inserts testAdapterPath in existing runSetting if not present already,
+    /// Gets the RunSettingXml with the TestAdapterPath inserted,
     /// or generates new runSettings with testAdapterPath if runSettings is Empty.
     /// </summary>
-    /// <param name="settingsXml">RunSettings provided for discovery/execution.</param>
-    /// <returns>RunSettingXml as string.</returns>
-    protected static string GetRunSettingXml(string settingsXml)
+    protected static string GetRunSettingsXml(string settingsXml)
     {
         if (string.IsNullOrEmpty(settingsXml))
         {
@@ -92,7 +75,7 @@ public partial class CLITestBase : TestContainer
         }
 
         XmlDocument doc = new();
-        using (var xmlReader = XmlReader.Create(new StringReader(settingsXml), new XmlReaderSettings() { XmlResolver = null, CloseInput = true }))
+        using (var xmlReader = XmlReader.Create(new StringReader(settingsXml), new XmlReaderSettings { XmlResolver = null, CloseInput = true }))
         {
             doc.Load(xmlReader);
         }

@@ -1,10 +1,11 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System.Collections;
-
 namespace Microsoft.Testing.Platform.Extensions.Messages;
 
+/// <summary>
+/// Represents a property bag.
+/// </summary>
 public sealed partial class PropertyBag
 {
     private readonly struct PropertyBagEnumerable(Property? properties, TestNodeStateProperty? testNodeStateProperty) : IEnumerable<IProperty>
@@ -17,7 +18,7 @@ public sealed partial class PropertyBag
         IEnumerator IEnumerable.GetEnumerator() => new PropertyBagEnumerator(_properties, _testNodeStateProperty);
     }
 
-    private struct PropertyBagEnumerator(Property? properties, TestNodeStateProperty? testNodeStateProperty) : IEnumerator<IProperty>
+    internal struct PropertyBagEnumerator(Property? properties, TestNodeStateProperty? testNodeStateProperty) : IEnumerator<IProperty>
     {
         private readonly Property? _properties = properties;
         private readonly TestNodeStateProperty? _testNodeStateProperty = testNodeStateProperty;
@@ -25,10 +26,10 @@ public sealed partial class PropertyBag
         private IProperty? _current;
 
         // https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerator-1.current?view=netframework-4.8#remarks
-        public readonly IProperty Current => _current is null ? throw new InvalidOperationException("Invalid Current state, possible wrong usage.") : _current;
+        public readonly IProperty Current => _current ?? throw new InvalidOperationException("Invalid Current state, possible wrong usage.");
 
         // https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerator-1.current?view=netframework-4.8#remarks
-        readonly object IEnumerator.Current => _current is null ? throw new InvalidOperationException("Invalid Current state, possible wrong usage.") : _current;
+        readonly object IEnumerator.Current => _current ?? throw new InvalidOperationException("Invalid Current state, possible wrong usage.");
 
         public bool MoveNext()
         {
@@ -49,7 +50,7 @@ public sealed partial class PropertyBag
                 }
             }
 
-            if (!object.ReferenceEquals(_testNodeStateProperty, _current) && _testNodeStateProperty is not null)
+            if (!ReferenceEquals(_testNodeStateProperty, _current) && _testNodeStateProperty is not null)
             {
                 _current = _testNodeStateProperty;
                 return true;

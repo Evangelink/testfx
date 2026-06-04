@@ -14,14 +14,22 @@ namespace Microsoft.Testing.Platform.Extensions.TestFramework;
 /// </remarks>
 public sealed class ExecuteRequestContext
 {
-    private readonly SemaphoreSlim _semaphore;
+    private readonly IExecuteRequestCompletionNotifier _executeRequestCompletionNotifier;
 
-    internal ExecuteRequestContext(IRequest request, IMessageBus messageBus, SemaphoreSlim semaphore,
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ExecuteRequestContext"/> class.
+    /// </summary>
+    /// <param name="request">The request.</param>
+    /// <param name="messageBus">The message bus.</param>
+    /// <param name="executeRequestCompletionNotifier">The request completion notifier.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    [Experimental("TPEXP", UrlFormat = "https://aka.ms/testingplatform/diagnostics#{0}")]
+    public ExecuteRequestContext(IRequest request, IMessageBus messageBus, IExecuteRequestCompletionNotifier executeRequestCompletionNotifier,
         CancellationToken cancellationToken)
     {
         Request = request;
         MessageBus = messageBus;
-        _semaphore = semaphore;
+        _executeRequestCompletionNotifier = executeRequestCompletionNotifier;
         CancellationToken = cancellationToken;
     }
 
@@ -44,5 +52,5 @@ public sealed class ExecuteRequestContext
     /// Completes the execution request.
     /// </summary>
     public void Complete()
-        => _semaphore.Release();
+        => _executeRequestCompletionNotifier.Complete();
 }

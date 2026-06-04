@@ -12,6 +12,9 @@ using MSTest.Analyzers.Helpers;
 
 namespace MSTest.Analyzers;
 
+/// <summary>
+/// MSTEST0019: <inheritdoc cref="Resources.PreferTestInitializeOverConstructorTitle"/>.
+/// </summary>
 [DiagnosticAnalyzer(LanguageNames.CSharp, LanguageNames.VisualBasic)]
 public sealed class PreferTestInitializeOverConstructorAnalyzer : DiagnosticAnalyzer
 {
@@ -25,11 +28,14 @@ public sealed class PreferTestInitializeOverConstructorAnalyzer : DiagnosticAnal
         null,
         Category.Design,
         DiagnosticSeverity.Info,
-        isEnabledByDefault: false);
+        isEnabledByDefault: false,
+        disableInAllMode: true);
 
+    /// <inheritdoc />
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; }
         = ImmutableArray.Create(Rule);
 
+    /// <inheritdoc />
     public override void Initialize(AnalysisContext context)
     {
         context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
@@ -37,7 +43,7 @@ public sealed class PreferTestInitializeOverConstructorAnalyzer : DiagnosticAnal
 
         context.RegisterCompilationStartAction(context =>
         {
-            if (context.Compilation.TryGetOrCreateTypeByMetadataName(WellKnownTypeNames.MicrosoftVisualStudioTestToolsUnitTestingTestClassAttribute, out var testClassAttributeSymbol))
+            if (context.Compilation.TryGetOrCreateTypeByMetadataName(WellKnownTypeNames.MicrosoftVisualStudioTestToolsUnitTestingTestClassAttribute, out INamedTypeSymbol? testClassAttributeSymbol))
             {
                 context.RegisterSymbolAction(context => AnalyzeSymbol(context, testClassAttributeSymbol), SymbolKind.NamedType);
             }
@@ -46,7 +52,7 @@ public sealed class PreferTestInitializeOverConstructorAnalyzer : DiagnosticAnal
 
     private static void AnalyzeSymbol(SymbolAnalysisContext context, INamedTypeSymbol testClassAttributeSymbol)
     {
-        INamedTypeSymbol namedTypeSymbol = (INamedTypeSymbol)context.Symbol;
+        var namedTypeSymbol = (INamedTypeSymbol)context.Symbol;
 
         if (namedTypeSymbol.GetAttributes().Any(attr => attr.AttributeClass.Inherits(testClassAttributeSymbol))
             && namedTypeSymbol.InstanceConstructors.FirstOrDefault(x => !x.IsImplicitlyDeclared && x.Parameters.Length == 0) is { } parameterlessExplicitCtor)

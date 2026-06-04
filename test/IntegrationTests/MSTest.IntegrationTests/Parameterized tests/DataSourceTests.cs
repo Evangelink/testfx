@@ -5,21 +5,23 @@ using Microsoft.MSTestV2.CLIAutomation;
 
 namespace MSTest.IntegrationTests;
 
+[TestClass]
 public class DataSourceTests : CLITestBase
 {
     private const string TestAssetName = "DataSourceTestProject";
 
-    // TODO @haplois | @evangelink: This test fails under CI - will be fixed in a future PR (Marked as private to ignore the test)
 #pragma warning disable IDE0051 // Remove unused private members
-    private void ExecuteCsvTestDataSourceTests()
+    [TestMethod]
+    [Ignore("This test is ignored because it fails under CI. It will be fixed in a future PR.")]
+    public async Task ExecuteCsvTestDataSourceTests()
 #pragma warning restore IDE0051 // Remove unused private members
     {
         // Arrange
-        var assemblyPath = GetAssetFullPath(TestAssetName);
+        string assemblyPath = GetAssetFullPath(TestAssetName);
 
         // Act
-        var testCases = DiscoverTests(assemblyPath, "CsvTestMethod");
-        var testResults = RunTests(testCases);
+        System.Collections.Immutable.ImmutableArray<Microsoft.VisualStudio.TestPlatform.ObjectModel.TestCase> testCases = DiscoverTests(assemblyPath, "CsvTestMethod");
+        System.Collections.Immutable.ImmutableArray<Microsoft.VisualStudio.TestPlatform.ObjectModel.TestResult> testResults = await RunTestsAsync(testCases);
 
         // Assert
         VerifyE2E.ContainsTestsPassed(

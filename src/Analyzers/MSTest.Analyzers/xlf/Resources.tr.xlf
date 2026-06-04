@@ -3,62 +3,43 @@
   <file datatype="xml" source-language="en" target-language="tr" original="../Resources.resx">
     <body>
       <trans-unit id="AssemblyCleanupShouldBeValidDescription">
-        <source>Methods marked with [AssemblyCleanup] should follow the following layout to be valid:
-- it should be 'public' 
-- it should be 'static'
-- it should not be generic
-- it should not take any parameter
-- return type should be 'void', 'Task' or 'ValueTask'
-- it should not be 'async void'
-- it should not be a special method (finalizer, operator...).</source>
-        <target state="translated">[AssemblyCleanup] ile işaretlenen yöntemlerin geçerli olması için aşağıdaki düzeni takip etmesi gerekir:
-- 'public' olmalıdır 
-- 'static' olmalıdır
+        <source>Methods marked with '[AssemblyCleanup]' should follow the following layout to be valid:
+-it can't be declared on a generic class
+-it should be 'public'
+-it should be 'static'
+-it should not be 'async void'
+-it should not be a special method (finalizer, operator...).
+-it should not be generic
+-it should either not take any parameter, or take a single parameter of type 'TestContext'
+-return type should be 'void', 'Task' or 'ValueTask'
+
+The type declaring these methods should also respect the following rules:
+-The type should be a class
+-The class should be 'public' or 'internal' (if the test project is using the '[DiscoverInternals]' attribute)
+-The class shouldn't be 'static'
+-The class should be marked with '[TestClass]' (or a derived attribute)
+-the class should not be generic.</source>
+        <target state="translated">'[AssemblyCleanup]' ile işaretlenen yöntemlerin geçerli olması için aşağıdaki düzeni takip etmesi gerekir:
+-genel bir sınıfta tanımlanamaz
+-'public' olmalıdır
+-'static' olmalıdır
+-'async void' olmamalıdır
+-özel bir metot (sonlandırıcı, işleç...) olmamalıdır.
 - genel olmamalıdır
-- herhangi bir parametre almamalıdır
+-herhangi bir parametre almamalı veya 'TestContext' türünde tek bir parametre almalıdır
 - dönüş türü 'void', 'Task' veya 'ValueTask' olmalıdır
-- 'async void' olmamalıdır
-- özel bir yöntem (sonlandırıcı, işleç...) olmamalıdır.</target>
+
+Bu metotları bildiren türün ayrıca aşağıdaki kurallara uyması gerekir:
+-Tür bir sınıf olmalıdır
+-Sınıf 'public' veya 'internal' olmalıdır (test projesi '[DiscoverInternals]' niteliğini kullanıyorsa)
+-Sınıf 'static' olmamalıdır
+-Sınıf '[TestClass]' (veya türetilmiş bir öznitelik) ile işaretlenmelidir
+-sınıf genel olmamalıdır.</target>
         <note />
       </trans-unit>
-      <trans-unit id="AssemblyCleanupShouldBeValidMessageFormat_NoParameters">
-        <source>AssemblyCleanup method '{0}' should not take any parameter</source>
-        <target state="translated">'{0}' AssemblyCleanup yöntemi herhangi bir parametre almamalıdır</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="AssemblyCleanupShouldBeValidMessageFormat_NotAGenericClass">
-        <source>AssemblyCleanup method '{0}' can't be declared on a generic class</source>
-        <target state="translated">'{0}' AssemblyCleanup metodu genel bir sınıfta bildirilemez</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="AssemblyCleanupShouldBeValidMessageFormat_NotAsyncVoid">
-        <source>AssemblyCleanup method '{0}' should return 'void', 'Task' or 'ValueTask'</source>
-        <target state="translated">'{0}' AssemblyCleanup yöntemi 'void', 'Task' veya 'ValueTask' döndürmelidir</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="AssemblyCleanupShouldBeValidMessageFormat_NotGeneric">
-        <source>AssemblyCleanup method '{0}' should not be generic</source>
-        <target state="translated">'{0}' AssemblyCleanup yöntemi genel olmamalıdır</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="AssemblyCleanupShouldBeValidMessageFormat_Ordinary">
-        <source>AssemblyCleanup method '{0}' should be an 'ordinary' method</source>
-        <target state="translated">'{0}' AssemblyCleanup yöntemi 'ordinary' bir yöntem olmalıdır</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="AssemblyCleanupShouldBeValidMessageFormat_Public">
-        <source>AssemblyCleanup method '{0}' should be 'public'</source>
-        <target state="translated">AssemblyCleanup yöntemi '{0}' 'public' olmalıdır</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="AssemblyCleanupShouldBeValidMessageFormat_ReturnType">
-        <source>AssemblyCleanup method '{0}' should return 'void', 'Task' or 'ValueTask'</source>
-        <target state="translated">'{0}' AssemblyCleanup yöntemi 'void', 'Task' veya 'ValueTask' döndürmelidir</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="AssemblyCleanupShouldBeValidMessageFormat_Static">
-        <source>AssemblyCleanup method '{0}' should be 'static'</source>
-        <target state="translated">AssemblyCleanup yöntemi '{0}' 'static' olmalıdır</target>
+      <trans-unit id="AssemblyCleanupShouldBeValidMessageFormat">
+        <source>AssemblyCleanup method '{0}' signature is invalid</source>
+        <target state="translated">AssemblyCleanup yöntemi '{0}' imzası geçersiz</target>
         <note />
       </trans-unit>
       <trans-unit id="AssemblyCleanupShouldBeValidTitle">
@@ -67,67 +48,58 @@
         <note />
       </trans-unit>
       <trans-unit id="AssemblyInitializeShouldBeValidDescription">
-        <source>Methods marked with [AssemblyInitialize] should follow the following layout to be valid:
-- it should be 'public' 
-- it should be 'static'
-- it should not be generic
-- it should take one parameter of type 'TestContext'
-- return type should be 'void', 'Task' or 'ValueTask'
-- it should not be 'async void'
-- it should not be a special method (finalizer, operator...).</source>
-        <target state="translated">[AssemblyInitialize] ile işaretlenen yöntemlerin geçerli olması için aşağıdaki düzeni takip etmesi gerekir:
-- 'public' olmalıdır 
-- 'static' olmalıdır
+        <source>Methods marked with '[AssemblyInitialize]' should follow the following layout to be valid:
+-it can't be declared on a generic class
+-it should be 'public'
+-it should be 'static'
+-it should not be 'async void'
+-it should not be a special method (finalizer, operator...).
+-it should not be generic
+-it should take one parameter of type 'TestContext'
+-return type should be 'void', 'Task' or 'ValueTask'
+
+The type declaring these methods should also respect the following rules:
+-The type should be a class
+-The class should be 'public' or 'internal' (if the test project is using the '[DiscoverInternals]' attribute)
+-The class shouldn't be 'static'
+-The class should be marked with '[TestClass]' (or a derived attribute)
+-the class should not be generic.</source>
+        <target state="translated">'[AssemblyInitialize]' ile işaretlenen yöntemlerin geçerli olması için aşağıdaki düzeni izlemesi gerekir:
+-genel bir sınıfta tanımlanamaz
+-'public' olmalıdır
+-'static' olmalıdır
+-'async void' olmamalıdır
+-özel bir yöntem (sonlandırıcı, işleç...) olmamalıdır.
 - genel olmamalıdır
 - 'TestContext' türünden bir parametre almalıdır
-- dönüş türü 'void', 'Task' veya 'ValueTask' olmalıdır
-- 'async void' olmamalıdır
-- özel bir yöntem (sonlandırıcı, işleç...) olmamalıdır.</target>
+- dönüş türü 'void', 'Task' veya 'ValueTask' olmalı
+
+Bu yöntemleri bildiren tipin ayrıca aşağıdaki kurallara uyması gerekir:
+-Tür bir sınıf olmalıdır
+-Sınıf 'public' veya 'internal' olmalıdır (test projesi '[DiscoverInternals]' niteliğini kullanıyorsa)
+-Sınıf 'static' olmamalıdır
+-Sınıf '[TestClass]' (veya türetilmiş bir öznitelik) ile işaretlenmelidir
+-sınıf genel olmamalıdır.</target>
         <note />
       </trans-unit>
-      <trans-unit id="AssemblyInitializeShouldBeValidMessageFormat_NotAGenericClass">
-        <source>AssemblyInitialize method '{0}' can't be declared on a generic class</source>
-        <target state="translated">'{0}' AssemblyInitialize metodu genel bir sınıfta bildirilemez</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="AssemblyInitializeShouldBeValidMessageFormat_NotAsyncVoid">
-        <source>AssemblyInitialize method '{0}' should return 'void', 'Task' or 'ValueTask'</source>
-        <target state="translated">'{0}' AssemblyInitialize yöntemi 'void', 'Task' veya 'ValueTask' döndürmelidir</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="AssemblyInitializeShouldBeValidMessageFormat_NotGeneric">
-        <source>AssemblyInitialize method '{0}' should not be generic</source>
-        <target state="translated">'{0}' AssemblyInitialize yöntemi genel olmamalıdır</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="AssemblyInitializeShouldBeValidMessageFormat_Ordinary">
-        <source>AssemblyInitialize method '{0}' should be an 'ordinary' method</source>
-        <target state="translated">'{0}' AssemblyInitialize yöntemi 'ordinary' bir yöntem olmalıdır</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="AssemblyInitializeShouldBeValidMessageFormat_Public">
-        <source>AssemblyInitialize method '{0}' should be 'public'</source>
-        <target state="translated">'{0}' AssemblyInitialize yöntemi 'public' olmalıdır</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="AssemblyInitializeShouldBeValidMessageFormat_ReturnType">
-        <source>AssemblyInitialize method '{0}' should return 'void', 'Task' or 'ValueTask'</source>
-        <target state="translated">'{0}' AssemblyInitialize yöntemi 'void', 'Task' veya 'ValueTask' döndürmelidir</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="AssemblyInitializeShouldBeValidMessageFormat_SingleContextParameter">
-        <source>AssemblyInitialize method '{0}' should take a single parameter of type 'TestContext'</source>
-        <target state="translated">'{0}' AssemblyInitialize yöntemi, 'TestContext' türünde tek bir parametre almalıdır</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="AssemblyInitializeShouldBeValidMessageFormat_Static">
-        <source>AssemblyInitialize method '{0}' should be 'static'</source>
-        <target state="translated">AssemblyInitialize yöntemi '{0}' 'static' olmalıdır</target>
+      <trans-unit id="AssemblyInitializeShouldBeValidMessageFormat">
+        <source>AssemblyInitialize method '{0}' signature is invalid</source>
+        <target state="translated">AssemblyInitialize yöntemi '{0}' imzası geçersiz</target>
         <note />
       </trans-unit>
       <trans-unit id="AssemblyInitializeShouldBeValidTitle">
         <source>AssemblyInitialize methods should have valid layout</source>
         <target state="translated">AssemblyInitialize yöntemleri geçerli bir düzene sahip olmalıdır</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="AssertionArgsShouldAvoidConditionalAccessMessageFormat">
+        <source>Prefer adding an additional assertion that checks for null</source>
+        <target state="translated">Null değerini denetlerken ek bir onaylama eklemeyi tercih et</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="AssertionArgsShouldAvoidConditionalAccessTitle">
+        <source>Avoid conditional access in assertions</source>
+        <target state="translated">Onaylamalarda koşullu erişimden kaçın</target>
         <note />
       </trans-unit>
       <trans-unit id="AssertionArgsShouldBePassedInCorrectOrderDescription">
@@ -145,78 +117,118 @@
         <target state="translated">Onay deyimi bağımsız değişkenleri doğru sıralama düzeninde geçirilmelidir</target>
         <note />
       </trans-unit>
-      <trans-unit id="AvoidExpectedExceptionAttributeDescription">
-        <source>Prefer 'Assert.ThrowsException' or 'Assert.ThrowsExceptionAsync' over '[ExpectedException]' as it ensures that only the expected call throws the expected exception. The assert APIs also provide more flexibility and allow you to assert extra properties of the exeption.</source>
-        <target state="translated">Yalnızca beklenen çağrının beklenen özel durumu oluşturmasını sağladığı için '[ExpectedException]' yerine 'Assert.ThrowsException' veya 'Assert.ThrowsExceptionAsync' tercih edin. Onaylama API'leri de daha fazla esneklik sağlar ve özel durumun ek özelliklerini onaylamanıza izin verir.</target>
+      <trans-unit id="AvoidAssertAreEqualOnCollectionsDescription">
+        <source>`Assert.AreEqual` and `Assert.AreNotEqual` use `EqualityComparer&lt;T&gt;.Default`. For collection-like types this relies on the type's own equality semantics instead of comparing sequence elements, so `Assert.AreSequenceEqual`/`Assert.AreNotSequenceEqual` or `Assert.AreEquivalent`/`Assert.AreNotEquivalent` are usually the better fit.</source>
+        <target state="translated">`Assert.AreEqual` ve `Assert.AreNotEqual`, `EqualityComparer&lt;T&gt;.Default` kullanır. Koleksiyon benzeri türlerde bu, dizi öğelerini karşılaştırmak yerine türün kendi eşitlik semantiğine dayanır. Bu nedenle genellikle `Assert.AreSequenceEqual`/`Assert.AreNotSequenceEqual` ya da `Assert.AreEquivalent`/`Assert.AreNotEquivalent` daha uygundur.</target>
         <note />
       </trans-unit>
-      <trans-unit id="AvoidExpectedExceptionAttributeMessageFormat">
-        <source>Prefer 'Assert.ThrowsException/ThrowsExceptionAsync' over '[ExpectedException]'</source>
-        <target state="translated">'[ExpectedException]' yerine 'Assert.ThrowsException/ThrowsExceptionAsync' tercih edin</target>
+      <trans-unit id="AvoidAssertAreEqualOnCollectionsMessageFormat">
+        <source>`{0}` on {1} (which implements IEnumerable&lt;T&gt;) does not perform element-wise sequence comparison. Use `Assert.AreSequenceEqual` for ordered element-wise comparison, `Assert.AreSequenceEqual(..., SequenceOrder.InAnyOrder)` for unordered, or `Assert.AreEquivalent` for deep structural comparison.</source>
+        <target state="translated">`{0}` üzerinde {1} (IEnumerable&lt;T&gt; uygulayan) öğe bazında dizi karşılaştırması yapmaz. Sıralı öğe bazında karşılaştırma için `Assert.AreSequenceEqual`, sırasız karşılaştırma için `Assert.AreSequenceEqual(..., SequenceOrder.InAnyOrder)` ya da derin yapısal karşılaştırma için `Assert.AreEquivalent` kullanın.</target>
         <note />
       </trans-unit>
-      <trans-unit id="AvoidExpectedExceptionAttributeTitle">
-        <source>Avoid '[ExpectedException]'</source>
-        <target state="translated">'[ExpectedException]' kullanmayın</target>
+      <trans-unit id="AvoidAssertAreEqualOnCollectionsTitle">
+        <source>Avoid Assert.AreEqual on collection types</source>
+        <target state="translated">Koleksiyon türleri için Assert.AreEqual kullanmaktan kaçının</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="AvoidAssertAreSameWithValueTypesDescription">
+        <source>Use 'Assert.AreEqual'/'Assert.AreNotEqual' instead of 'Assert.AreSame'/'Assert.AreNotSame' when comparing value types. Passing a value type to 'Assert.AreSame'/'Assert.AreNotSame' will be boxed (creating a new object). Because 'Assert.AreSame'/'Assert.AreNotSame' does the comparison by reference, 'Assert.AreSame' will fail when boxing happens, and 'Assert.AreNotSame' will always pass.</source>
+        <target state="translated">Değer türlerini karşılaştırılırken 'Assert.AreSame'/'Assert.AreNotSame' yerine 'Assert.AreEqual'/'Assert.AreNotSame' kullanın. 'Assert.AreSame'/'Assert.AreNotSame' değerine bir değer türü geçirilemedi (yeni bir nesne oluşturuluyor). 'Assert.AreSame'/'Assert.AreNotSame' başvuruya göre karşılaştırmayı yapar, kutulama gerçekleşirken 'Assert.AreSame' başarısız olur ve 'Assert.AreNotSame' her zaman başarılı olur.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="AvoidAssertAreSameWithValueTypesMessageFormat">
+        <source>Use '{0}' instead of '{1}' when comparing value types</source>
+        <target state="translated">Değer '{0}' karşılaştırılırken '{1}' yerine farklı bir ad kullanın</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="AvoidAssertAreSameWithValueTypesTitle">
+        <source>Don't use 'Assert.AreSame' or 'Assert.AreNotSame' with value types</source>
+        <target state="translated">Değer türleriyle 'Assert.AreSame' veya 'Assert.AreNotSame' kullanma</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="AvoidExplicitDynamicDataSourceTypeMessageFormat">
+        <source>Remove the 'DynamicDataSourceType' argument to use the default auto detect behavior</source>
+        <target state="translated">Varsayılan otomatik algılama davranışını kullanmak için ‘DynamicDataSourceType’ bağımsız değişkenini kaldırın</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="AvoidExplicitDynamicDataSourceTypeTitle">
+        <source>Avoid passing an explicit 'DynamicDataSourceType' and use the default auto detect behavior</source>
+        <target state="translated">Açık bir ‘DynamicDataSourceType’ geçirmeyin ve varsayılan otomatik algılama davranışını kullanın</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="AvoidThreadSleepAndTaskWaitInTestsDescription">
+        <source>Synchronously blocking the current thread with 'Thread.Sleep', 'Task.Wait', 'Task.WaitAll', 'Task.WaitAny' or 'Task&lt;TResult&gt;.Result' inside test methods or test fixtures is a common source of flakiness and can also deadlock when the test framework runs tests on a SynchronizationContext that requires cooperative scheduling. Prefer 'await Task.Delay' for time-based waits and 'await' the task to observe its result.</source>
+        <target state="translated">Test yöntemleri veya test düzenleri içinde geçerli iş parçacığını 'Thread.Sleep', 'Task.Wait', 'Task.WaitAll', 'Task.WaitAny' ya da 'Task&lt;TResult&gt;.Result' ile eşzamanlı olarak engellemek, yaygın bir kararsızlık kaynağıdır ve test çerçevesi, ortaklaşa zamanlama gerektiren bir SynchronizationContext üzerinde testleri çalıştırdığında kilitlenmeye de neden olabilir. Zaman tabanlı beklemeler için 'await Task.Delay' seçeneğini tercih edin ve sonucunu gözlemlemek üzere görev için 'await' kullanın.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="AvoidThreadSleepAndTaskWaitInTestsMessageFormat">
+        <source>Avoid '{0}' in test code as it can cause test flakiness; consider an asynchronous alternative such as 'await Task.Delay' or 'await' the task</source>
+        <target state="translated">Test kodunda '{0}' kullanmaktan kaçının çünkü testlerde kararsızlığa neden olabilir. Bunun yerine 'await Task.Delay' gibi bir zaman uyumsuz alternatif kullanın veya görev için 'await' kullanın</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="AvoidThreadSleepAndTaskWaitInTestsTitle">
+        <source>Avoid synchronously blocking calls such as 'Thread.Sleep', 'Task.Wait', 'Task.WaitAll', 'Task.WaitAny' or 'Task&lt;TResult&gt;.Result' in test code</source>
+        <target state="translated">Test kodunda 'Thread.Sleep', 'Task.Wait', 'Task.WaitAll', 'Task.WaitAny' veya 'Task&lt;TResult&gt;.Result' gibi eşzamanlı olarak engelleyen çağrılardan kaçının</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="AvoidUsingAssertsInAsyncVoidContextDescription">
+        <source>Do not assert inside 'async void' methods, local functions, or lambdas. Exceptions that are thrown in this context will be unhandled exceptions. When using VSTest under .NET Framework, they will be silently swallowed. When using Microsoft.Testing.Platform or VSTest under modern .NET, they may crash the process.</source>
+        <target state="translated">'async void' metotları, yerel işlevler veya lambdalar içinde onaylamayın. Bu bağlamda oluşturulan özel durumlar işlenmeyen özel durumlar olacak. VsTest'i .NET Framework, sessizce kırılır. Modern .NET altında Microsoft.Testing.Platform veya VSTest kullanırken işlemi kilitler.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="AvoidUsingAssertsInAsyncVoidContextMessageFormat">
+        <source>Do not assert inside 'async void' methods, local functions, or lambdas because they may not fail the test</source>
+        <target state="translated">'async void' metotları, yerel işlevler veya lambdalar içinde onaylamayın çünkü test başarısız olamazlar</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="AvoidUsingAssertsInAsyncVoidContextTitle">
+        <source>Do not assert inside 'async void' contexts</source>
+        <target state="translated">'async void' bağlamları içinde onaylama</target>
         <note />
       </trans-unit>
       <trans-unit id="ClassCleanupShouldBeValidDescription">
-        <source>Methods marked with [ClassCleanup] should follow the following layout to be valid:
-- it should be 'public' 
-- it should not 'static'
-- it should not be generic
-- it should not take any parameter
-- return type should be 'void', 'Task' or 'ValueTask'
-- it should not be 'async void'
-- it should not be a special method (finalizer, operator...).</source>
-        <target state="translated">[ClassCleanup] ile işaretlenen yöntemlerin geçerli olması için aşağıdaki düzeni takip etmesi gerekir:
-- 'public' olmalıdır 
-- 'static' olmamalıdır
+        <source>Methods marked with '[ClassCleanup]' should follow the following layout to be valid:
+-it can't be declared on a generic class without the 'InheritanceBehavior' mode is set
+-it should be 'public'
+-it should be 'static'
+-it should not be 'async void'
+-it should not be a special method (finalizer, operator...).
+-it should not be generic
+-it should either not take any parameter, or take a single parameter of type 'TestContext'
+-return type should be 'void', 'Task' or 'ValueTask'
+-'InheritanceBehavior.BeforeEachDerivedClass' attribute parameter should be specified if the class is 'abstract'
+-'InheritanceBehavior.BeforeEachDerivedClass' attribute parameter should not be specified if the class is 'sealed'
+
+The type declaring these methods should also respect the following rules:
+-The type should be a class
+-The class should be 'public' or 'internal' (if the test project is using the '[DiscoverInternals]' attribute)
+-The class shouldn't be 'static'
+-If the class is 'sealed', it should be marked with '[TestClass]' (or a derived attribute)
+-the class should not be generic.</source>
+        <target state="translated">'[ClassCleanup]' ile işaretlenen yöntemlerin geçerli olması için aşağıdaki düzeni takip etmesi gereklidir:
+-'InheritanceBehavior' modu ayarlanmadan genel bir sınıfta tanımlanamaz
+-'public' olmalıdır
+-'static' olmalıdır
+-'async void' olmamalıdır
+-özel bir metot (sonlandırıcı, işleç...) olmamalıdır.
 - genel olmamalıdır
-- herhangi bir parametre almamalıdır
+-herhangi bir parametre almamalı veya 'TestContext' türünde tek bir parametre almalıdır
 - dönüş türü 'void', 'Task' veya 'ValueTask' olmalıdır
-- 'async void' olmamalıdır
-- özel bir yöntem (sonlandırıcı, işleç...) olmamalıdır.</target>
+-Sınıf 'abstract' ise 'InheritanceBehavior.BeforeEachDerivedClass' öznitelik parametresi belirtilmelidir
+-'InheritanceBehavior.BeforeEachDerivedClass' öznitelik parametresi, sınıf 'sealed' ise belirtilmemelidir
+
+Bu metotları bildiren türün ayrıca aşağıdaki kurallara uyması gerekir:
+-Tür bir sınıf olmalıdır
+-Sınıf 'public' veya 'internal' olmalıdır (test projesi '[DiscoverInternals]' niteliğini kullanıyorsa)
+-Sınıf 'static' olmamalıdır
+-Sınıf 'sealed' ise '[TestClass]' (veya türetilmiş bir öznitelik) ile işaretlenmelidir
+-sınıf genel olmamalıdır.</target>
         <note />
       </trans-unit>
-      <trans-unit id="ClassCleanupShouldBeValidMessageFormat_NoParameters">
-        <source>ClassCleanup method '{0}' should not take any parameter</source>
-        <target state="translated">'{0}' ClassCleanup yöntemi herhangi bir parametre almamalıdır</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="ClassCleanupShouldBeValidMessageFormat_NotAGenericClassUnlessInheritanceModeSet">
-        <source>ClassCleanup method '{0}' can't be declared on a generic class without the `InheritanceBehavior` mode is set</source>
-        <target state="translated">'{0}' ClassCleanup metodu 'InheritanceBehavior' modu ayarlanmamış genel bir sınıfta bildirilemez</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="ClassCleanupShouldBeValidMessageFormat_NotAsyncVoid">
-        <source>ClassCleanup method '{0}' should return 'void', 'Task' or 'ValueTask'</source>
-        <target state="translated">'{0}' ClassCleanup yöntemi 'void', 'Task' veya 'ValueTask' döndürmelidir</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="ClassCleanupShouldBeValidMessageFormat_NotGeneric">
-        <source>ClassCleanup method '{0}' should not be generic</source>
-        <target state="translated">'{0}' ClassCleanup yöntemi genel olmamalıdır</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="ClassCleanupShouldBeValidMessageFormat_Ordinary">
-        <source>ClassCleanup method '{0}' should be an 'ordinary' method</source>
-        <target state="translated">'{0}' ClassCleanup yöntemi 'ordinary' bir yöntem olmalıdır</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="ClassCleanupShouldBeValidMessageFormat_Public">
-        <source>ClassCleanup method '{0}' should be 'public'</source>
-        <target state="translated">'{0}' ClassCleanup yöntemi 'public' olmalıdır</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="ClassCleanupShouldBeValidMessageFormat_ReturnType">
-        <source>ClassCleanup method '{0}' should return 'void', 'Task' or 'ValueTask'</source>
-        <target state="translated">'{0}' ClassCleanup yöntemi 'void', 'Task' veya 'ValueTask' döndürmelidir</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="ClassCleanupShouldBeValidMessageFormat_Static">
-        <source>ClassCleanup method '{0}' should be 'static'</source>
-        <target state="translated">'{0}' ClassCleanup yöntemi 'static' olmalıdır</target>
+      <trans-unit id="ClassCleanupShouldBeValidMessageFormat">
+        <source>ClassCleanup method '{0}' signature is invalid</source>
+        <target state="translated">ClassCleanup yöntemi '{0}' imzası geçersiz</target>
         <note />
       </trans-unit>
       <trans-unit id="ClassCleanupShouldBeValidTitle">
@@ -225,67 +237,62 @@
         <note />
       </trans-unit>
       <trans-unit id="ClassInitializeShouldBeValidDescription">
-        <source>Methods marked with [ClassInitialize] should follow the following layout to be valid:
-- it should be 'public' 
-- it should be 'static'
-- it should not be generic
-- it should take one parameter of type 'TestContext'
-- return type should be 'void', 'Task' or 'ValueTask'
-- it should not be 'async void'
-- it should not be a special method (finalizer, operator...).</source>
-        <target state="translated">[ClassInitialize] ile işaretlenen yöntemlerin geçerli olması için aşağıdaki düzeni takip etmesi gerekir:
-- 'public' olmalıdır 
-- 'static' olmalıdır
+        <source>Methods marked with '[ClassInitialize]' should follow the following layout to be valid:
+-it can't be declared on a generic class without the 'InheritanceBehavior' mode is set
+-it should be 'public'
+-it should be 'static'
+-it should not be 'async void'
+-it should not be a special method (finalizer, operator...).
+-it should not be generic
+-it should take one parameter of type 'TestContext'
+-return type should be 'void', 'Task' or 'ValueTask'
+-'InheritanceBehavior.BeforeEachDerivedClass' attribute parameter should be specified if the class is 'abstract'
+-'InheritanceBehavior.BeforeEachDerivedClass' attribute parameter should not be specified if the class is 'sealed'
+
+The type declaring these methods should also respect the following rules:
+-The type should be a class
+-The class should be 'public' or 'internal' (if the test project is using the '[DiscoverInternals]' attribute)
+-The class shouldn't be 'static'
+-If the class is 'sealed', it should be marked with '[TestClass]' (or a derived attribute)
+-the class should not be generic.</source>
+        <target state="translated">'[ClassInitialize]' ile işaretlenen yöntemlerin geçerli olması için aşağıdaki düzeni takip etmesi gereklidir:
+-'InheritanceBehavior' modu ayarlanmadan genel bir sınıfta tanımlanamaz
+-'public' olmalıdır
+-'static' olmalıdır
+-'async void' olmamalıdır
+-özel bir yöntem (sonlandırıcı, işleç...) olmamalıdır.
 - genel olmamalıdır
 - 'TestContext' türünden bir parametre almalıdır
-- dönüş türü 'void', 'Task' veya 'ValueTask' olmalıdır
-- 'async void' olmamalıdır
-- özel bir yöntem (sonlandırıcı, işleç...) olmamalıdır.</target>
+- dönüş türü 'void', 'Task' veya 'ValueTask' olmalı
+-Sınıf 'abstract' ise 'InheritanceBehavior.BeforeEachDerivedClass' öznitelik parametresi belirtilmelidir.
+-'InheritanceBehavior.BeforeEachDerivedClass' öznitelik parametresi, sınıf 'sealed' ise belirtilmemelidir
+
+Bu yöntemleri bildiren tipin ayrıca aşağıdaki kurallara uyması gerekir:
+-Tür bir sınıf olmalıdır
+-Sınıf 'public' veya 'internal' olmalıdır (test projesi '[DiscoverInternals]' niteliğini kullanıyorsa)
+-Sınıf 'static' olmamalıdır
+-Sınıf 'sealed' ise '[TestClass]' (veya türetilmiş bir öznitelik) ile işaretlenmelidir.
+-sınıf genel olmamalıdır.</target>
         <note />
       </trans-unit>
-      <trans-unit id="ClassInitializeShouldBeValidMessageFormat_NotAGenericClassUnlessInheritanceModeSet">
-        <source>ClassInitialize method '{0}' can't be declared on a generic class without the `InheritanceBehavior` mode is set</source>
-        <target state="translated">'{0}' ClassInitialize metodu 'InheritanceBehavior' modu ayarlanmamış genel bir sınıfta bildirilemez</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="ClassInitializeShouldBeValidMessageFormat_NotAsyncVoid">
-        <source>ClassInitialize method '{0}' should return 'void', 'Task' or 'ValueTask'</source>
-        <target state="translated">'{0}' ClassInitialize yöntemi 'void', 'Task' veya 'ValueTask' döndürmelidir</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="ClassInitializeShouldBeValidMessageFormat_NotGeneric">
-        <source>ClassInitialize method '{0}' should not be generic</source>
-        <target state="translated">'{0}' ClassInitialize yöntemi genel olmamalıdır</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="ClassInitializeShouldBeValidMessageFormat_Ordinary">
-        <source>ClassInitialize method '{0}' should be an 'ordinary' method</source>
-        <target state="translated">'{0}' ClassInitialize yöntemi 'ordinary' bir yöntem olmalıdır</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="ClassInitializeShouldBeValidMessageFormat_Public">
-        <source>ClassInitialize method '{0}' should be 'public'</source>
-        <target state="translated">ClassInitialize yöntemi '{0}' 'public' olmalıdır</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="ClassInitializeShouldBeValidMessageFormat_ReturnType">
-        <source>ClassInitialize method '{0}' should return 'void', 'Task' or 'ValueTask'</source>
-        <target state="translated">'{0}' ClassInitialize yöntemi 'void', 'Task' veya 'ValueTask' döndürmelidir</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="ClassInitializeShouldBeValidMessageFormat_SingleContextParameter">
-        <source>ClassInitialize method '{0}' should take a single parameter of type 'TestContext'</source>
-        <target state="translated">'{0}' ClassInitialize yöntemi, 'TestContext' türünde tek bir parametre almalıdır</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="ClassInitializeShouldBeValidMessageFormat_Static">
-        <source>ClassInitialize method '{0}' should be 'static'</source>
-        <target state="translated">ClassInitialize yöntemi '{0}' 'static' olmalıdır</target>
+      <trans-unit id="ClassInitializeShouldBeValidMessageFormat">
+        <source>ClassInitialize method '{0}' signature is invalid</source>
+        <target state="translated">ClassInitialize yöntemi '{0}' imzası geçersiz</target>
         <note />
       </trans-unit>
       <trans-unit id="ClassInitializeShouldBeValidTitle">
         <source>ClassInitialize methods should have valid layout</source>
         <target state="translated">ClassInitialize yöntemleri geçerli bir düzene sahip olmalıdır</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="CollectionAssertToAssertMessageFormat">
+        <source>Use 'Assert.{0}' instead of 'CollectionAssert.{1}'</source>
+        <target state="new">Use 'Assert.{0}' instead of 'CollectionAssert.{1}'</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="CollectionAssertToAssertTitle">
+        <source>Use 'Assert' instead of 'CollectionAssert'</source>
+        <target state="new">Use 'Assert' instead of 'CollectionAssert'</target>
         <note />
       </trans-unit>
       <trans-unit id="DataRowShouldBeValidDescription">
@@ -305,8 +312,23 @@
         <note />
       </trans-unit>
       <trans-unit id="DataRowShouldBeValidMessageFormat_ArgumentTypeMismatch">
-        <source>DataRow argument type should match method parameter type. Mismatches occur at indices: {0}</source>
-        <target state="translated">DataRow bağımsız değişken türü, yöntem parametresinin türüyle eşleşmelidir. Dizinler sırasında uyuşmazlıklar oluştu: {0}</target>
+        <source>DataRow argument types do not match method parameter types. {0}</source>
+        <target state="translated">DataRow bağımsız değişken türleri, yöntem parametre türleriyle eşleşmiyor. {0}</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DataRowShouldBeValidMessageFormat_ParameterMismatch">
+        <source>Parameter '{0}' expects type '{1}', but the provided value has type '{2}'</source>
+        <target state="translated">Parametre ‘{0}’ tipi ‘{1}’ bekliyor, ancak verilen değer ‘{2}’ tipindedir</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DataRowShouldBeValidMessageFormat_GenericTypeArgumentConflictingTypes">
+        <source>Found two conflicting types for generic parameter '{0}'. The conflicting types are '{1}' and '{2}'.</source>
+        <target state="translated">Genel parametre türü için iki çakışan tür '{0}'. Çakışan türler '{1}' '{2}'.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DataRowShouldBeValidMessageFormat_GenericTypeArgumentNotResolved">
+        <source>The type of the generic parameter '{0}' could not be inferred.</source>
+        <target state="translated">Genel parametre türü '{0}' çıkarsanamadı.</target>
         <note />
       </trans-unit>
       <trans-unit id="DataRowShouldBeValidMessageFormat_OnTestMethod">
@@ -317,6 +339,16 @@
       <trans-unit id="DataRowShouldBeValidTitle">
         <source>DataRow should be valid</source>
         <target state="translated">DataRow geçerli olmalıdır</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DoNotNegateBooleanAssertionFix">
+        <source>Use 'Assert.{0}' instead</source>
+        <target state="translated">Bunun yerine 'Assert.{0}' kullanın</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DoNotNegateBooleanAssertionFixAllTitle">
+        <source>Use proper Assert methods for all negated assertions</source>
+        <target state="translated">Tüm olumsuz doğrulamalar için uygun Assert yöntemlerini kullanın</target>
         <note />
       </trans-unit>
       <trans-unit id="DoNotNegateBooleanAssertionMessageFormat">
@@ -337,6 +369,262 @@
       <trans-unit id="DoNotStoreStaticTestContextAnalyzerTitle">
         <source>Do not store TestContext in a static member</source>
         <target state="translated">TestContext'i statik üyede depolama</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DoNotUseShadowingDescription">
+        <source>Shadowing test members could cause testing issues (such as NRE).</source>
+        <target state="translated">Gölge test üyeleri test sorunlarına (NRE gibi) neden olabilir.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DoNotUseShadowingMessageFormat">
+        <source>Member '{0}' already exists in the base class</source>
+        <target state="translated">'{0}' adlı üye zaten temel sınıfta mevcut</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DoNotUseShadowingTitle">
+        <source>Do not use shadowing</source>
+        <target state="translated">Gölgeleme kullanma</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DoNotUseSystemDescriptionAttributeDescription">
+        <source>'System.ComponentModel.DescriptionAttribute' has no effect in the context of tests and you likely wanted to use 'Microsoft.VisualStudio.TestTools.UnitTesting.DescriptionAttribute' instead.</source>
+        <target state="translated">'System.ComponentModel.DescriptionAttribute'un testler bağlamında hiçbir etkisi yoktur ve muhtemelen bunun yerine 'Microsoft.VisualStudio.TestTools.UnitTesting.DescriptionAttribute' kullanmak istediniz.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DoNotUseSystemDescriptionAttributeMessageFormat">
+        <source>Did you mean to be using 'Microsoft.VisualStudio.TestTools.UnitTesting.DescriptionAttribute'?</source>
+        <target state="translated">'Microsoft.VisualStudio.TestTools.UnitTesting.DescriptionAttribute' kullanmayı mı düşündünüz?</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DoNotUseSystemDescriptionAttributeTitle">
+        <source>'System.ComponentModel.DescriptionAttribute' has no effect on test methods</source>
+        <target state="translated">'System.ComponentModel.DescriptionAttribute' test yöntemlerini etkilemez</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DuplicateDataRowMessageFormat">
+        <source>Do not duplicate 'DataRow' attributes. This is usually a copy/paste error. The attribute indices are '{0}' and '{1}'.</source>
+        <target state="translated">'DataRow' özniteliklerini kopyalamayın. Bu genellikle kopyala-yapıştır hatasıdır. Öznitelik dizinleri '{0}' ve '{1}'.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DuplicateDataRowTitle">
+        <source>Avoid duplicated 'DataRow' entries</source>
+        <target state="translated">'DataRow' girdilerinin yenilenmesinden kaçının</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DynamicDataShouldBeValidDescription">
+        <source>'DynamicData' entry should have the following layout to be valid:
+- should only be set on a test method;
+- member should be defined on the type specified;
+- member should be a method if DynamicDataSourceType.Method is specified or a property otherwise.</source>
+        <target state="translated">'[DynamicData]' girdisinin geçerli olması için aşağıdaki koşulları karşılamalıdır:
+- yalnızca bir test yönteminde ayarlanmalıdır; 
+- üye belirtilen türde tanımlanmalıdır;
+- DynamicDataSourceType.Method belirtilmişse üye bir yöntem olmalı, aksi takdirde bir özellik olmalıdır.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DynamicDataShouldBeValidMessageFormat_DataMemberSignature">
+        <source>'[DynamicData]' data member '{0}.{1}' signature is invalid</source>
+        <target state="translated">'[DynamicData]' veri üyesi '{0}.{1}' imzası geçersiz</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DynamicDataShouldBeValidMessageFormat_DisplayMethodSignature">
+        <source>'[DynamicData]' display name method '{0}.{1}' signature is invalid</source>
+        <target state="translated">'[DynamicData]' görünen ad yöntemi '{0}.{1}' imzası geçersiz</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DynamicDataShouldBeValidMessageFormat_MemberMethod">
+        <source>'[DynamicData]' member '{0}.{1}' should be a method</source>
+        <target state="translated">'[DynamicData]' üyesi '{0}.{1}' bir yöntem olmalıdır</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DynamicDataShouldBeValidMessageFormat_MemberNotFound">
+        <source>'[DynamicData]' member '{0}.{1}' cannot be found</source>
+        <target state="translated">'[DynamicData]' üyesi '{0}.{1}' bulunamıyor</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DynamicDataShouldBeValidMessageFormat_MemberType">
+        <source>'[DynamicData]' referenced member '{0}.{1}' should return 'IEnumerable&lt;object[]&gt;', 'IEnumerable&lt;Tuple&gt;` or 'IEnumerable&lt;ValueTuple&gt;'</source>
+        <target state="translated">'[DynamicData]' başvurulan üyesi '{0}.{1}' şu değerleri döndürmelidir: 'IEnumerable&lt;object[]&gt;', 'IEnumerable&lt;Tuple&gt;` veya 'IEnumerable&lt;ValueTuple&gt;'</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DynamicDataShouldBeValidMessageFormat_OnTestMethod">
+        <source>'[DynamicData]' should only be set on a test method</source>
+        <target state="translated">'[DynamicData]' yalnızca bir test yönteminde ayarlanmalıdır</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DynamicDataShouldBeValidMessageFormat_SourceTypeField">
+        <source>'[DynamicData]' member '{0}.{1}' is a field so you should use 'DynamicDataSourceType.AutoDetect' or 'DynamicDataSourceType.Field' (auto detect is the default when not specified explicitly, and is recommended)</source>
+        <target state="translated">‘[DynamicData]’ üyesi ‘{0}.{1}’, bir alandır, bu nedenle ‘DynamicDataSourceType.AutoDetect’ veya ‘DynamicDataSourceType.Field’ kullanmalısınız (otomatik algılama, açıkça belirtilmediğinde varsayılan ayardır ve önerilir)</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DynamicDataShouldBeValidMessageFormat_SourceTypeMethod">
+        <source>'[DynamicData]' member '{0}.{1}' is a method so you should use 'DynamicDataSourceType.AutoDetect' or 'DynamicDataSourceType.Method' (auto detect is the default when not specified explicitly, and is recommended)</source>
+        <target state="translated">'[DynamicData]' üyesi '{0}.{1}' bir metot olduğundan 'DynamicDataSourceType.AutoDetect' veya 'DynamicDataSourceType.Method' kullanmalısınız (otomatik algılama açıkça belirtilmediğinden varsayılandır ve önerilir)</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DynamicDataShouldBeValidMessageFormat_SourceTypeNotPropertyMethodOrField">
+        <source>'[DynamicData]' member '{0}.{1}' is not a property, method, or field. Only properties, methods, and fields are supported.</source>
+        <target state="translated">‘[DynamicData]’ üyesi ‘{0}.{1}’, bir özellik, yöntem veya alan değildir. Yalnızca özellikler, yöntemler ve alanlar desteklenir.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DynamicDataShouldBeValidMessageFormat_SourceTypeNotPropertyOrMethod">
+        <source>'[DynamicData]' member '{0}.{1}' is not a property nor a method. Only properties and methods are supported.</source>
+        <target state="translated">'[DynamicData]' '{0}.{1}' üyesi bir özellik veya yöntem değil. Yalnızca özellikler ve yöntemler desteklenir.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DynamicDataShouldBeValidMessageFormat_SourceTypeProperty">
+        <source>'[DynamicData]' member '{0}.{1}' is a property so you should use 'DynamicDataSourceType.AutoDetect' or 'DynamicDataSourceType.Property' (auto detect is the default when not specified explicitly, and is recommended)</source>
+        <target state="translated">'[DynamicData]' üyesi '{0}.{1}' bir özelliktir, bu nedenle 'DynamicDataSourceType.AutoDetect' veya 'DynamicDataSourceType.Property' kullanmalısınız (otomatik algılama açıkça belirtilmediğinden varsayılandır ve önerilir)</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DynamicDataShouldBeValidMessageFormat_TooManyMembers">
+        <source>'[DynamicData]' member '{0}.{1}' is found more than once</source>
+        <target state="translated">'[DynamicData]' üyesi '{0}.{1}' birden çok kez bulundu</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DynamicDataShouldBeValidTitle">
+        <source>DynamicData should be valid</source>
+        <target state="translated">DynamicData geçerli olmalıdır</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="FlowTestContextCancellationTokenDescription">
+        <source>When calling async methods that have overloads accepting a CancellationToken parameter, prefer using the overload with TestContext.CancellationToken to enable cooperative cancellation and respect test timeouts.</source>
+        <target state="translated">CancellationToken parametresini kabul eden aşırı yüklemeleri olan asenkron yöntemleri çağırırken, işbirliğine dayalı iptal işlemini etkinleştirmek ve test zaman aşımlarını dikkate almak için TestContext.CancellationToken ile aşırı yüklemeyi kullanmayı tercih edin.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="FlowTestContextCancellationTokenMessageFormat">
+        <source>Consider using the overload that accepts a CancellationToken and pass 'TestContext.CancellationToken'</source>
+        <target state="translated">CancellationToken'ı kabul eden aşırı yüklemeyi kullanmayı düşünün ve 'TestContext.CancellationToken'i geçirin</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="FlowTestContextCancellationTokenTitle">
+        <source>Flow TestContext.CancellationToken to async operations</source>
+        <target state="translated">TestContext.CancellationToken'ı asenkron işlemler için akışa aktarın</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="GlobalTestFixtureShouldBeValidDescription">
+        <source>Methods marked with '[GlobalTestInitialize]' or '[GlobalTestCleanup]' should follow the following layout to be valid:
+-it can't be declared on a generic class
+-it should be 'public'
+-it should be 'static'
+-it should not be 'async void'
+-it should not be a special method (finalizer, operator...).
+-it should not be generic
+-it should take one parameter of type 'TestContext'
+-return type should be 'void', 'Task' or 'ValueTask'
+
+The type declaring these methods should also respect the following rules:
+-The type should be a class
+-The class should be 'public'
+-The class shouldn't be 'static'
+-The class should be marked with '[TestClass]' (or a derived attribute)
+-the class should not be generic.</source>
+        <target state="translated">‘[GlobalTestInitialize]’ veya ‘[GlobalTestCleanup]’ ile işaretlenmiş yöntemlerin geçerli olabilmesi için şu düzeni izlemesi gerekir:
+-genel bir sınıfta tanımlanamaz
+-'public' olmalıdır
+-'static' olmalıdır
+-'async void' olmamalıdır
+-özel bir metot (sonlandırıcı, işleç...) olmamalıdır.
+- genel olmamalıdır
+- 'TestContext' türünden bir parametre almalıdır
+- dönüş türü 'void', 'Task' veya 'ValueTask' olmalıdır
+
+Bu metotları bildiren türün ayrıca aşağıdaki kurallara uyması gerekir:
+-Tür bir sınıf olmalıdır
+-Sınıf ‘public’ olmalıdır
+-Sınıf 'static' olmamalıdır
+-Sınıf '[TestClass]' (veya türetilmiş bir öznitelik) ile işaretlenmelidir
+-sınıf genel olmamalıdır.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="GlobalTestFixtureShouldBeValidMessageFormat">
+        <source>Global test fixture method '{0}' signature is invalid</source>
+        <target state="translated">Global test düzeni yöntemi ‘{0}’ imzası geçersiz</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="GlobalTestFixtureShouldBeValidTitle">
+        <source>GlobalTestInitialize and GlobalTestCleanup methods should have valid layout</source>
+        <target state="translated">GlobalTestInitialize ve GlobalTestCleanup yöntemleri geçerli bir düzene sahip olmalıdır</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="IgnoreShouldHaveJustificationDescription">
+        <source>An '[Ignore]' attribute applied to a test method or test class should include a non-empty message explaining why the test or class is ignored. A justification message makes it easier to triage skipped tests, helps reviewers understand the intent, and prevents tests from being silently disabled forever.</source>
+        <target state="translated">Bir test yöntemine veya test sınıfına uygulanan '[Ignore]' özniteliği, testin ya da sınıfın neden yoksayıldığını açıklayan boş olmayan bir ileti içermelidir. Bir gerekçe iletisi, atlanan testleri önceliklendirmeyi kolaylaştırır, gözden geçirenlerin amacı anlamasına yardımcı olur ve testlerin sessizce sonsuza kadar devre dışı bırakılmasını önler.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="IgnoreShouldHaveJustificationMessageFormat">
+        <source>'[Ignore]' should specify a message explaining why '{0}' is ignored</source>
+        <target state="translated">'[Ignore]', '{0}' öğesinin neden yoksayıldığını açıklayan bir ileti belirtmelidir</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="IgnoreShouldHaveJustificationTitle">
+        <source>'[Ignore]' should specify a justification</source>
+        <target state="translated">'[Ignore]' bir gerekçe belirtmelidir</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="IgnoreStringMethodReturnValueDescription">
+        <source>Methods like Contains, StartsWith, and EndsWith return boolean values that indicate whether the condition was met. Ignoring these return values is likely a mistake.</source>
+        <target state="translated">Contains, StartsWith ve EndsWith gibi yöntemler, koşulun karşılanıp karşılanmadığını belirten boole değerleri döndürür. Bu dönüş değerlerini yok saymak büyük olasılıkla bir hataya yol açar.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="IgnoreStringMethodReturnValueMessageFormat">
+        <source>The return value of '{0}' should not be ignored</source>
+        <target state="translated">'{0}' değerinin dönüş değeri yok sayılmamalıdır</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="IgnoreStringMethodReturnValueTitle">
+        <source>Do not ignore the return value of string methods</source>
+        <target state="translated">Dize yöntemlerinin dönüş değerini yok saymayın</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PreferAssertFailOverAlwaysFalseConditionsMessageFormat">
+        <source>Use 'Assert.Fail' instead of an always-failing 'Assert.{0}' assert</source>
+        <target state="translated">Her zaman başarısız olan 'Assert.{0}' onaylaması yerine 'Assert.Fail' seçeneğini kullanın</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PreferAssertFailOverAlwaysFalseConditionsTitle">
+        <source>Use 'Assert.Fail' instead of an always-failing assert</source>
+        <target state="translated">Her zaman başarısız olan onaylama yerine 'Assert.Fail' seçeneğini kullanın</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PreferAsyncAssertionDescription">
+        <source>When verifying exceptions from asynchronous code, use the async assertion methods instead of blocking the asynchronous operation with GetAwaiter().GetResult().</source>
+        <target state="translated">Zaman uyumsuz koddan gelen özel durumları doğrularken GetAwaiter().GetResult() ile zaman uyumsuz işlemi engellemek yerine zaman uyumsuz onaylama yöntemlerini kullanın.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PreferAsyncAssertionMessageFormat">
+        <source>Use 'Assert.{0}' instead of blocking an async call in 'Assert.{1}'</source>
+        <target state="translated">'Assert.{0}' içinde zaman uyumsuz bir çağrıyı engellemek yerine 'Assert.{1}' kullanın</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PreferAsyncAssertionTitle">
+        <source>Prefer async assertion methods</source>
+        <target state="translated">Zaman uyumsuz doğrulama yöntemlerini tercih edin</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PreferTestMethodOverDataTestMethodAnalyzerDescription">
+        <source>'DataTestMethodAttribute' is obsolete and provides no additional functionality over 'TestMethodAttribute'. Use 'TestMethodAttribute' for all test methods, including parameterized tests.</source>
+        <target state="translated">'DataTestMethodAttribute' artık kullanılmıyor ve 'TestMethodAttribute' üzerinde ek bir işlevsellik sunmuyor. Parametreli testler de dahil, tüm test yöntemleri için 'TestMethodAttribute' kullanın.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PreferTestMethodOverDataTestMethodAnalyzerMessageFormat">
+        <source>'DataTestMethod' is obsolete. Use 'TestMethod' instead.</source>
+        <target state="translated">'DataTestMethod' artık kullanılmıyor. Bunun yerine 'TestMethod' kullanın.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PreferTestMethodOverDataTestMethodAnalyzerTitle">
+        <source>Prefer 'TestMethod' over 'DataTestMethod'</source>
+        <target state="translated">'DataTestMethod' yerine 'TestMethod' yöntemini tercih edin</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ReviewAlwaysTrueAssertConditionAnalyzerMessageFormat">
+        <source>Review or remove the assertion as its condition is known to be always true</source>
+        <target state="translated">Koşulu her zaman true olarak bilinen onaylamayı gözden geçirin veya kaldırın</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ReviewAlwaysTrueAssertConditionAnalyzerTitle">
+        <source>Assertion condition is always true</source>
+        <target state="translated">Onaylama koşulu her zaman true'dur</target>
         <note />
       </trans-unit>
       <trans-unit id="PreferConstructorOverTestInitializeMessageFormat">
@@ -379,6 +667,21 @@
         <target state="translated">TestInitialize yöntemlerini oluşturuculara tercih et</target>
         <note />
       </trans-unit>
+      <trans-unit id="PublicMethodShouldBeTestMethodAnalyzerDescription">
+        <source>Public methods should be test methods (marked with `[TestMethod]`).</source>
+        <target state="translated">Genel metotlar test metotları olmalıdır ('[TestMethod]' ile işaretlendi).</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PublicMethodShouldBeTestMethodAnalyzerFormat">
+        <source>Public method '{0}' should be a test method</source>
+        <target state="translated">Genel metot '{0}' bir test metodu olmalıdır</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PublicMethodShouldBeTestMethodAnalyzerTitle">
+        <source>Public methods should be test methods</source>
+        <target state="translated">Genel metotlar test metotları olmalıdır</target>
+        <note />
+      </trans-unit>
       <trans-unit id="PublicTypeShouldBeTestClassDescription">
         <source>It's considered a good practice to have only test classes marked public in a test project.</source>
         <target state="translated">Test projesinde yalnızca public olarak işaretlenmiş test sınıflarının olması iyi bir uygulama olarak kabul edilir.</target>
@@ -394,6 +697,66 @@
         <target state="translated">Genel türler test sınıfları olmalıdır</target>
         <note />
       </trans-unit>
+      <trans-unit id="StringAssertToAssertMessageFormat">
+        <source>Use 'Assert.{0}' instead of 'StringAssert.{1}'</source>
+        <target state="translated">‘StringAssert.{1}’ yerine ‘Assert.{0}’ kullanın</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="StringAssertToAssertTitle">
+        <source>Use 'Assert' instead of 'StringAssert'</source>
+        <target state="translated">‘StringAssert’ yerine ‘Assert’ kullanın</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="TestClassShouldBeValidMessageFormat">
+        <source>Test class '{0}' should be valid</source>
+        <target state="translated">'{0}' test sınıfı geçerli olmalıdır</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="TestContextShouldBeValidMessageFormat">
+        <source>Property 'TestContext' should be valid</source>
+        <target state="translated">'TestContext' özelliği geçerli olmalıdır</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="TestMethodAttributeShouldPropagateSourceInformationMessageFormat">
+        <source>TestMethodAttribute derived class '{0}' should add CallerFilePath and CallerLineNumber parameters to its constructor</source>
+        <target state="translated">TestMethodAttribute türetilmiş sınıf '{0}', yapıcıya CallerFilePath ve CallerLineNumber parametrelerini eklemelidir</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="TestMethodAttributeShouldPropagateSourceInformationTitle">
+        <source>TestMethodAttribute derived class should propagate source information</source>
+        <target state="translated">TestMethodAttribute türetilmiş sınıfı kaynak bilgilerini yaymalıdır</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="TestMethodAttributeShouldSetDisplayNameCorrectlyMessageFormat">
+        <source>Use the 'DisplayName' property instead of passing a string argument to TestMethodAttribute</source>
+        <target state="translated">TestMethodAttribute'a bir dize bağımsız değişkeni aktarmak yerine 'DisplayName' özelliğini kullanın</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="TestMethodAttributeShouldSetDisplayNameCorrectlyTitle">
+        <source>TestMethodAttribute should set DisplayName correctly</source>
+        <target state="translated">TestMethodAttribute, DisplayName'i doğru şekilde ayarlamalıdır</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="TestMethodShouldBeValidMessageFormat">
+        <source>Test method '{0}' signature is invalid</source>
+        <target state="translated">'{0}' test yöntemi imzası geçersiz</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="UseCancellationTokenPropertyDescription">
+        <source>TestContext.CancellationToken provides a more direct way to access the cancellation token compared to TestContext.CancellationTokenSource.Token.</source>
+        <target state="translated">TestContext.CancellationToken, TestContext.CancellationTokenSource.Token'a kıyasla iptal belirtecine erişmek için daha doğrudan bir yol sağlar.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="UseCancellationTokenPropertyMessageFormat">
+        <source>Use 'TestContext.CancellationToken' instead of 'TestContext.CancellationTokenSource.Token'</source>
+        <target state="translated">'TestContext.CancellationTokenSource.Token' yerine ‘TestContext.CancellationToken’ kullanın</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="UseCancellationTokenPropertyTitle">
+        <source>Use TestContext.CancellationToken instead of TestContext.CancellationTokenSource.Token</source>
+        <target state="translated">TestContext.CancellationTokenSource.Token yerine TestContext.CancellationToken kullanın</target>
+        <note />
+      </trans-unit>
       <trans-unit id="TestClassShouldBeValidDescription">
         <source>Test classes, classes marked with the '[TestClass]' attribute, should respect the following layout to be considered valid by MSTest:
 - it should be 'public' (or 'internal' if '[assembly: DiscoverInternals]' attribute is set)
@@ -406,34 +769,19 @@
 - genel olmalıdır.</target>
         <note />
       </trans-unit>
-      <trans-unit id="TestClassShouldBeValidMessageFormat_NotStatic">
-        <source>Test class '{0}' should not be 'static'</source>
-        <target state="translated">'{0}' test sınıfı 'static' olamaz</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="TestClassShouldBeValidMessageFormat_Public">
-        <source>Test class '{0}' should be 'public'</source>
-        <target state="translated">'{0}' test sınıfı 'public' olmalıdır</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="TestClassShouldBeValidMessageFormat_PublicOrInternal">
-        <source>Test class '{0}' should be 'public' or 'internal'</source>
-        <target state="translated">'{0}' test sınıfı 'public' veya 'internal' olmalıdır</target>
-        <note />
-      </trans-unit>
       <trans-unit id="TestClassShouldBeValidTitle">
         <source>Test classes should have valid layout</source>
         <target state="translated">Test sınıfları geçerli bir düzene sahip olmalıdır</target>
         <note />
       </trans-unit>
       <trans-unit id="TestClassShouldHaveTestMethodDescription">
-        <source>Test class should have at least one test method or be 'static' with method(s) marked by '[AssemblyInitialization]' and/or '[AssemblyCleanup]'.</source>
-        <target state="translated">Test sınıfı en az bir test yöntemine sahip olmalıdır veya '[AssemblyInitialization]' ve/veya '[AssemblyCleanup]' ile işaretlenen yöntemlere sahip 'static' olmalıdır.</target>
+        <source>Test class should have at least one test method or be 'static' with method(s) marked by '[AssemblyInitialize]' and/or '[AssemblyCleanup]'.</source>
+        <target state="translated">Test sınıfı en az bir test yöntemine sahip olmalıdır veya '[AssemblyInitialize]' ve/veya '[AssemblyCleanup]' ile işaretlenen yöntemlere sahip 'static' olmalıdır.</target>
         <note />
       </trans-unit>
       <trans-unit id="TestClassShouldHaveTestMethodMessageFormat">
-        <source>Test class '{0}' should have at least one test method or be 'static' with method(s) marked by '[AssemblyInitialization]' and/or '[AssemblyCleanup]'</source>
-        <target state="translated">'{0}' test sınıfı en az bir test yöntemine sahip olmalıdır veya '[AssemblyInitialization]' ve/veya '[AssemblyCleanup]' ile işaretlenen yöntemlere sahip 'static' olmalıdır</target>
+        <source>Test class '{0}' should have at least one test method or be 'static' with method(s) marked by '[AssemblyInitialize]' and/or '[AssemblyCleanup]'</source>
+        <target state="translated">'{0}' test sınıfı en az bir test yöntemine sahip olmalıdır veya '[AssemblyInitialize]' ve/veya '[AssemblyCleanup]' ile işaretlenen yöntemlere sahip 'static' olmalıdır</target>
         <note />
       </trans-unit>
       <trans-unit id="TestClassShouldHaveTestMethodTitle">
@@ -442,64 +790,41 @@
         <note />
       </trans-unit>
       <trans-unit id="TestCleanupShouldBeValidDescription">
-        <source>Methods marked with [TestCleanup] should follow the following layout to be valid:
-- it should be 'public' 
-- it should not be 'static'
-- it should not be generic
-- it should not be 'abstract'
-- it should not take any parameter
-- return type should be 'void', 'Task' or 'ValueTask'
-- it should not be 'async void'
-- it should not be a special method (finalizer, operator...).</source>
-        <target state="translated">[TestCleanup] ile işaretlenen yöntemlerin geçerli olması için aşağıdaki düzeni takip etmesi gerekir:
-- 'public' olmalıdır 
-- 'static' olmamalıdır
-- genel olmamalıdır
+        <source>Methods marked with '[TestCleanup]' should follow the following layout to be valid:
+-it should be 'public'
+-it should not be 'abstract'
+-it should not be 'async void'
+-it should not be 'static'
+-it should not be a special method (finalizer, operator...).
+-it should not be generic
+-it should not take any parameter
+-return type should be 'void', 'Task' or 'ValueTask'
+
+The type declaring these methods should also respect the following rules:
+-The type should be a class
+-The class should be 'public' or 'internal' (if the test project is using the '[DiscoverInternals]' attribute)
+-The class shouldn't be 'static'
+-If the class is 'sealed', it should be marked with '[TestClass]' (or a derived attribute).</source>
+        <target state="translated">'[TestCleanup]' ile işaretlenen yöntemlerin geçerli olması için aşağıdaki düzeni takip etmesi gerekir:
+-'public' olmalıdır 
 - 'abstract' olmamalıdır
+-'async void' olmamalıdır
+-'static' olmamalıdır
+-özel bir yöntem (sonlandırıcı, işleç...) olmamalıdır.
+- genel olmamalıdır
 - herhangi bir parametre almamalıdır
-- dönüş türü 'void', 'Task' veya 'ValueTask' olmalıdır
-- 'async void' olmamalıdır
-- özel bir yöntem (sonlandırıcı, işleç...) olmamalıdır.</target>
+- dönüş türü 'void', 'Task' veya 'ValueTask' olmalı
+
+Bu yöntemleri bildiren tipin ayrıca aşağıdaki kurallara uyması gerekir:
+-Tür bir sınıf olmalıdır
+--Sınıf 'public' veya 'internal' olmalıdır (test projesi '[DiscoverInternals]' niteliğini kullanıyorsa)
+-Sınıf 'static' olmamalıdır
+-Sınıf 'sealed' ise '[TestClass]' (veya türetilmiş bir öznitelik) ile işaretlenmelidir.</target>
         <note />
       </trans-unit>
-      <trans-unit id="TestCleanupShouldBeValidMessageFormat_NoParameters">
-        <source>TestCleanup method '{0}' should not take any parameter</source>
-        <target state="translated">'{0}' TestCleanup yöntemi herhangi bir parametre almamalıdır</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="TestCleanupShouldBeValidMessageFormat_NotAbstract">
-        <source>TestCleanup method '{0}' should not be 'abstract'</source>
-        <target state="translated">'{0}' TestCleanup yöntemi 'abstract' olmamalıdır</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="TestCleanupShouldBeValidMessageFormat_NotAsyncVoid">
-        <source>TestCleanup method '{0}' should not be 'async void'</source>
-        <target state="translated">'{0}' TestCleanup yöntemi 'async void' olmamalıdır</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="TestCleanupShouldBeValidMessageFormat_NotGeneric">
-        <source>TestCleanup method '{0}' should not be generic</source>
-        <target state="translated">'{0}' TestCleanup yöntemi genel olmamalıdır</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="TestCleanupShouldBeValidMessageFormat_NotStatic">
-        <source>TestCleanup method '{0}' should not be 'static'</source>
-        <target state="translated">'{0}' TestCleanup yöntemi 'static' olmamalıdır</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="TestCleanupShouldBeValidMessageFormat_Ordinary">
-        <source>TestCleanup method '{0}' should be an 'ordinary' method</source>
-        <target state="translated">'{0}' TestCleanup yöntemi 'ordinary' bir yöntem olmalıdır</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="TestCleanupShouldBeValidMessageFormat_Public">
-        <source>TestCleanup method '{0}' should be 'public'</source>
-        <target state="translated">'{0}' TestCleanup yöntemi 'public' olmalıdır</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="TestCleanupShouldBeValidMessageFormat_ReturnType">
-        <source>TestCleanup method '{0}' should return 'void', 'Task' or 'ValueTask'</source>
-        <target state="translated">'{0}' TestCleanup yöntemi 'void', 'Task' veya 'ValueTask' döndürmelidir</target>
+      <trans-unit id="TestCleanupShouldBeValidMessageFormat">
+        <source>TestCleanup method '{0}' signature is invalid</source>
+        <target state="translated">TestCleanup yöntemi '{0}' imzası geçersiz</target>
         <note />
       </trans-unit>
       <trans-unit id="TestCleanupShouldBeValidTitle">
@@ -508,41 +833,14 @@
         <note />
       </trans-unit>
       <trans-unit id="TestContextShouldBeValidDescription">
-        <source>TestContext property should follow the following layout to be valid:
-- it should be a property
-- it should be 'public' (or 'internal' if '[assembly: DiscoverInternals]' attribute is set)
+        <source>'TestContext' should be a non-static property assigned in constructor or set by MSTest. To be set by MSTest, it should follow the layout:
+- it should be 'public' regardless of whether '[assembly: DiscoverInternals]' attribute is set or not.
 - it should not be 'static'
-- it should not be readonly.</source>
-        <target state="translated">TestContext özelliğinin geçerli olması için aşağıdaki düzeni izlemesi gerekir:
-- bir özellik olmalıdır
-- 'public' (veya '[assembly: DiscoverInternals]' özniteliği ayarlanmışsa 'internal') olmalıdır
+- it should have a setter.</source>
+        <target state="translated">'TestContext' oluşturucuda atanan statik olmayan bir özellik olmalıdır veya MSTest tarafından ayarlanmalıdır. MSTest tarafından ayarlanacaksa şu düzeni izlemelidir:
+- '[assembly: DiscoverInternals]' özniteliğinin ayarlanıp ayarlanmadığına bakılmaksızın 'public' olmalıdır.
 - 'static' olmamalıdır
-- salt okunur olamaz.</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="TestContextShouldBeValidMessageFormat_NotField">
-        <source>Member 'TestContext' should be a property and not a field</source>
-        <target state="translated">'TestContext' üyesi bir alan değil bir özellik olmalıdır</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="TestContextShouldBeValidMessageFormat_NotReadonly">
-        <source>Property 'TestContext' should be settable</source>
-        <target state="translated">'TestContext' özelliği ayarlanmalıdır</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="TestContextShouldBeValidMessageFormat_NotStatic">
-        <source>Property 'TestContext' should not be 'static'</source>
-        <target state="translated">'TestContext' özelliği 'static' olamaz</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="TestContextShouldBeValidMessageFormat_Public">
-        <source>Property 'TestContext' should be 'public'</source>
-        <target state="translated">'TestContext' özelliği 'public' olmalıdır</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="TestContextShouldBeValidMessageFormat_PublicOrInternal">
-        <source>Property 'TestContext' should be 'public' or 'internal'</source>
-        <target state="translated">'TestContext' özelliği 'public' veya 'internal' olmalıdır</target>
+- bir ayarlayıcı içermelidir.</target>
         <note />
       </trans-unit>
       <trans-unit id="TestContextShouldBeValidTitle">
@@ -551,64 +849,41 @@
         <note />
       </trans-unit>
       <trans-unit id="TestInitializeShouldBeValidDescription">
-        <source>Methods marked with [TestInitialize] should follow the following layout to be valid:
-- it should be 'public' 
-- it should not be 'static'
-- it should not be generic
-- it should not be 'abstract'
-- it should not take any parameter
-- return type should be 'void', 'Task' or 'ValueTask'
-- it should not be 'async void'
-- it should not be a special method (finalizer, operator...).</source>
-        <target state="translated">[TestInitialize] ile işaretlenen yöntemlerin geçerli olması için aşağıdaki düzeni takip etmesi gerekir:
-- 'public' olmalıdır 
-- 'static' olmamalıdır
-- genel olmamalıdır
+        <source>Methods marked with '[TestInitialize]' should follow the following layout to be valid:
+-it should be 'public'
+-it should not be 'abstract'
+-it should not be 'async void'
+-it should not be 'static'
+-it should not be a special method (finalizer, operator...).
+-it should not be generic
+-it should not take any parameter
+-return type should be 'void', 'Task' or 'ValueTask'
+
+The type declaring these methods should also respect the following rules:
+-The type should be a class
+-The class should be 'public' or 'internal' (if the test project is using the '[DiscoverInternals]' attribute)
+-The class shouldn't be 'static'
+-If the class is 'sealed', it should be marked with '[TestClass]' (or a derived attribute).</source>
+        <target state="translated">'[TestInitialize]' ile işaretlenen yöntemlerin geçerli olması için aşağıdaki düzeni izlemesi gerekir:
+-'public' olmalıdır 
 - 'abstract' olmamalıdır
+-'async void' olmamalıdır
+-'static' olmamalıdır
+-özel bir yöntem (sonlandırıcı, işleç...) olmamalıdır.
+- genel olmamalıdır
 - herhangi bir parametre almamalıdır
-- dönüş türü 'void', 'Task' veya 'ValueTask' olmalıdır
-- 'async void' olmamalıdır
-- özel bir yöntem (sonlandırıcı, işleç...) olmamalıdır.</target>
+- dönüş türü 'void', 'Task' veya 'ValueTask' olmalı
+
+Bu yöntemleri bildiren tipin ayrıca aşağıdaki kurallara uyması gerekir:
+-Tür bir sınıf olmalıdır
+--Sınıf 'public' veya 'internal' olmalıdır (test projesi '[DiscoverInternals]' niteliğini kullanıyorsa)
+-Sınıf 'static' olmamalıdır
+-Sınıf 'sealed' ise '[TestClass]' (veya türetilmiş bir öznitelik) ile işaretlenmelidir.</target>
         <note />
       </trans-unit>
-      <trans-unit id="TestInitializeShouldBeValidMessageFormat_NoParameters">
-        <source>TestInitialize method '{0}' should not take any parameter</source>
-        <target state="translated">'{0}' TestCleanup yöntemi herhangi bir parametre almamalıdır</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="TestInitializeShouldBeValidMessageFormat_NotAbstract">
-        <source>TestInitialize method '{0}' should not be 'abstract'</source>
-        <target state="translated">'{0}' TestInitialize yöntemi 'abstract' olmamalıdır</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="TestInitializeShouldBeValidMessageFormat_NotAsyncVoid">
-        <source>TestInitialize method  '{0}' should not be 'async void'</source>
-        <target state="translated">'{0}' TestInitialize yöntemi 'async void' olmamalıdır</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="TestInitializeShouldBeValidMessageFormat_NotGeneric">
-        <source>TestInitialize method '{0}' should not be generic</source>
-        <target state="translated">'{0}' TestInitialize yöntemi genel olmamalıdır</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="TestInitializeShouldBeValidMessageFormat_NotStatic">
-        <source>TestInitialize method '{0}' should not be 'static'</source>
-        <target state="translated">'{0}' TestInitialize yöntemi 'static' olmamalıdır</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="TestInitializeShouldBeValidMessageFormat_Ordinary">
-        <source>TestInitialize method '{0}' should be an 'ordinary' method</source>
-        <target state="translated">'{0}' TestInitialize yöntemi 'ordinary' bir yöntem olmalıdır</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="TestInitializeShouldBeValidMessageFormat_Public">
-        <source>TestInitialize method '{0}' should be 'public'</source>
-        <target state="translated">'{0}' TestInitialize yöntemi 'public' olmalıdır</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="TestInitializeShouldBeValidMessageFormat_ReturnType">
-        <source>TestInitialize method '{0}' should return 'void', 'Task' or 'ValueTask'</source>
-        <target state="translated">'{0}' TestCleanup yöntemi 'void', 'Task' veya 'ValueTask' döndürmelidir</target>
+      <trans-unit id="TestInitializeShouldBeValidMessageFormat">
+        <source>TestInitialize method '{0}' signature is invalid</source>
+        <target state="translated">TestInitialize yöntemi '{0}' imzası geçersiz</target>
         <note />
       </trans-unit>
       <trans-unit id="TestInitializeShouldBeValidTitle">
@@ -620,60 +895,20 @@
         <source>Test methods, methods marked with the '[TestMethod]' attribute, should respect the following layout to be considered valid by MSTest:
 - it should be 'public' (or 'internal' if '[assembly: DiscoverInternals]' attribute is set)
 - it should not be 'static'
-- it should not be generic
+- it should may be generic as long as type parameters can be inferred and argument types are compatible
 - it should not be 'abstract'
 - return type should be 'void', 'Task' or 'ValueTask'
 - it should not be 'async void'
 - it should not be a special method (finalizer, operator...).</source>
         <target state="translated">'[TestMethod]' özniteliğiyle işaretlenen test yöntemleri, MSTest:
- tarafından geçerli kabul edilmesi için aşağıdaki düzene göre düzenlenmelidir.
+ tarafından geçerli kabul edilebilmesi için aşağıdaki düzene uygun olacak şekilde düzenlenmelidir
 - 'public' (veya '[assembly: DiscoverInternals]' özniteliği ayarlanmışsa 'internal') olmalıdır
 - 'static' olmamalıdır
-- genel olmamalıdır
+- Tür parametreleri çıkarsandıkça ve bağımsız değişken türleri uyumlu olduğu sürece genel olmalıdır
 - 'abstract' olmamalıdır
 - dönüş türü 'void', 'Task' veya 'ValueTask' olmalıdır
 - 'async void' olmamalıdır
 - özel bir yöntem (sonlandırıcı, işleç...) olmamalıdır.</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="TestMethodShouldBeValidMessageFormat_NotAbstract">
-        <source>Test method '{0}' should not be 'abstract'</source>
-        <target state="translated">'{0}' test metodu 'abstract' olmamalıdır</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="TestMethodShouldBeValidMessageFormat_NotAsyncVoid">
-        <source>Test method '{0}' should not be 'async void'</source>
-        <target state="translated">'{0}' test metodu 'async void' olmamalıdır</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="TestMethodShouldBeValidMessageFormat_NotGeneric">
-        <source>Test method '{0}' should not be generic</source>
-        <target state="translated">'{0}' test metodu genel olmamalıdır</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="TestMethodShouldBeValidMessageFormat_NotStatic">
-        <source>Test method '{0}' should not be 'static'</source>
-        <target state="translated">'{0}' test metodu 'static' olmamalıdır</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="TestMethodShouldBeValidMessageFormat_Ordinary">
-        <source>Test method '{0}' should be an 'ordinary' method</source>
-        <target state="translated">'{0}' test metodu 'ordinary' bir yöntem olmalıdır</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="TestMethodShouldBeValidMessageFormat_Public">
-        <source>Test method '{0}' should be 'public'</source>
-        <target state="translated">'{0}' test metodu 'public' olmalıdır</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="TestMethodShouldBeValidMessageFormat_PublicOrInternal">
-        <source>Test method '{0}' should be 'public' or 'internal'</source>
-        <target state="translated">'{0}' test metodu 'public' veya 'internal' olmalıdır</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="TestMethodShouldBeValidMessageFormat_ReturnType">
-        <source>Test method '{0}' should return 'void', 'Task' or 'ValueTask'</source>
-        <target state="translated">'{0}' test metodu 'void', 'Task' veya 'ValueTask' döndürmelidir</target>
         <note />
       </trans-unit>
       <trans-unit id="TestMethodShouldBeValidTitle">
@@ -696,6 +931,36 @@
         <target state="translated">Test metodu yoksayılmamalıdır</target>
         <note />
       </trans-unit>
+      <trans-unit id="TypeContainingTestMethodShouldBeATestClassDescription">
+        <source>Type containing '[TestMethod]' should be marked with '[TestClass]', otherwise the test method will be silently ignored.</source>
+        <target state="translated">'[TestMethod]' içeren tür '[TestClass]' ile işaretlenmeli, aksi takdirde test yöntemi sessizce yoksayılır.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="TypeContainingTestMethodShouldBeATestClassMessageFormat">
+        <source>Type '{0}' contains test methods and should be marked with '[TestClass]'</source>
+        <target state="translated">'{0}' türü test yöntemleri içeriyor ve '[TestClass]' ile işaretlenmeli</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="TypeContainingTestMethodShouldBeATestClassTitle">
+        <source>Type containing '[TestMethod]' should be marked with '[TestClass]'</source>
+        <target state="translated">'[TestMethod]' içeren tür '[TestClass]' ile işaretlenmelidir</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="UseAsyncSuffixTestFixtureMethodSuppressorJustification">
+        <source>Asynchronous test fixture methods do not require the 'Async' suffix</source>
+        <target state="translated">Zaman uyumsuz test düzeni metotları için 'Async' soneki gerekmez</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="UseAsyncSuffixTestMethodSuppressorJustification">
+        <source>Asynchronous test methods do not require the 'Async' suffix</source>
+        <target state="translated">Asenkron test metotları için 'Async' soneki gerekmez</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="UnusedParameterSuppressorJustification">
+        <source>TestContext parameter is required by MSTest for AssemblyInitialize and ClassInitialize methods</source>
+        <target state="translated">AssemblyInitialize ve ClassInitialize yöntemleri için MSTest tarafından TestContext parametresi gereklidir.</target>
+        <note />
+      </trans-unit>
       <trans-unit id="UseAttributeOnTestMethodAnalyzerMessageFormat">
         <source>[{0}] can only be set on methods marked with [TestMethod]</source>
         <target state="translated">[{0}] yalnızca [TestMethod] ile işaretli yöntemlerde ayarlanabilir</target>
@@ -704,6 +969,41 @@
       <trans-unit id="UseAttributeOnTestMethodAnalyzerTitle">
         <source>[{0}] can only be set on methods marked with [TestMethod]</source>
         <target state="translated">[{0}] yalnızca [TestMethod] ile işaretli yöntemlerde ayarlanabilir</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="UseConditionBaseWithTestClassMessageFormat">
+        <source>The attribute '{0}' which derives from 'ConditionBaseAttribute' should be used only on classes marked with `TestClassAttribute`</source>
+        <target state="translated">'ConditionBaseAttribute' öğesinden türetilen '{0}' özniteliği yalnızca 'TestClassAttribute' ile işaretlenmiş sınıflarda kullanılmalıdır</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="UseConditionBaseWithTestClassTitle">
+        <source>Use 'ConditionBaseAttribute' on test classes</source>
+        <target state="translated">Test sınıflarda 'ConditionBaseAttribute' kullanın</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="UseCooperativeCancellationForTimeoutDescription">
+        <source>Using '[Timeout]' without explicitly setting 'CooperativeCancellation = true' is discouraged. In a future version, cooperative cancellation will become the default behavior. Set 'CooperativeCancellation = true' to opt into the recommended behavior and avoid breaking changes.</source>
+        <target state="translated">'[Timeout]' ayarını 'CooperativeCancellation = true' olarak açıkça ayarlamadan kullanmak önerilmez. Gelecek bir sürümde, birlikte iptal etme varsayılan davranış haline gelecektir. Önerilen davranışı kabul etmek ve uyumsuzlukları önlemek için 'CooperativeCancellation = true' değerini ayarlayın.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="UseCooperativeCancellationForTimeoutMessageFormat">
+        <source>Use 'CooperativeCancellation = true' with '[Timeout]' to enable cooperative cancellation behavior</source>
+        <target state="translated">'[Timeout]' ile 'CooperativeCancellation = true' kullanarak birlikte iptal etme davranışını etkinleştirin</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="UseCooperativeCancellationForTimeoutTitle">
+        <source>Use 'CooperativeCancellation = true' with '[Timeout]'</source>
+        <target state="translated">'[Timeout]' ile 'CooperativeCancellation = true' kullanın</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="UseDeploymentItemWithTestMethodOrTestClassMessageFormat">
+        <source>'[DeploymentItem]' can be specified only on test class or test method</source>
+        <target state="translated">'[DeploymentItem]' yalnızca test sınıfında veya test yönteminde belirtilebilir</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="UseDeploymentItemWithTestMethodOrTestClassTitle">
+        <source>'[DeploymentItem]' can be specified only on test class or test method</source>
+        <target state="translated">'[DeploymentItem]' yalnızca test sınıfında veya test yönteminde belirtilebilir</target>
         <note />
       </trans-unit>
       <trans-unit id="UseParallelizeAttributeAnalyzerDescription">
@@ -719,6 +1019,146 @@
       <trans-unit id="UseParallelizeAttributeAnalyzerTitle">
         <source>Explicitly enable or disable tests parallelization</source>
         <target state="translated">Doğrudan test paralelleştirmeyi etkinleştirin veya devre dışı bırakın</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="UseProperAssertMethodsMessageFormat">
+        <source>Use 'Assert.{0}' instead of 'Assert.{1}'</source>
+        <target state="translated">'Assert.{1}' yerine 'Assert.{0}' kullan</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="UseProperAssertMethodsTitle">
+        <source>Use proper 'Assert' methods</source>
+        <target state="translated">Uygun 'Assert' yöntemlerini kullan</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="UseRetryWithTestMethodMessageFormat">
+        <source>An attribute that derives from 'RetryBaseAttribute' can be specified only on a test method or a test class</source>
+        <target state="translated">'RetryBaseAttribute' özniteliğinden türetilen bir öznitelik yalnızca bir test yönteminde veya test sınıfında belirtilebilir</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="UseRetryWithTestMethodTitle">
+        <source>Use retry attribute on test method or test class</source>
+        <target state="translated">Test yönteminde veya test sınıfında yeniden deneme özniteliğini kullan</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="TestContextPropertyUsageTitle">
+        <source>TestContext property cannot be accessed in this context</source>
+        <target state="translated">TestContext özelliğine bu bağlamda erişilemiyor</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="TestContextPropertyUsageMessageFormat">
+        <source>TestContext property '{0}' cannot be accessed in '{1}' method</source>
+        <target state="translated">TestContext '{0}' özelliğine '{1}' yönteminde erişilemiyor</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="TestContextPropertyUsageDescription">
+        <source>Some TestContext properties are only available during test execution and cannot be accessed in assembly initialize, class initialize, class cleanup, or assembly cleanup methods.</source>
+        <target state="translated">Bazı TestContext özellikleri yalnızca test yürütmesi sırasında kullanılabilir ve derleme başlatma, sınıf başlatma, sınıf temizleme veya derleme temizleme yöntemlerinde erişilemez.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="AssertThrowsShouldContainSingleStatementDescription">
+        <source>Assert.Throws methods should contain only a single statement or expression. Multiple statements can be misleading - if the first statement throws, subsequent statements are never executed; if it doesn't throw, it should be moved outside the Assert.Throws.</source>
+        <target state="translated">Assert.Throws yöntemleri yalnızca tek bir deyim veya ifade içermelidir. Birden fazla deyim yanıltıcı olabilir; eğer ilk deyim bir sonuç oluşturursa, sonraki deyimler asla çalıştırılmaz; eğer sonuç oluşturmazsa, bu deyim Assert.Throws dışına alınmalıdır.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="AssertThrowsShouldContainSingleStatementMessageFormat">
+        <source>Assert.Throws should contain only a single statement/expression</source>
+        <target state="translated">Assert.Throws yalnızca tek bir deyim/ifade içermelidir.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="AssertThrowsShouldContainSingleStatementTitle">
+        <source>Assert.Throws should contain only a single statement/expression</source>
+        <target state="translated">Assert.Throws yalnızca tek bir deyim/ifade içermelidir.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="AvoidAssertsInCatchBlocksTitle">
+        <source>Do not use asserts in catch blocks</source>
+        <target state="translated">Catch bloklarında assert kullanmayın</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="AvoidAssertsInCatchBlocksMessageFormat">
+        <source>Do not use asserts in catch blocks because they may not fail the test if no exception is thrown</source>
+        <target state="translated">Catch bloklarında assert kullanmayın, çünkü özel durum atılmadığında test başarısız olmayabilir</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="AvoidAssertsInCatchBlocksDescription">
+        <source>Using asserts in catch blocks is problematic because the test will pass even if no exception is thrown and the catch block is never executed. Use 'Assert.Throws', 'Assert.ThrowsExactly', 'Assert.ThrowsAsync' or 'Assert.ThrowsExactlyAsync' to verify that an exception is thrown, and then make additional assertions on the caught exception without using the try-catch block. The rule also flags 'throw new AssertFailedException(...)' and 'throw new AssertInconclusiveException(...)' (the desugared forms of 'Assert.Fail' and 'Assert.Inconclusive'). 'Assert.Inconclusive' (and 'throw new AssertInconclusiveException(...)') is exempt when used inside a filtered catch ('catch (...) when (...)'), because demoting a caught failure to an Inconclusive outcome is the only use case that cannot be expressed without a catch block. For other intentional bypasses (for example, attaching a runtime-built message to the failure), suppress the diagnostic with '#pragma warning disable MSTEST0058'.</source>
+        <target state="translated">Catch bloklarında assert kullanmak sorunludur, çünkü özel durum atılmasa ve catch bloğu hiç çalıştırılmasa bile test geçecektir. Bir özel durumun atıldığını doğrulamak için ‘Assert.Throws’, ‘Assert.ThrowsExactly’, ‘Assert.ThrowsAsync’ veya ‘Assert.ThrowsExactlyAsync’ kullanın ve ardından try-catch bloğu kullanmadan yakalanan özel durum üzerinde ek doğrulamalar yapın. Kural ayrıca 'throw new AssertFailedException(...)' ve 'throw new AssertInconclusiveException(...)' ('Assert.Fail' ve 'Assert.Inconclusive' ifadelerinin açılmış biçimleri) ifadelerini de işaretler. Yakalanan bir hatayı Inconclusive sonucuna düşürmek, catch bloğu olmadan ifade edilemeyen tek kullanım senaryosu olduğundan, 'Assert.Inconclusive' ve 'throw new AssertInconclusiveException(...)', filtreli bir catch ('catch (...) when (...)') içinde kullanıldığında bu kuraldan muaftır. Diğer kasıtlı atlamalar için (örneğin hataya çalışma zamanında oluşturulan bir ileti eklemek), tanılamayı '#pragma warning disable MSTEST0058' ile gizleyin.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DoNotUseParallelizeAndDoNotParallelizeTogetherDescription">
+        <source>An assembly should have either '[Parallelize]' or '[DoNotParallelize]' attribute, but not both. Having both attributes creates an ambiguous configuration. When both are present, '[DoNotParallelize]' takes precedence and parallelization will be disabled.</source>
+        <target state="translated">Bir derlemede '[Parallelize]' veya '[DoNotParallelize]' özniteliği bulunmalı ancak ikisi birden bulunmamalıdır. Her iki özniteliğin de bulunması belirsiz bir yapılandırma oluşturur. Her ikisi de varsa, '[DoNotParallelize]' özniteliği öncelikli olarak uygulanır ve paralelleştirme devre dışı bırakılır.</target>
+        <note>{Locked="[Parallelize]"}{Locked="[DoNotParallelize]"}</note>
+      </trans-unit>
+      <trans-unit id="DoNotUseParallelizeAndDoNotParallelizeTogetherMessageFormat">
+        <source>Assembly has both '[Parallelize]' and '[DoNotParallelize]' attributes which creates ambiguity</source>
+        <target state="translated">Derlemede hem '[Parallelize]' hem de '[DoNotParallelize]' özniteliklerinin olması belirsizlik yaratıyor</target>
+        <note>{Locked="[Parallelize]"}{Locked="[DoNotParallelize]"}</note>
+      </trans-unit>
+      <trans-unit id="DoNotUseParallelizeAndDoNotParallelizeTogetherTitle">
+        <source>Do not use both '[Parallelize]' and '[DoNotParallelize]' attributes</source>
+        <target state="translated">Hem '[Parallelize]' hem de '[DoNotParallelize]' özniteliklerini birlikte kullanmayın</target>
+        <note>{Locked="[Parallelize]"}{Locked="[DoNotParallelize]"}</note>
+      </trans-unit>
+      <trans-unit id="UseOSConditionAttributeInsteadOfRuntimeCheckTitle">
+        <source>Use '[OSCondition]' attribute instead of 'RuntimeInformation.IsOSPlatform' calls with early return or 'Assert.Inconclusive'</source>
+        <target state="translated">Erken dönüş veya 'Assert.Inconclusive' ile 'RuntimeInformation.IsOSPlatform' çağrılarını kullanmak yerine '[OSCondition]' özniteliğini kullanın</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="UseOSConditionAttributeInsteadOfRuntimeCheckMessageFormat">
+        <source>Use '[OSCondition]' attribute instead of 'RuntimeInformation.IsOSPlatform' calls with early return or 'Assert.Inconclusive'</source>
+        <target state="translated">Erken dönüş veya 'Assert.Inconclusive' ile 'RuntimeInformation.IsOSPlatform' çağrılarını kullanmak yerine '[OSCondition]' özniteliğini kullanın</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="UseOSConditionAttributeInsteadOfRuntimeCheckDescription">
+        <source>Test methods that use 'RuntimeInformation.IsOSPlatform' with early return or 'Assert.Inconclusive' should use the '[OSCondition]' attribute instead. This attribute provides a more declarative and discoverable way to specify OS-specific test requirements.</source>
+        <target state="translated">Erken dönüş veya 'Assert.Inconclusive' ile 'RuntimeInformation.IsOSPlatform' kullanan test yöntemleri, bunun yerine '[OSCondition]' özniteliğini kullanmalıdır. Bu öznitelik, işletim sistemine özgü test gereksinimlerini belirtmenin daha bildirime dayalı ve keşfedilebilir bir yolunu sağlar.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DuplicateTestMethodAttributeTitle">
+        <source>Avoid duplicate test method attributes</source>
+        <target state="translated">Yinelenen test yöntemi özniteliklerini önleyin</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DuplicateTestMethodAttributeMessageFormat">
+        <source>Test method '{0}' has multiple attributes that inherit from 'TestMethodAttribute'. Only one test method attribute should be used.</source>
+        <target state="translated">Test yöntemi '{0}' 'TestMethodAttribute'den devralan birden fazla özniteliğe sahiptir. Yalnızca bir test yöntemi özelliği kullanılmalıdır.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DuplicateTestMethodAttributeDescription">
+        <source>A test method should be marked with exactly one attribute that is or inherits from 'TestMethodAttribute'. When multiple such attributes are present, only the first one returned by reflection will be used.</source>
+        <target state="translated">Bir test yöntemi, ‘TestMethodAttribute’ olan veya bundan devralan tam olarak bir öznitelikle işaretlenmelidir. Bu türden birden fazla öznitelik mevcut olduğunda, yansıma tarafından döndürülen ilk öznitelik kullanılır.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="AvoidOutRefTestMethodParametersTitle">
+        <source>Avoid using 'out' or 'ref' parameters in test methods</source>
+        <target state="translated">Test yöntemlerinde 'out' veya 'ref' parametrelerini kullanmaktan kaçının</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="AvoidOutRefTestMethodParametersMessageFormat">
+        <source>Test method '{0}' has 'out' or 'ref' parameters for which support will be dropped in a future major version</source>
+        <target state="translated">'{0}' test yönteminde, gelecekteki bir ana sürümde desteği kaldırılacak olan 'out' veya 'ref' parametreleri var</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="AvoidOutRefTestMethodParametersDescription">
+        <source>'out' and 'ref' parameters add no value in test methods and they can safely be replaced by normal parameters.</source>
+        <target state="translated">'out' ve 'ref' parametreleri test yöntemlerine değer katmıyor ve güvenli bir şekilde normal parametrelerle değiştirilebilir.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="TestClassConstructorShouldBeValidTitle">
+        <source>Test classes should have valid constructors</source>
+        <target state="translated">Test sınıfları geçerli oluşturuculara sahip olmalıdır</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="TestClassConstructorShouldBeValidMessageFormat">
+        <source>Test class '{0}' does not have a valid constructor. Valid constructors are 'public' and either parameterless or with one parameter of type 'TestContext'.</source>
+        <target state="translated">‘{0}’ test sınıfının geçerli bir oluşturucusu yok Geçerli oluşturucular 'public' ve parametresiz veya 'TestContext' türünde tek bir parametre içeriyor.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="TestClassConstructorShouldBeValidDescription">
+        <source>Test classes must have a public constructor that is either parameterless or accepts a single TestContext parameter. This allows the test framework to instantiate the test class properly.</source>
+        <target state="translated">Test sınıfları, parametresiz olan veya tek bir TestContext parametresini kabul eden bir genel oluşturucuya sahip olmalıdır. Bu, test çerçevesinin test sınıfının örneğini doğru şekilde oluşturmasına olanak tanır.</target>
         <note />
       </trans-unit>
     </body>

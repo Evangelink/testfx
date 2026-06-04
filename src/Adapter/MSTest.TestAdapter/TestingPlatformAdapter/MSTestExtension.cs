@@ -2,12 +2,11 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 #if !WINDOWS_UWP
-using System.Reflection;
-
 using Microsoft.Testing.Platform.Extensions;
 
 namespace Microsoft.VisualStudio.TestTools.UnitTesting;
 
+[SuppressMessage("ApiDesign", "RS0030:Do not use banned APIs", Justification = "We can use MTP from this folder")]
 internal sealed class MSTestExtension : IExtension
 {
     public string Uid { get; } = GetExtensionUid();
@@ -22,7 +21,7 @@ internal sealed class MSTestExtension : IExtension
 
     private static string GetExtensionUid()
     {
-        var assemblyMetadataAttributes = Assembly.GetEntryAssembly()?.GetCustomAttributes<AssemblyMetadataAttribute>();
+        IEnumerable<AssemblyMetadataAttribute>? assemblyMetadataAttributes = Assembly.GetEntryAssembly()?.GetCustomAttributes<AssemblyMetadataAttribute>();
         return assemblyMetadataAttributes?.FirstOrDefault(x => x.Key == "MSTest.Extension.Uid")?.Value ?? nameof(MSTestExtension);
     }
 }

@@ -4,23 +4,15 @@
 #pragma warning disable CA1837 // Use 'Environment.ProcessId'
 #pragma warning disable CA1416 // Validate platform compatibility
 
-using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
-using System.Globalization;
-using System.Reflection;
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.ComTypes;
 
 namespace Microsoft.Testing.TestInfrastructure;
 
 public class DebuggerUtility
 {
-    public static bool AttachCurrentProcessToParentVSProcess(bool enableLog = false)
-        => AttachVSToProcess(Process.GetCurrentProcess().Id, null, enableLog);
+    public static bool AttachCurrentProcessToParentVSProcess(bool enableLog = false) => AttachVSToProcess(Process.GetCurrentProcess().Id, null, enableLog);
 
-    public static bool AttachCurrentProcessToVSProcessPID(int vsProcessPid, bool enableLog = false)
-        => AttachVSToProcess(Process.GetCurrentProcess().Id, vsProcessPid, enableLog);
+    public static bool AttachCurrentProcessToVSProcessPID(int vsProcessPid, bool enableLog = false) => AttachVSToProcess(Process.GetCurrentProcess().Id, vsProcessPid, enableLog);
 
     private static bool AttachVSToProcess(int? pid, int? vsPid, bool enableLog = false)
     {
@@ -28,14 +20,14 @@ public class DebuggerUtility
         {
             if (pid == null)
             {
-                Trace($"FAIL: Pid is null.", enabled: enableLog);
+                Trace("FAIL: Pid is null.", enabled: enableLog);
                 return false;
             }
 
             var process = Process.GetProcessById(pid.Value);
             Trace($"Starting with pid '{pid}({process.ProcessName})', and vsPid '{vsPid}'", enabled: enableLog);
             Trace($"Using pid: {pid} to get parent VS.", enabled: enableLog);
-            var vs = GetVsFromPid(Process.GetProcessById(vsPid ?? process.Id));
+            Process? vs = GetVsFromPid(Process.GetProcessById(vsPid ?? process.Id));
 
             if (vs != null)
             {
@@ -44,7 +36,7 @@ public class DebuggerUtility
                 return true;
             }
 
-            Trace($"Parent VS not found, finding the first VS that started.", enabled: enableLog);
+            Trace("Parent VS not found, finding the first VS that started.", enabled: enableLog);
             var firstVs = Process.GetProcesses()
                 .Where(p => p.ProcessName == "devenv")
                 .Select(p =>
@@ -81,7 +73,7 @@ public class DebuggerUtility
 
     private static void AttachTo(Process process, Process vs, bool enableLog = false)
     {
-        var attached = AttachVs(vs, process.Id);
+        bool attached = AttachVs(vs, process.Id);
         if (attached)
         {
             // You won't see this in DebugView++ because at this point VS is already attached and all the output goes into Debug window in VS.
@@ -101,30 +93,30 @@ public class DebuggerUtility
         try
         {
 #pragma warning disable IL2050
-            var r = CreateBindCtx(0, out bindCtx);
+            int r = CreateBindCtx(0, out bindCtx);
 #pragma warning restore IL2050
             Marshal.ThrowExceptionForHR(r);
             if (bindCtx == null)
             {
-                Trace($"BindCtx is null. Cannot attach VS.", enabled: enableLog);
+                Trace("BindCtx is null. Cannot attach VS.", enabled: enableLog);
                 return false;
             }
 
             bindCtx.GetRunningObjectTable(out runningObjectTable);
             if (runningObjectTable == null)
             {
-                Trace($"RunningObjectTable is null. Cannot attach VS.", enabled: enableLog);
+                Trace("RunningObjectTable is null. Cannot attach VS.", enabled: enableLog);
                 return false;
             }
 
             runningObjectTable.EnumRunning(out enumMoniker);
             if (enumMoniker == null)
             {
-                Trace($"EnumMoniker is null. Cannot attach VS.", enabled: enableLog);
+                Trace("EnumMoniker is null. Cannot attach VS.", enabled: enableLog);
                 return false;
             }
 
-            var dteSuffix = ":" + vs.Id;
+            string dteSuffix = ":" + vs.Id;
 
             var moniker = new IMoniker[1];
             while (enumMoniker.Next(1, moniker, IntPtr.Zero) == 0 && moniker[0] != null)
@@ -133,21 +125,20 @@ public class DebuggerUtility
 
                 if (dn.StartsWith("!VisualStudio.DTE.", StringComparison.Ordinal) && dn.EndsWith(dteSuffix, StringComparison.Ordinal))
                 {
-                    object dbg, lps;
                     runningObjectTable.GetObject(moniker[0], out object dte);
 
                     // The COM object can be busy, we retry few times, hoping that it won't be busy next time.
-                    for (var i = 0; i < 10; i++)
+                    for (int i = 0; i < 10; i++)
                     {
                         try
                         {
-                            dbg = dte.GetType().InvokeMember("Debugger", BindingFlags.GetProperty, null, dte, null, CultureInfo.InvariantCulture)!;
-                            lps = dbg.GetType().InvokeMember("LocalProcesses", BindingFlags.GetProperty, null, dbg, null, CultureInfo.InvariantCulture)!;
+                            object dbg = dte.GetType().InvokeMember("Debugger", BindingFlags.GetProperty, null, dte, null, CultureInfo.InvariantCulture)!;
+                            object lps = dbg.GetType().InvokeMember("LocalProcesses", BindingFlags.GetProperty, null, dbg, null, CultureInfo.InvariantCulture)!;
                             var lpn = (System.Collections.IEnumerator)lps.GetType().InvokeMember("GetEnumerator", BindingFlags.InvokeMethod, null, lps, null, CultureInfo.InvariantCulture)!;
 
                             while (lpn.MoveNext())
                             {
-                                var pn = Convert.ToInt32(lpn.Current.GetType().InvokeMember("ProcessID", BindingFlags.GetProperty, null, lpn.Current, null, CultureInfo.InvariantCulture), CultureInfo.InvariantCulture);
+                                int pn = Convert.ToInt32(lpn.Current.GetType().InvokeMember("ProcessID", BindingFlags.GetProperty, null, lpn.Current, null, CultureInfo.InvariantCulture), CultureInfo.InvariantCulture);
 
                                 if (pn == pid)
                                 {
@@ -158,7 +149,7 @@ public class DebuggerUtility
                         }
 
                         // Catch the exception if it is COMException coming directly, or coming from methodInvocation, otherwise just let it be.
-                        catch (Exception ex) when (ex is COMException || (ex is TargetInvocationException tie && tie.InnerException is COMException))
+                        catch (Exception ex) when (ex is COMException or TargetInvocationException { InnerException: COMException })
                         {
                             Trace($"ComException: Retrying in 250ms.\n{ex}", enabled: enableLog);
                             Thread.Sleep(250);
@@ -214,7 +205,7 @@ public class DebuggerUtility
 
     private static Process? GetVsFromPid(Process process)
     {
-        var parent = process;
+        Process? parent = process;
         while (!IsVsOrNull(parent))
         {
             parent = GetParentProcess(parent);
@@ -231,7 +222,7 @@ public class DebuggerUtility
             return true;
         }
 
-        var isVs = process.ProcessName.Equals("devenv", StringComparison.OrdinalIgnoreCase);
+        bool isVs = process.ProcessName.Equals("devenv", StringComparison.OrdinalIgnoreCase);
         if (isVs)
         {
             Trace($"Process {process.ProcessName} ({process.Id}) is VS.", enabled: enableLog);
@@ -290,10 +281,10 @@ public class DebuggerUtility
         {
             try
             {
-                var handle = process.Handle;
-                var res = NtQueryInformationProcess(handle, 0, out var pbi, Marshal.SizeOf<PROCESS_BASIC_INFORMATION>(), out int size);
+                IntPtr handle = process.Handle;
+                int res = NtQueryInformationProcess(handle, 0, out PROCESS_BASIC_INFORMATION pbi, Marshal.SizeOf<PROCESS_BASIC_INFORMATION>(), out int size);
 
-                var p = res != 0 ? -1 : pbi.InheritedFromUniqueProcessId.ToInt32();
+                int p = res != 0 ? -1 : pbi.InheritedFromUniqueProcessId.ToInt32();
 
                 return p;
             }
@@ -332,5 +323,5 @@ public class DebuggerUtility
         out int returnLength);
 
     [DllImport("ole32.dll")]
-    private static extern int CreateBindCtx(uint reserved, out IBindCtx ppbc);
+    private static extern int CreateBindCtx(uint reserved, out IBindCtx? ppbc);
 }

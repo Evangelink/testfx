@@ -1,86 +1,84 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System.Text;
+#if !NETFRAMEWORK
+using System.Text.Json;
+#endif
 
-using Microsoft.Testing.Internal.Framework;
+using Microsoft.Testing.Platform.CommandLine;
 using Microsoft.Testing.Platform.Configurations;
-using Microsoft.Testing.Platform.Extensions;
 using Microsoft.Testing.Platform.Helpers;
 using Microsoft.Testing.Platform.Logging;
 using Microsoft.Testing.Platform.Services;
-using Microsoft.Testing.TestInfrastructure;
 
 using Moq;
 
 namespace Microsoft.Testing.Platform.UnitTests;
 
-[TestGroup]
-public class ConfigurationManagerTests : TestBase
+[TestClass]
+public sealed class ConfigurationManagerTests
 {
-    private readonly ServiceProvider _serviceProvider;
-
-    public ConfigurationManagerTests(ITestExecutionContext testExecutionContext)
-        : base(testExecutionContext)
-    {
-        _serviceProvider = new();
-        _serviceProvider.AddService(new SystemFileSystem());
-    }
-
-    [ArgumentsProvider(nameof(GetConfigurationValueFromJsonData))]
+    [TestMethod]
+    [DynamicData(nameof(GetConfigurationValueFromJsonData))]
     public async ValueTask GetConfigurationValueFromJson(string jsonFileConfig, string key, string? result)
     {
         Mock<IFileSystem> fileSystem = new();
-        fileSystem.Setup(x => x.Exists(It.IsAny<string>())).Returns(true);
+        fileSystem.Setup(x => x.ExistFile(It.IsAny<string>())).Returns(true);
         fileSystem.Setup(x => x.NewFileStream(It.IsAny<string>(), FileMode.Open, FileAccess.Read))
-            .Returns(new MemoryStream(Encoding.UTF8.GetBytes(jsonFileConfig)));
+            .Returns(new MemoryFileStream(Encoding.UTF8.GetBytes(jsonFileConfig)));
         CurrentTestApplicationModuleInfo testApplicationModuleInfo = new(new SystemEnvironment(), new SystemProcessHandler());
-        ConfigurationManager configurationManager = new(fileSystem.Object, testApplicationModuleInfo);
+        ConfigurationManager configurationManager = new(fileSystem.Object, testApplicationModuleInfo, new SystemEnvironment());
         configurationManager.AddConfigurationSource(() => new JsonConfigurationSource(testApplicationModuleInfo, fileSystem.Object, null));
-        IConfiguration configuration = await configurationManager.BuildAsync(null);
+        IConfiguration configuration = await configurationManager.BuildAsync(null, new CommandLineParseResult(null, new List<CommandLineParseOption>(), []));
         Assert.AreEqual(result, configuration[key], $"Expected '{result}' found '{configuration[key]}'");
     }
 
     internal static IEnumerable<(string JsonFileConfig, string Key, string? Result)> GetConfigurationValueFromJsonData()
     {
-        yield return ("{\"TestingPlatform\": {\"Troubleshooting\": {\"CrashDump\": {\"Enable\": true}}}}", "TestingPlatform:Troubleshooting:CrashDump:Enable", "True");
-        yield return ("{\"TestingPlatform\": {\"Troubleshooting\": {\"CrashDump\": {\"Enable\": true}}}}", "TestingPlatform:Troubleshooting:CrashDump:enable", "True");
-        yield return ("{\"TestingPlatform\": {\"Troubleshooting\": {\"CrashDump\": {\"Enable\": true}}}}", "TestingPlatform:Troubleshooting:CrashDump:Missing", null);
-        yield return ("{\"TestingPlatform\": {\"Troubleshooting\": {\"CrashDump\": {\"Enable\": true}}}}", "TestingPlatform:Troubleshooting:CrashDump", "{\"Enable\": true}");
-        yield return ("{\"TestingPlatform\": {\"Troubleshooting\": {\"CrashDump\": {\"Enable\": true} , \"CrashDump2\": {\"Enable\": true}}}}", "TestingPlatform:Troubleshooting:CrashDump", "{\"Enable\": true}");
-        yield return ("{\"TestingPlatform\": {\"Troubleshooting\": {\"CrashDump\": {\"Enable\": true}}}}", "TestingPlatform:", null);
-        yield return ("{}", "TestingPlatform:Troubleshooting:CrashDump:Enable", null);
-        yield return ("{\"TestingPlatform\": [1,2] }", "TestingPlatform:0", "1");
-        yield return ("{\"TestingPlatform\": [1,2] }", "TestingPlatform:1", "2");
-        yield return ("{\"TestingPlatform\": [1,2] }", "TestingPlatform", "[1,2]");
-        yield return ("{\"TestingPlatform\": { \"Array\" : [ {\"Key\" : \"Value\"} , {\"Key\" : 3} ] } }", "TestingPlatform:Array:0", null);
-        yield return ("{\"TestingPlatform\": { \"Array\" : [ {\"Key\" : \"Value\"} , {\"Key\" : 3} ] } }", "TestingPlatform:Array:0:Key", "Value");
-        yield return ("{\"TestingPlatform\": { \"Array\" : [ {\"Key\" : \"Value\"} , {\"Key\" : 3} ] } }", "TestingPlatform:Array:1:Key", "3");
+        yield return ("{\"platformOptions\": {\"Troubleshooting\": {\"CrashDump\": {\"Enable\": true}}}}", "platformOptions:Troubleshooting:CrashDump:Enable", "True");
+        yield return ("{\"platformOptions\": {\"Troubleshooting\": {\"CrashDump\": {\"Enable\": true}}}}", "platformOptions:Troubleshooting:CrashDump:enable", "True");
+        yield return ("{\"platformOptions\": {\"Troubleshooting\": {\"CrashDump\": {\"Enable\": true}}}}", "platformOptions:Troubleshooting:CrashDump:Missing", null);
+        yield return ("{\"platformOptions\": {\"Troubleshooting\": {\"CrashDump\": {\"Enable\": true}}}}", "platformOptions:Troubleshooting:CrashDump", "{\"Enable\": true}");
+        yield return ("{\"platformOptions\": {\"Troubleshooting\": {\"CrashDump\": {\"Enable\": true} , \"CrashDump2\": {\"Enable\": true}}}}", "platformOptions:Troubleshooting:CrashDump", "{\"Enable\": true}");
+        yield return ("{\"platformOptions\": {\"Troubleshooting\": {\"CrashDump\": {\"Enable\": true}}}}", "platformOptions:", null);
+        yield return ("{}", "platformOptions:Troubleshooting:CrashDump:Enable", null);
+        yield return ("{\"platformOptions\": [1,2] }", "platformOptions:0", "1");
+        yield return ("{\"platformOptions\": [1,2] }", "platformOptions:1", "2");
+        yield return ("{\"platformOptions\": [1,2] }", "platformOptions", "[1,2]");
+        yield return ("{\"platformOptions\": { \"Array\" : [ {\"Key\" : \"Value\"} , {\"Key\" : 3} ] } }", "platformOptions:Array:0", null);
+        yield return ("{\"platformOptions\": { \"Array\" : [ {\"Key\" : \"Value\"} , {\"Key\" : 3} ] } }", "platformOptions:Array:0:Key", "Value");
+        yield return ("{\"platformOptions\": { \"Array\" : [ {\"Key\" : \"Value\"} , {\"Key\" : 3} ] } }", "platformOptions:Array:1:Key", "3");
     }
 
+    [TestMethod]
     public async ValueTask InvalidJson_Fail()
     {
         Mock<IFileSystem> fileSystem = new();
-        fileSystem.Setup(x => x.Exists(It.IsAny<string>())).Returns(true);
-        fileSystem.Setup(x => x.NewFileStream(It.IsAny<string>(), FileMode.Open)).Returns(new MemoryStream(Encoding.UTF8.GetBytes(string.Empty)));
+        fileSystem.Setup(x => x.ExistFile(It.IsAny<string>())).Returns(true);
+        fileSystem.Setup(x => x.NewFileStream(It.IsAny<string>(), FileMode.Open, FileAccess.Read)).Returns(() => new MemoryFileStream(Encoding.UTF8.GetBytes(string.Empty)));
         CurrentTestApplicationModuleInfo testApplicationModuleInfo = new(new SystemEnvironment(), new SystemProcessHandler());
-        ConfigurationManager configurationManager = new(fileSystem.Object, testApplicationModuleInfo);
+        ConfigurationManager configurationManager = new(fileSystem.Object, testApplicationModuleInfo, new SystemEnvironment());
         configurationManager.AddConfigurationSource(() =>
             new JsonConfigurationSource(testApplicationModuleInfo, fileSystem.Object, null));
-        await Assert.ThrowsAsync<Exception>(() => configurationManager.BuildAsync(null));
+
+        // The behavior difference is System.Text.Json vs Jsonite
+#if NETFRAMEWORK
+        await Assert.ThrowsAsync<FormatException>(() => configurationManager.BuildAsync(null, new CommandLineParseResult(null, new List<CommandLineParseOption>(), [])), ex => ex?.ToString() ?? "No exception was thrown");
+#else
+        await Assert.ThrowsAsync<JsonException>(() => configurationManager.BuildAsync(null, new CommandLineParseResult(null, new List<CommandLineParseOption>(), [])), ex => ex?.ToString() ?? "No exception was thrown");
+#endif
     }
 
-    [ArgumentsProvider(nameof(GetConfigurationValueFromJsonData))]
+    [TestMethod]
+    [DynamicData(nameof(GetConfigurationValueFromJsonData))]
     public async ValueTask GetConfigurationValueFromJsonWithFileLoggerProvider(string jsonFileConfig, string key, string? result)
     {
         byte[] bytes = Encoding.UTF8.GetBytes(jsonFileConfig);
 
         Mock<IFileSystem> fileSystem = new();
-        fileSystem.Setup(x => x.Exists(It.IsAny<string>())).Returns(true);
-        fileSystem.Setup(x => x.NewFileStream(It.IsAny<string>(), FileMode.Open))
-            .Returns(new MemoryStream(bytes));
+        fileSystem.Setup(x => x.ExistFile(It.IsAny<string>())).Returns(true);
         fileSystem.Setup(x => x.NewFileStream(It.IsAny<string>(), FileMode.Open, FileAccess.Read))
-            .Returns(new MemoryStream(bytes));
+            .Returns(() => new MemoryFileStream(bytes));
 
         Mock<ILogger> loggerMock = new();
         loggerMock.Setup(x => x.IsEnabled(LogLevel.Trace)).Returns(true);
@@ -89,37 +87,40 @@ public class ConfigurationManagerTests : TestBase
         loggerProviderMock.Setup(x => x.CreateLogger(It.IsAny<string>())).Returns(loggerMock.Object);
 
         CurrentTestApplicationModuleInfo testApplicationModuleInfo = new(new SystemEnvironment(), new SystemProcessHandler());
-        ConfigurationManager configurationManager = new(fileSystem.Object, testApplicationModuleInfo);
+        ConfigurationManager configurationManager = new(fileSystem.Object, testApplicationModuleInfo, new SystemEnvironment());
         configurationManager.AddConfigurationSource(() =>
             new JsonConfigurationSource(testApplicationModuleInfo, fileSystem.Object, null));
 
-        IConfiguration configuration = await configurationManager.BuildAsync(loggerProviderMock.Object);
+        IConfiguration configuration = await configurationManager.BuildAsync(loggerProviderMock.Object, new CommandLineParseResult(null, new List<CommandLineParseOption>(), []));
         Assert.AreEqual(result, configuration[key], $"Expected '{result}' found '{configuration[key]}'");
 
         loggerMock.Verify(x => x.LogAsync(LogLevel.Trace, It.IsAny<string>(), null, LoggingExtensions.Formatter), Times.Once);
     }
 
+    [TestMethod]
     public async ValueTask BuildAsync_EmptyConfigurationSources_ThrowsException()
     {
         CurrentTestApplicationModuleInfo testApplicationModuleInfo = new(new SystemEnvironment(), new SystemProcessHandler());
-        ConfigurationManager configurationManager = new(new SystemFileSystem(), testApplicationModuleInfo);
-        await Assert.ThrowsAsync<InvalidOperationException>(() => configurationManager.BuildAsync(null));
+        ConfigurationManager configurationManager = new(new SystemFileSystem(), testApplicationModuleInfo, new SystemEnvironment());
+        await Assert.ThrowsAsync<InvalidOperationException>(() => configurationManager.BuildAsync(null, new CommandLineParseResult(null, new List<CommandLineParseOption>(), [])));
     }
 
+    [TestMethod]
     public async ValueTask BuildAsync_ConfigurationSourcesNotEnabledAsync_ThrowsException()
     {
         Mock<IConfigurationSource> mockConfigurationSource = new();
         mockConfigurationSource.Setup(x => x.IsEnabledAsync()).ReturnsAsync(false);
 
         CurrentTestApplicationModuleInfo testApplicationModuleInfo = new(new SystemEnvironment(), new SystemProcessHandler());
-        ConfigurationManager configurationManager = new(new SystemFileSystem(), testApplicationModuleInfo);
+        ConfigurationManager configurationManager = new(new SystemFileSystem(), testApplicationModuleInfo, new SystemEnvironment());
         configurationManager.AddConfigurationSource(() => mockConfigurationSource.Object);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => configurationManager.BuildAsync(null));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => configurationManager.BuildAsync(null, new CommandLineParseResult(null, new List<CommandLineParseOption>(), [])));
 
         mockConfigurationSource.Verify(x => x.IsEnabledAsync(), Times.Once);
     }
 
+    [TestMethod]
     public async ValueTask BuildAsync_ConfigurationSourceIsAsyncInitializableExtension_InitializeAsyncIsCalled()
     {
         Mock<IConfigurationProvider> mockConfigurationProvider = new();
@@ -131,28 +132,182 @@ public class ConfigurationManagerTests : TestBase
         };
 
         CurrentTestApplicationModuleInfo testApplicationModuleInfo = new(new SystemEnvironment(), new SystemProcessHandler());
-        ConfigurationManager configurationManager = new(new SystemFileSystem(), testApplicationModuleInfo);
+        ConfigurationManager configurationManager = new(new SystemFileSystem(), testApplicationModuleInfo, new SystemEnvironment());
         configurationManager.AddConfigurationSource(() => fakeConfigurationSource);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => configurationManager.BuildAsync(null));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => configurationManager.BuildAsync(null, new CommandLineParseResult(null, new List<CommandLineParseOption>(), [])));
     }
-}
 
-internal class FakeConfigurationSource : IConfigurationSource, IAsyncInitializableExtension
-{
-    public string Uid => nameof(FakeConfigurationSource);
+    [TestMethod]
+    public async ValueTask GetTestConfigJsonSection_AbsentSection_ReturnsEmpty()
+    {
+        AggregatedConfiguration configuration = await BuildAggregatedConfigurationAsync("{\"other\": {}}");
+        IReadOnlyList<KeyValuePair<string, string?>> entries = configuration.GetTestConfigJsonSection("environmentVariables");
 
-    public string Version => "1.0.0";
+        Assert.IsEmpty(entries);
+    }
 
-    public string DisplayName => nameof(FakeConfigurationSource);
+    [TestMethod]
+    public async ValueTask GetTestConfigJsonSection_EmptyObject_ReturnsEmpty()
+    {
+        AggregatedConfiguration configuration = await BuildAggregatedConfigurationAsync("{\"environmentVariables\": {}}");
+        IReadOnlyList<KeyValuePair<string, string?>> entries = configuration.GetTestConfigJsonSection("environmentVariables");
 
-    public string Description => nameof(FakeConfigurationSource);
+        Assert.IsEmpty(entries);
+    }
 
-    public required IConfigurationProvider ConfigurationProvider { get; set; }
+    [TestMethod]
+    public async ValueTask GetTestConfigJsonSection_FlatStringEntries_ReturnsAll()
+    {
+        AggregatedConfiguration configuration = await BuildAggregatedConfigurationAsync(
+            "{\"environmentVariables\": {\"DOTNET_ENVIRONMENT\": \"Development\", \"HEADED\": \"1\"}}");
 
-    public IConfigurationProvider Build() => ConfigurationProvider;
+        IReadOnlyList<KeyValuePair<string, string?>> entries = configuration.GetTestConfigJsonSection("environmentVariables");
 
-    public Task InitializeAsync() => Task.CompletedTask;
+        Assert.HasCount(2, entries);
+        Assert.AreEqual("Development", entries.Single(e => e.Key == "DOTNET_ENVIRONMENT").Value);
+        Assert.AreEqual("1", entries.Single(e => e.Key == "HEADED").Value);
+    }
 
-    public Task<bool> IsEnabledAsync() => Task.FromResult(true);
+    [TestMethod]
+    public async ValueTask GetTestConfigJsonSection_ScalarSectionValue_Throws()
+    {
+        AggregatedConfiguration configuration = await BuildAggregatedConfigurationAsync(
+            "{\"environmentVariables\": \"oops\"}");
+
+        FormatException exception = Assert.Throws<FormatException>(() => configuration.GetTestConfigJsonSection("environmentVariables"));
+        Assert.Contains("environmentVariables", exception.Message);
+    }
+
+    [TestMethod]
+    public async ValueTask GetTestConfigJsonSection_ArraySectionValue_Throws()
+    {
+        AggregatedConfiguration configuration = await BuildAggregatedConfigurationAsync(
+            "{\"environmentVariables\": [\"a\", \"b\"]}");
+
+        FormatException exception = Assert.Throws<FormatException>(() => configuration.GetTestConfigJsonSection("environmentVariables"));
+        Assert.Contains("environmentVariables", exception.Message);
+    }
+
+    [TestMethod]
+    public async ValueTask GetTestConfigJsonSection_NestedObjectEntry_Throws()
+    {
+        AggregatedConfiguration configuration = await BuildAggregatedConfigurationAsync(
+            "{\"environmentVariables\": {\"FOO\": {\"NESTED\": \"x\"}}}");
+
+        FormatException exception = Assert.Throws<FormatException>(() => configuration.GetTestConfigJsonSection("environmentVariables"));
+        Assert.Contains("FOO", exception.Message);
+    }
+
+    [TestMethod]
+    public async ValueTask GetTestConfigJsonSection_NestedArrayEntry_Throws()
+    {
+        AggregatedConfiguration configuration = await BuildAggregatedConfigurationAsync(
+            "{\"environmentVariables\": {\"FOO\": [\"a\", \"b\"]}}");
+
+        Assert.Throws<FormatException>(() => configuration.GetTestConfigJsonSection("environmentVariables"));
+    }
+
+    [TestMethod]
+    public async ValueTask GetTestConfigJsonSection_EmptyObjectEntry_Throws()
+    {
+        AggregatedConfiguration configuration = await BuildAggregatedConfigurationAsync(
+            "{\"environmentVariables\": {\"FOO\": {}}}");
+
+        Assert.Throws<FormatException>(() => configuration.GetTestConfigJsonSection("environmentVariables"));
+    }
+
+    [TestMethod]
+    public async ValueTask GetTestConfigJsonSection_EmptyArrayValue_Throws()
+    {
+        AggregatedConfiguration configuration = await BuildAggregatedConfigurationAsync(
+            "{\"environmentVariables\": []}");
+
+        FormatException exception = Assert.Throws<FormatException>(() => configuration.GetTestConfigJsonSection("environmentVariables"));
+        Assert.Contains("environmentVariables", exception.Message);
+    }
+
+    [TestMethod]
+    public async ValueTask GetTestConfigJsonSection_EmptyChildKey_PassesThroughForConsumerValidation()
+    {
+        AggregatedConfiguration configuration = await BuildAggregatedConfigurationAsync(
+            "{\"environmentVariables\": {\"\": \"x\"}}");
+
+        // GetSection itself must not throw the "must be scalar" error for an empty child key. Empty
+        // remainders represent a direct (top-level) child of the section with a scalar value, so the
+        // entry is returned and the consumer (e.g. TestConfigurationEnvironmentVariableProvider) can
+        // run its own dedicated empty-name validation/error message.
+        IReadOnlyList<KeyValuePair<string, string?>> entries = configuration.GetTestConfigJsonSection("environmentVariables");
+
+        Assert.HasCount(1, entries);
+        Assert.AreEqual(string.Empty, entries[0].Key);
+        Assert.AreEqual("x", entries[0].Value);
+    }
+
+    [TestMethod]
+    public async ValueTask GetTestConfigJsonSection_NumericAndBoolValues_AreCoercedToText()
+    {
+        AggregatedConfiguration configuration = await BuildAggregatedConfigurationAsync(
+            "{\"environmentVariables\": {\"COUNT\": 42, \"ENABLED\": true}}");
+
+        IReadOnlyList<KeyValuePair<string, string?>> entries = configuration.GetTestConfigJsonSection("environmentVariables");
+
+        Assert.HasCount(2, entries);
+        Assert.AreEqual("42", entries.Single(e => e.Key == "COUNT").Value);
+        // The parser titlecases booleans on both runtimes.
+        Assert.AreEqual("True", entries.Single(e => e.Key == "ENABLED").Value);
+    }
+
+    private static async Task<AggregatedConfiguration> BuildAggregatedConfigurationAsync(string jsonFileContent)
+    {
+        Mock<IFileSystem> fileSystem = new();
+        fileSystem.Setup(x => x.ExistFile(It.IsAny<string>())).Returns(true);
+        fileSystem.Setup(x => x.NewFileStream(It.IsAny<string>(), FileMode.Open, FileAccess.Read))
+            .Returns(() => new MemoryFileStream(Encoding.UTF8.GetBytes(jsonFileContent)));
+        CurrentTestApplicationModuleInfo testApplicationModuleInfo = new(new SystemEnvironment(), new SystemProcessHandler());
+        ConfigurationManager configurationManager = new(fileSystem.Object, testApplicationModuleInfo, new SystemEnvironment());
+        configurationManager.AddConfigurationSource(() => new JsonConfigurationSource(testApplicationModuleInfo, fileSystem.Object, null));
+        IConfiguration configuration = await configurationManager.BuildAsync(null, new CommandLineParseResult(null, new List<CommandLineParseOption>(), []));
+        return (AggregatedConfiguration)configuration;
+    }
+
+    private class FakeConfigurationSource : IConfigurationSource, IAsyncInitializableExtension
+    {
+        public string Uid => nameof(FakeConfigurationSource);
+
+        public string Version => "1.0.0";
+
+        public string DisplayName => nameof(FakeConfigurationSource);
+
+        public string Description => nameof(FakeConfigurationSource);
+
+        public required IConfigurationProvider ConfigurationProvider { get; set; }
+
+        public int Order => 100;
+
+        public Task<IConfigurationProvider> BuildAsync(CommandLineParseResult commandLineParseResult) => Task.FromResult(ConfigurationProvider);
+
+        public Task InitializeAsync() => Task.CompletedTask;
+
+        public Task<bool> IsEnabledAsync() => Task.FromResult(true);
+    }
+
+    internal sealed class MemoryFileStream : IFileStream
+    {
+        private readonly MemoryStream _stream;
+
+        public MemoryFileStream(byte[] bytes) => _stream = new MemoryStream(bytes);
+
+        Stream IFileStream.Stream => _stream;
+
+        string IFileStream.Name => string.Empty;
+
+        void IDisposable.Dispose()
+            => _stream.Dispose();
+
+#if NETCOREAPP
+        ValueTask IAsyncDisposable.DisposeAsync()
+            => _stream.DisposeAsync();
+#endif
+    }
 }

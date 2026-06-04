@@ -1,14 +1,16 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Microsoft.CodeAnalysis;
+
 namespace Microsoft.Testing.Platform.IPC;
 
-internal interface IServer : INamedPipeBase, IDisposable
+[Embedded]
+internal interface IServer :
 #if NETCOREAPP
-#pragma warning disable SA1001 // Commas should be spaced correctly
-    , IAsyncDisposable
-#pragma warning restore SA1001 // Commas should be spaced correctly
+    IAsyncDisposable,
 #endif
+    IDisposable
 {
     PipeNameDescription PipeName { get; }
 

@@ -1,8 +1,7 @@
-// Copyright (c) Microsoft Corporation. All rights reserved.
+﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 #if !WINDOWS_UWP
-using System.Globalization;
 
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -11,7 +10,9 @@ namespace Microsoft.VisualStudio.TestPlatform.MSTestAdapter.PlatformServices.Dep
 /// <summary>
 /// Specifies type of deployment item origin, where the item comes from.
 /// </summary>
+#if NETFRAMEWORK
 [Serializable]
+#endif
 internal enum DeploymentItemOriginType
 {
     /// <summary>
@@ -38,8 +39,10 @@ internal enum DeploymentItemOriginType
 /// <summary>
 /// The deployment item for a test class or a test method.
 /// </summary>
+#if NETFRAMEWORK
 [Serializable]
-internal class DeploymentItem
+#endif
+internal sealed class DeploymentItem
 {
     /// <summary>
     /// Initializes a new instance of the <see cref="DeploymentItem"/> class.

@@ -1,7 +1,5 @@
-// Copyright (c) Microsoft Corporation. All rights reserved.
+﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
-
-using System.Diagnostics;
 
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -10,13 +8,12 @@ namespace SuiteLifeCycleTestProject;
 [TestClass]
 public sealed class LifeCycleDerivedClassInitializeAndCleanupNone : LifeCycleClassInitializeAndCleanupNone
 {
-    private static TestContext s_testContext;
+    public TestContext DerivedClassTestContext { get; set; } = null!;
 
-    public TestContext DerivedClassTestContext { get; set; }
-
-    public LifeCycleDerivedClassInitializeAndCleanupNone()
+    public LifeCycleDerivedClassInitializeAndCleanupNone(TestContext testContext)
+        : base(testContext)
     {
-        s_testContext.WriteLine("LifeCycleDerivedClassInitializeAndCleanupNone.ctor was called");
+        testContext.WriteLine("LifeCycleDerivedClassInitializeAndCleanupNone.ctor was called");
         Console.WriteLine("Console: LifeCycleDerivedClassInitializeAndCleanupNone.ctor was called");
         Trace.WriteLine("Trace: LifeCycleDerivedClassInitializeAndCleanupNone.ctor was called");
         Debug.WriteLine("Debug: LifeCycleDerivedClassInitializeAndCleanupNone.ctor was called");
@@ -25,8 +22,7 @@ public sealed class LifeCycleDerivedClassInitializeAndCleanupNone : LifeCycleCla
     [ClassInitialize]
     public static void DerivedClassInitialize(TestContext testContext)
     {
-        s_testContext = testContext;
-        s_testContext.WriteLine("LifeCycleDerivedClassInitializeAndCleanupNone.ClassInitialize was called");
+        testContext.WriteLine("LifeCycleDerivedClassInitializeAndCleanupNone.ClassInitialize was called");
         Console.WriteLine("Console: LifeCycleDerivedClassInitializeAndCleanupNone.ClassInitialize was called");
         Trace.WriteLine("Trace: LifeCycleDerivedClassInitializeAndCleanupNone.ClassInitialize was called");
         Debug.WriteLine("Debug: LifeCycleDerivedClassInitializeAndCleanupNone.ClassInitialize was called");
@@ -60,9 +56,9 @@ public sealed class LifeCycleDerivedClassInitializeAndCleanupNone : LifeCycleCla
     }
 
     [ClassCleanup]
-    public static void DerivedClassCleanup()
+    public static void DerivedClassCleanup(TestContext testContext)
     {
-        s_testContext.WriteLine("LifeCycleDerivedClassInitializeAndCleanupNone.ClassCleanup was called");
+        testContext.WriteLine("LifeCycleDerivedClassInitializeAndCleanupNone.ClassCleanup was called");
         Console.WriteLine("Console: LifeCycleDerivedClassInitializeAndCleanupNone.ClassCleanup was called");
         Trace.WriteLine("Trace: LifeCycleDerivedClassInitializeAndCleanupNone.ClassCleanup was called");
         Debug.WriteLine("Debug: LifeCycleDerivedClassInitializeAndCleanupNone.ClassCleanup was called");

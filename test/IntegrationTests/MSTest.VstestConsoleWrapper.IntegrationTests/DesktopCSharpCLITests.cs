@@ -5,6 +5,7 @@ using Microsoft.MSTestV2.CLIAutomation;
 
 namespace MSTest.VstestConsoleWrapper.IntegrationTests;
 
+[TestClass]
 public class DesktopCSharpCLITests : CLITestBase
 {
     private const string X86DebugTestProject = "DesktopTestProjectx86Debug";
@@ -12,54 +13,64 @@ public class DesktopCSharpCLITests : CLITestBase
     private const string X86ReleaseTestProject = "DesktopTestProjectx86Release";
     private const string X64ReleaseTestProject = "DesktopTestProjectx64Release";
     private const string RunSetting =
-        @"<RunSettings>   
-                <RunConfiguration>  
-                    <TargetPlatform>x64</TargetPlatform>   
-                </RunConfiguration>  
-            </RunSettings>";
+        """
+        <RunSettings>
+          <RunConfiguration>
+            <TargetPlatform>x64</TargetPlatform>
+          </RunConfiguration>
+        </RunSettings>
+        """;
 
+    [TestMethod]
     public void DiscoverTestsx86Debug()
     {
         string[] sources = [X86DebugTestProject];
         DoDiscoveryAndValidateDiscoveredTests(sources);
     }
 
+    [TestMethod]
     public void DiscoverTestsx64Debug()
     {
         string[] sources = [X64DebugTestProject];
         DoDiscoveryAndValidateDiscoveredTests(sources, RunSetting);
     }
 
+    [TestMethod]
     public void DiscoverTestsx86Release()
     {
         string[] sources = [X86ReleaseTestProject];
         DoDiscoveryAndValidateDiscoveredTests(sources);
     }
 
+    [TestMethod]
     public void DiscoverTestsx64Release()
     {
         string[] sources = [X64ReleaseTestProject];
         DoDiscoveryAndValidateDiscoveredTests(sources, RunSetting);
     }
 
+    [TestMethod]
     public void RunAllTestsx86Debug()
     {
         string[] sources = [X86DebugTestProject];
         RunAllTestsAndValidateResults(sources);
     }
 
+    [TestMethod]
     public void RunAllTestsx64Debug()
     {
         string[] sources = [X64DebugTestProject];
         RunAllTestsAndValidateResults(sources, RunSetting);
     }
 
+    [TestMethod]
     public void RunAllTestsx86Release()
     {
         string[] sources = [X86ReleaseTestProject];
         RunAllTestsAndValidateResults(sources);
     }
 
+    [TestMethod]
     public void RunAllTestsx64Release()
     {
         string[] sources = [X64ReleaseTestProject];
@@ -69,7 +80,7 @@ public class DesktopCSharpCLITests : CLITestBase
     private void DoDiscoveryAndValidateDiscoveredTests(string[] sources, string runSettings = "")
     {
         InvokeVsTestForDiscovery(sources, runSettings);
-        var listOfTests = new string[] { "SampleUnitTestProject.UnitTest1.PassingTest", "SampleUnitTestProject.UnitTest1.FailingTest", "SampleUnitTestProject.UnitTest1.SkippingTest" };
+        string[] listOfTests = ["SampleUnitTestProject.UnitTest1.PassingTest", "SampleUnitTestProject.UnitTest1.FailingTest", "SampleUnitTestProject.UnitTest1.SkippingTest"];
         ValidateDiscoveredTests(listOfTests);
     }
 

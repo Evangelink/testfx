@@ -1,30 +1,114 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-// using System.Diagnostics;
-using System.Runtime.CompilerServices;
-
 namespace Microsoft.Testing.Platform.Helpers;
 
 // The idea was taken from https://github.com/dotnet/aspnetcore/blob/main/src/Shared/TaskExtensions.cs
 internal static class TaskExtensions
 {
+    // CancellationTokenSource.CancelAfter / Timer.Change cap at this many milliseconds
+    // (~49.7 days). This matches the runtime's internal Timer.MaxSupportedTimeout constant.
+    public const long MaxSupportedTimeoutMs = 0xfffffffe;
+
+#if !NETCOREAPP
+    public static Task WaitAsync(this Task target, CancellationToken cancellationToken) =>
+        target.WaitAsync(Timeout.InfiniteTimeSpan, cancellationToken);
+
+    public static Task WaitAsync(
+        this Task target,
+        TimeSpan timeout) =>
+        target.WaitAsync(timeout, default);
+
+    public static async Task WaitAsync(
+        this Task target,
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
+    {
+        long milliseconds = (long)timeout.TotalMilliseconds;
+        if (milliseconds is < -1 or > MaxSupportedTimeoutMs)
+        {
+            throw new ArgumentOutOfRangeException(nameof(timeout));
+        }
+
+        if (target.IsCompleted ||
+            (!cancellationToken.CanBeCanceled && timeout == Timeout.InfiniteTimeSpan))
+        {
+            await target.ConfigureAwait(false);
+            return;
+        }
+
+        if (cancellationToken.IsCancellationRequested)
+        {
+            await Task.FromCanceled(cancellationToken).ConfigureAwait(false);
+        }
+
+        if (timeout == TimeSpan.Zero)
+        {
+            throw new TimeoutException();
+        }
+
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        cts.CancelAfter(timeout);
+
+        var cancellationTask = new TaskCompletionSource<bool>();
+#pragma warning disable SA1312 // Variable names should begin with lower-case letter
+        using CancellationTokenRegistration _ = cts.Token.Register(tcs => ((TaskCompletionSource<bool>)tcs!).TrySetResult(true), cancellationTask);
+#pragma warning restore SA1312 // Variable names should begin with lower-case letter
+        await Task.WhenAny(target, cancellationTask.Task).ConfigureAwait(false);
+
+        if (!target.IsCompleted)
+        {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                await Task.FromCanceled(cancellationToken).ConfigureAwait(false);
+            }
+
+            throw new TimeoutException();
+        }
+
+        await target.ConfigureAwait(false);
+    }
+
+    public static Task<TResult> WaitAsync<TResult>(
+        this Task<TResult> target,
+        CancellationToken cancellationToken) =>
+        target.WaitAsync<TResult>(Timeout.InfiniteTimeSpan, cancellationToken);
+
+    public static Task<TResult> WaitAsync<TResult>(
+        this Task<TResult> target,
+        TimeSpan timeout) =>
+        target.WaitAsync<TResult>(timeout, default);
+
+    public static async Task<TResult> WaitAsync<TResult>(
+        this Task<TResult> target,
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
+    {
+        await ((Task)target).WaitAsync(timeout, cancellationToken).ConfigureAwait(false);
+#pragma warning disable VSTHRD103 // Call async methods when in an async method
+        return target.Result;
+#pragma warning restore VSTHRD103 // Call async methods when in an async method
+    }
+#endif
+
     // We observe by default because usually we're no more interested in the result of the task
     public static async Task<T> WithCancellationAsync<T>(this Task<T> task, CancellationToken cancellationToken, bool observeException = true)
     {
         if (observeException)
         {
-            _ = task.ContinueWith(async task =>
-            {
-                try
+            _ = task.ContinueWith(
+                async task =>
                 {
-                    await task;
-                }
-                catch (Exception)
-                {
-                    // Observe the exception
-                }
-            });
+                    try
+                    {
+                        await task.ConfigureAwait(false);
+                    }
+                    catch (Exception)
+                    {
+                        // Observe the exception
+                    }
+                },
+                cancellationToken);
         }
 
         // Don't create a timer if the task is already completed
@@ -51,17 +135,19 @@ internal static class TaskExtensions
     {
         if (observeException)
         {
-            _ = task.ContinueWith(async task =>
-            {
-                try
+            _ = task.ContinueWith(
+                async task =>
                 {
-                    await task;
-                }
-                catch (Exception)
-                {
-                    // Observe the exception
-                }
-            });
+                    try
+                    {
+                        await task.ConfigureAwait(false);
+                    }
+                    catch (Exception)
+                    {
+                        // Observe the exception
+                    }
+                },
+                cancellationToken);
         }
 
         // Don't create a timer if the task is already completed
@@ -71,22 +157,7 @@ internal static class TaskExtensions
             return;
         }
 
-#if NET6_0_OR_GREATER
         await task.WaitAsync(cancellationToken).ConfigureAwait(false);
-#else
-        TaskCompletionSource<bool> taskCompletionSource = new();
-        using CancellationTokenRegistration tokenRegistration = cancellationToken.Register(() => taskCompletionSource.TrySetCanceled());
-        if (task == await Task.WhenAny(task, taskCompletionSource.Task).ConfigureAwait(false))
-        {
-            taskCompletionSource.SetResult(true);
-            await task.ConfigureAwait(false);
-            return;
-        }
-        else
-        {
-            throw new OperationCanceledException(cancellationToken);
-        }
-#endif
     }
 
     // We observe by default because usually we're no more interested in the result of the task
@@ -100,7 +171,7 @@ internal static class TaskExtensions
             {
                 try
                 {
-                    await task;
+                    await task.ConfigureAwait(false);
                 }
                 catch (Exception)
                 {
@@ -115,7 +186,7 @@ internal static class TaskExtensions
             await task.ConfigureAwait(false);
             return;
         }
-#if NET6_0_OR_GREATER
+
         try
         {
             await task.WaitAsync(timeout).ConfigureAwait(false);
@@ -124,18 +195,6 @@ internal static class TaskExtensions
         {
             throw new TimeoutException(CreateMessage(timeout, filePath, lineNumber));
         }
-#else
-        var cts = new CancellationTokenSource();
-        if (task == await Task.WhenAny(task, Task.Delay(timeout, cts.Token)).ConfigureAwait(false))
-        {
-            cts.Cancel();
-            await task.ConfigureAwait(false);
-        }
-        else
-        {
-            throw new TimeoutException(CreateMessage(timeout, filePath, lineNumber));
-        }
-#endif
     }
 
     // We observe by default because usually we're no more interested in the result of the task
@@ -145,17 +204,19 @@ internal static class TaskExtensions
     {
         if (observeException)
         {
-            _ = task.ContinueWith(async task =>
-            {
-                try
+            _ = task.ContinueWith(
+                async task =>
                 {
-                    await task;
-                }
-                catch (Exception)
-                {
-                    // Observe the exception
-                }
-            });
+                    try
+                    {
+                        await task.ConfigureAwait(false);
+                    }
+                    catch (Exception)
+                    {
+                        // Observe the exception
+                    }
+                },
+                token);
         }
 
         // Don't create a timer if the task is already completed
@@ -164,7 +225,7 @@ internal static class TaskExtensions
             await task.ConfigureAwait(false);
             return;
         }
-#if NET6_0_OR_GREATER
+
         try
         {
             await task.WaitAsync(timeout, token).ConfigureAwait(false);
@@ -173,24 +234,6 @@ internal static class TaskExtensions
         {
             throw new TimeoutException(CreateMessage(timeout, filePath, lineNumber));
         }
-#else
-        var cts = new CancellationTokenSource();
-        var linkedTokenSource = CancellationTokenSource.CreateLinkedTokenSource(token, cts.Token);
-        if (task == await Task.WhenAny(task, Task.Delay(timeout, linkedTokenSource.Token)).ConfigureAwait(false))
-        {
-            cts.Cancel();
-            await task.ConfigureAwait(false);
-        }
-        else
-        {
-            if (token.IsCancellationRequested)
-            {
-                throw new TaskCanceledException(task);
-            }
-
-            throw new TimeoutException(CreateMessage(timeout, filePath, lineNumber));
-        }
-#endif
     }
 
     private static string CreateMessage(TimeSpan timeout, string? filePath, int lineNumber)

@@ -1,16 +1,16 @@
-// Copyright (c) Microsoft Corporation. All rights reserved.
+﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 #if NETFRAMEWORK
-
-using System.Diagnostics;
-using System.Runtime.InteropServices;
 
 using static System.String;
 
 namespace Microsoft.VisualStudio.TestPlatform.MSTestAdapter.PlatformServices.Utilities;
 
-public static class VSInstallationUtilities
+/// <summary>
+/// Utilities to get Visual Studio installation paths.
+/// </summary>
+internal static class VSInstallationUtilities
 {
     /// <summary>
     /// Public assemblies directory name.
@@ -27,15 +27,13 @@ public static class VSInstallationUtilities
     /// </summary>
     private const string PortableVsTestManifestFilename = "Portable.VsTest.Manifest";
 
-    private static string? s_vsInstallPath;
-
     private static bool s_vsInstallPathEvaluated;
 
     /// <summary>
     /// Gets the visual studio installation path on the local machine.
     /// </summary>
     /// <returns>VS install path.</returns>
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes", Justification = "Need to ignore failures to read the registry settings")]
+    [SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes", Justification = "Need to ignore failures to read the registry settings")]
     public static string? VSInstallPath
     {
         get
@@ -44,14 +42,14 @@ public static class VSInstallationUtilities
             {
                 try
                 {
-                    s_vsInstallPath = null;
+                    field = null;
 
                     // Use the Setup API to find the installation folder for currently running VS instance.
                     if (new SetupConfiguration() is ISetupConfiguration setupConfiguration)
                     {
-                        var currentConfiguration = setupConfiguration.GetInstanceForCurrentProcess();
-                        var currentInstallationPath = currentConfiguration.GetInstallationPath();
-                        s_vsInstallPath = Path.Combine(currentInstallationPath, @"Common7\IDE");
+                        ISetupInstance currentConfiguration = setupConfiguration.GetInstanceForCurrentProcess();
+                        string currentInstallationPath = currentConfiguration.GetInstallationPath();
+                        field = Path.Combine(currentInstallationPath, @"Common7\IDE");
                     }
                 }
                 catch
@@ -65,7 +63,7 @@ public static class VSInstallationUtilities
                 }
             }
 
-            return s_vsInstallPath;
+            return field;
         }
     }
 
@@ -98,13 +96,13 @@ public static class VSInstallationUtilities
     public static bool IsProcessRunningInPortableMode(string? exeName)
     {
         // Get the directory of the exe
-        var exeDir = Path.GetDirectoryName(exeName);
+        string exeDir = Path.GetDirectoryName(exeName);
         return !IsNullOrEmpty(exeDir) && File.Exists(Path.Combine(exeDir, PortableVsTestManifestFilename));
     }
 
     private static string? GetFullPath(string folderName)
     {
-        var vsInstallDir = VSInstallPath;
+        string? vsInstallDir = VSInstallPath;
         return IsNullOrWhiteSpace(vsInstallDir?.Trim()) ? null : Path.Combine(vsInstallDir, folderName);
     }
 
@@ -251,9 +249,7 @@ public static class VSInstallationUtilities
     /// </summary>
     [ComImport]
     [Guid("177F0C4A-1CD3-4DE7-A32C-71DBBB9FA36D")]
-    public class SetupConfiguration
-    {
-    }
+    public class SetupConfiguration;
 }
 
 #endif

@@ -6,20 +6,20 @@ namespace Microsoft.VisualStudio.TestTools.UnitTesting;
 /// <summary>
 /// Description of the test.
 /// </summary>
-[AttributeUsage(AttributeTargets.Method, AllowMultiple = false)]
-public sealed class DescriptionAttribute : Attribute
+[AttributeUsage(AttributeTargets.Method)]
+public sealed class DescriptionAttribute : TestPropertyAttribute
 {
     /// <summary>
     /// Initializes a new instance of the <see cref="DescriptionAttribute"/> class to describe a test.
     /// </summary>
     /// <param name="description">The description.</param>
     public DescriptionAttribute(string? description)
+        : base("Description", description ?? string.Empty)
     {
-        Description = description;
     }
 
     /// <summary>
     /// Gets the description of a test.
     /// </summary>
-    public string? Description { get; }
+    public string? Description => Value;
 }

@@ -1,4 +1,4 @@
-// Copyright (c) Microsoft Corporation. All rights reserved.
+﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -8,7 +8,7 @@ namespace Microsoft.VisualStudio.TestPlatform.MSTestAdapter.PlatformServices.Int
 /// <summary>
 /// Operations on the TestContext object that is implemented differently for each platform.
 /// </summary>
-public interface ITestContext
+internal interface ITestContext
 {
     /// <summary>
     /// Gets the inner test context object.
@@ -37,10 +37,23 @@ public interface ITestContext
     void SetOutcome(UnitTestOutcome outcome);
 
     /// <summary>
+    /// Sets the exception that occurred during the TestInitialize or TestMethod step (if any).
+    /// </summary>
+    /// <param name="exception">The exception.</param>
+    void SetException(Exception? exception);
+
+    /// <summary>
     /// Set data row for particular run of TestMethod.
     /// </summary>
     /// <param name="dataRow">data row.</param>
     void SetDataRow(object? dataRow);
+
+    /// <summary>
+    /// Sets the data that will be provided to the test.
+    /// For non-parameterized tests, the value will be <see langword="null"/>.
+    /// </summary>
+    /// <param name="data">The data.</param>
+    void SetTestData(object?[]? data);
 
     /// <summary>
     /// Set connection for TestContext.
@@ -66,4 +79,17 @@ public interface ITestContext
     /// Clears the previous testContext writeline messages.
     /// </summary>
     void ClearDiagnosticMessages();
+
+    /// <summary>
+    /// Sets the test method display name.
+    /// </summary>
+    /// <param name="displayName">The display name.</param>
+    void SetDisplayName(string? displayName);
+
+    /// <summary>
+    /// Displays a message in the output.
+    /// </summary>
+    /// <param name="messageLevel">The level of the message.</param>
+    /// <param name="message">The message to display.</param>
+    void DisplayMessage(MessageLevel messageLevel, string message);
 }

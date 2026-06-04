@@ -1,80 +1,330 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using Microsoft.Testing.Internal.Framework;
-using Microsoft.Testing.TestInfrastructure;
-
 using VerifyCS = MSTest.Analyzers.Test.CSharpCodeFixVerifier<
     MSTest.Analyzers.TestContextShouldBeValidAnalyzer,
-    Microsoft.CodeAnalysis.Testing.EmptyCodeFixProvider>;
+    MSTest.Analyzers.TestContextShouldBeValidFixer>;
 
 namespace MSTest.Analyzers.Test;
 
-[TestGroup]
-public sealed class TestContextShouldBeValidAnalyzerTests(ITestExecutionContext testExecutionContext) : TestBase(testExecutionContext)
+[TestClass]
+public sealed class TestContextShouldBeValidAnalyzerTests
 {
-    [Arguments("TestContext", "private")]
-    [Arguments("TestContext", "public")]
-    [Arguments("TestContext", "internal")]
-    [Arguments("TestContext", "protected")]
-    [Arguments("testcontext", "private")]
-    [Arguments("testcontext", "public")]
-    [Arguments("testcontext", "internal")]
-    [Arguments("testcontext", "protected")]
-    [Arguments("TESTCONTEXT", "private")]
-    [Arguments("TESTCONTEXT", "public")]
-    [Arguments("TESTCONTEXT", "internal")]
-    [Arguments("TESTCONTEXT", "protected")]
-    [Arguments("TeStCoNtExT", "private")]
-    [Arguments("TeStCoNtExT", "public")]
-    [Arguments("TeStCoNtExT", "internal")]
-    [Arguments("TeStCoNtExT", "protected")]
-    public async Task WhenTestContextCaseInsensitiveIsField_Diagnostic(string fieldName, string accessibility)
+    [DataRow("TestContext", "private")]
+    [DataRow("TestContext", "public")]
+    [DataRow("TestContext", "internal")]
+    [DataRow("TestContext", "protected")]
+    [DataRow("testcontext", "private")]
+    [DataRow("testcontext", "public")]
+    [DataRow("testcontext", "internal")]
+    [DataRow("testcontext", "protected")]
+    [DataRow("TESTCONTEXT", "private")]
+    [DataRow("TESTCONTEXT", "public")]
+    [DataRow("TESTCONTEXT", "internal")]
+    [DataRow("TESTCONTEXT", "protected")]
+    [DataRow("TeStCoNtExT", "private")]
+    [DataRow("TeStCoNtExT", "public")]
+    [DataRow("TeStCoNtExT", "internal")]
+    [DataRow("TeStCoNtExT", "protected")]
+    [TestMethod]
+    public async Task WhenTestContextCaseInsensitiveIsField_NoDiagnostic(string fieldName, string accessibility)
     {
-        var code = $$"""
+        // MSTEST0005 only validates the TestContext property layout. Fields of type TestContext
+        // are intentionally not flagged, because doing so produced too many false positives
+        // (see https://github.com/microsoft/testfx/issues/4590). The static-field case is
+        // covered by MSTEST0024 (DoNotStoreStaticTestContext).
+        string code = $$"""
             using Microsoft.VisualStudio.TestTools.UnitTesting;
 
             [TestClass]
             public class MyTestClass
             {
-                {{accessibility}} TestContext {|#0:{{fieldName}}|};
+                {{accessibility}} TestContext {{fieldName}};
             }
             """;
 
-        await VerifyCS.VerifyAnalyzerAsync(
-            code,
-            VerifyCS.Diagnostic(TestContextShouldBeValidAnalyzer.NotFieldRule).WithLocation(0));
+        await VerifyCS.VerifyCodeFixAsync(code, code);
     }
 
-    [Arguments("TestContext", "private")]
-    [Arguments("TestContext", "internal")]
-    [Arguments("testcontext", "private")]
-    [Arguments("testcontext", "internal")]
-    [Arguments("TESTCONTEXT", "private")]
-    [Arguments("TESTCONTEXT", "internal")]
-    [Arguments("TeStCoNtExT", "private")]
-    [Arguments("TeStCoNtExT", "internal")]
-    public async Task WhenTestContextPropertyIsPrivateOrInternal_Diagnostic(string propertyName, string accessibility)
+    [DataRow("_testContext")]
+    [DataRow("s_testContext")]
+    [DataRow("testContext")]
+    [TestMethod]
+    public async Task WhenStaticFieldOfTypeTestContextAssignedInClassInitialize_NoDiagnostic(string fieldName)
     {
-        var code = $$"""
+        // Regression test for https://github.com/microsoft/testfx/issues/4590:
+        // a static field of type TestContext that is assigned in a [ClassInitialize] method
+        // must not trigger MSTEST0005. MSTEST0024 already covers the "do not store TestContext
+        // in a static member" guidance.
+        string code = $$"""
             using Microsoft.VisualStudio.TestTools.UnitTesting;
 
             [TestClass]
             public class MyTestClass
             {
+                private static TestContext {{fieldName}};
+
+                [ClassInitialize]
+                public static void ClassInitialize(TestContext context) =>
+                    {{fieldName}} = context;
+
+                [TestMethod]
+                public void TestMethod1() { }
+            }
+            """;
+
+        await VerifyCS.VerifyCodeFixAsync(code, code);
+    }
+
+    [TestMethod]
+    public async Task WhenStaticFieldOfTypeTestContextIsNeverAssigned_NoDiagnostic()
+    {
+        // Documents the deliberate behavior change tied to https://github.com/microsoft/testfx/issues/4590:
+        // MSTEST0005 no longer reports on fields of type TestContext, including unassigned static fields.
+        // Such a field is also not reported by MSTEST0024 (which only fires on assignment), so this is
+        // an accepted trade-off in favor of removing the false positives that previously bothered users.
+        string code = """
+            using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+            [TestClass]
+            public class MyTestClass
+            {
+                private static TestContext _context;
+
+                [TestMethod]
+                public void TestMethod1() { }
+            }
+            """;
+
+        await VerifyCS.VerifyCodeFixAsync(code, code);
+    }
+
+    [TestMethod]
+    public async Task WhenTestContextIsInPrimaryConstructor_NoDiagnostic()
+    {
+        string code = $$"""
+            using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+            [TestClass]
+            public sealed class Test1(TestContext testContext)
+            {
+                [TestMethod]
+                public void TestMethod1()
+                {
+                    testContext.CancellationTokenSource.Cancel();
+                }
+            }
+            """;
+
+        await VerifyCS.VerifyCodeFixAsync(code, code);
+    }
+
+    [DataRow("TestContext", "private")]
+    [DataRow("TestContext", "internal")]
+    [DataRow("testcontext", "private")]
+    [DataRow("testcontext", "internal")]
+    [DataRow("TESTCONTEXT", "private")]
+    [DataRow("TESTCONTEXT", "internal")]
+    [DataRow("TeStCoNtExT", "private")]
+    [DataRow("TeStCoNtExT", "internal")]
+    [TestMethod]
+    public async Task WhenTestContextPropertyIsPrivateOrInternal_Diagnostic(string propertyName, string accessibility)
+    {
+        string code = $$"""
+            using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+            [TestClass]
+            public class MyTestClass
+            {
+                {{accessibility}} TestContext [|{{propertyName}}|] { get; set; }
+            }
+            """;
+        string fixedCode =
+            """
+            using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+            [TestClass]
+            public class MyTestClass
+            {
+                public TestContext TestContext { get; set; }
+            }
+            """;
+        await VerifyCS.VerifyCodeFixAsync(
+            code,
+            fixedCode);
+    }
+
+    [DataRow("TestContext", "private")]
+    [DataRow("TestContext", "internal")]
+    [DataRow("testcontext", "private")]
+    [DataRow("testcontext", "internal")]
+    [DataRow("TESTCONTEXT", "private")]
+    [DataRow("TESTCONTEXT", "internal")]
+    [DataRow("TeStCoNtExT", "private")]
+    [DataRow("TeStCoNtExT", "internal")]
+    [TestMethod]
+    public async Task WhenTestContextPropertyIsPrivateOrInternal_AssignedInConstructor_NoDiagnostic(string propertyName, string accessibility)
+    {
+        string code = $$"""
+            using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+            [TestClass]
+            public class MyTestClass
+            {
+                public MyTestClass(TestContext testContext)
+                {
+                    this.{{propertyName}} = testContext;
+                }
+
                 {{accessibility}} TestContext {|#0:{{propertyName}}|} { get; set; }
             }
             """;
 
-        await VerifyCS.VerifyAnalyzerAsync(
-            code,
-            VerifyCS.Diagnostic(TestContextShouldBeValidAnalyzer.PublicRule)
-                .WithLocation(0));
+        await VerifyCS.VerifyCodeFixAsync(code, code);
     }
 
-    public async Task WhenTestContextPropertyIsValid_NoDiagnostic()
+    [DataRow(true)]
+    [DataRow(false)]
+    [TestMethod]
+    public async Task WhenTestContextPropertyIsValid_NoDiagnostic(bool discoverInternals)
     {
-        var code = $$"""
+        string code = $$"""
+            using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+            {{(discoverInternals ? "[assembly: DiscoverInternals]" : string.Empty)}}
+
+            [TestClass]
+            public class MyTestClass
+            {
+                public TestContext TestContext { get; set; }
+            }
+            """;
+
+        await VerifyCS.VerifyCodeFixAsync(code, code);
+    }
+
+    [TestMethod]
+    public async Task WhenDiscoverInternalsTestContextPropertyIsPrivate_Diagnostic()
+    {
+        string code = """
+            using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+            [assembly: DiscoverInternals]
+
+            [TestClass]
+            public class MyTestClass
+            {
+                private TestContext [|TestContext|] { get; set; }
+            }
+            """;
+        string fixedCode = """
+            using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+            [assembly: DiscoverInternals]
+
+            [TestClass]
+            public class MyTestClass
+            {
+                public TestContext TestContext { get; set; }
+            }
+            """;
+
+        await VerifyCS.VerifyCodeFixAsync(
+            code,
+            fixedCode);
+    }
+
+    [TestMethod]
+    public async Task WhenDiscoverInternalsTestContextPropertyIsPrivate_AssignedInConstructor_NoDiagnostic()
+    {
+        string code = """
+            using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+            [assembly: DiscoverInternals]
+
+            [TestClass]
+            public class MyTestClass
+            {
+                public MyTestClass(TestContext testContext)
+                {
+                    TestContext = testContext;
+                }
+
+                private TestContext TestContext { get; set; }
+            }
+            """;
+
+        await VerifyCS.VerifyCodeFixAsync(code, code);
+    }
+
+    [TestMethod]
+    public async Task WhenDiscoverInternalsTestContextPropertyIsInternal_Diagnostic()
+    {
+        string code = """
+            using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+            [assembly: DiscoverInternals]
+
+            [TestClass]
+            public class MyTestClass
+            {
+                internal TestContext [|TestContext|] { get; set; }
+            }
+            """;
+
+        string fixedCode = """
+            using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+            [assembly: DiscoverInternals]
+
+            [TestClass]
+            public class MyTestClass
+            {
+                public TestContext [|TestContext|] { get; set; }
+            }
+            """;
+
+        await VerifyCS.VerifyCodeFixAsync(code, fixedCode);
+    }
+
+    [TestMethod]
+    public async Task WhenDiscoverInternalsTestContextPropertyIsInternal_AssignedInConstructor_NoDiagnostic()
+    {
+        string code = """
+            using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+            [assembly: DiscoverInternals]
+
+            [TestClass]
+            public class MyTestClass
+            {
+                public MyTestClass(TestContext testContext)
+                {
+                    TestContext = testContext;
+                }
+
+                internal TestContext TestContext { get; set; }
+            }
+            """;
+
+        await VerifyCS.VerifyCodeFixAsync(code, code);
+    }
+
+    [TestMethod]
+    public async Task WhenTestContextPropertyIsStatic_Diagnostic()
+    {
+        string code =
+            """
+            using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+            [TestClass]
+            public class MyTestClass
+            {
+                public static TestContext [|TestContext|] { get; set; }
+            }
+            """;
+        string fixedCode =
+            """
             using Microsoft.VisualStudio.TestTools.UnitTesting;
 
             [TestClass]
@@ -84,103 +334,132 @@ public sealed class TestContextShouldBeValidAnalyzerTests(ITestExecutionContext 
             }
             """;
 
-        await VerifyCS.VerifyAnalyzerAsync(code);
-    }
-
-    public async Task WhenDiscoverInternalsTestContextPropertyIsPrivate_Diagnostic()
-    {
-        var code = """
-            using Microsoft.VisualStudio.TestTools.UnitTesting;
-
-            [assembly: DiscoverInternals]
-
-            [TestClass]
-            public class MyTestClass
-            {
-                private TestContext {|#0:TestContext|} { get; set; }
-            }
-            """;
-
-        await VerifyCS.VerifyAnalyzerAsync(
+        await VerifyCS.VerifyCodeFixAsync(
             code,
-            VerifyCS.Diagnostic(TestContextShouldBeValidAnalyzer.PublicOrInternalRule)
-                .WithLocation(0));
+            fixedCode);
     }
 
-    [Arguments("public")]
-    [Arguments("internal")]
-    public async Task WhenDiscoverInternalsTestContextPropertyIsPublicOrInternal_NoDiagnostic(string accessibility)
-    {
-        var code = $$"""
-            using Microsoft.VisualStudio.TestTools.UnitTesting;
-
-            [assembly: DiscoverInternals]
-
-            [TestClass]
-            public class MyTestClass
-            {
-                {{accessibility}} TestContext TestContext { get; set; }
-            }
-            """;
-
-        await VerifyCS.VerifyAnalyzerAsync(code);
-    }
-
-    public async Task WhenTestContextPropertyIsStatic_Diagnostic()
-    {
-        var code = $$"""
-            using Microsoft.VisualStudio.TestTools.UnitTesting;
-
-            [TestClass]
-            public class MyTestClass
-            {
-                public static TestContext {|#0:TestContext|} { get; set; }
-            }
-            """;
-
-        await VerifyCS.VerifyAnalyzerAsync(
-            code,
-            VerifyCS.Diagnostic(TestContextShouldBeValidAnalyzer.NotStaticRule)
-                .WithLocation(0));
-    }
-
+    [TestMethod]
     public async Task WhenTestContextPropertyIsReadonly_Diagnostic()
     {
-        var code = $$"""
+        string code =
+            """
             using Microsoft.VisualStudio.TestTools.UnitTesting;
 
             [TestClass]
             public class MyTestClass
             {
-                public TestContext {|#0:TestContext|} { get; }
+                public TestContext [|TestContext|] { get; }
+            }
+            """;
+        string fixedCode =
+            """
+            using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+            [TestClass]
+            public class MyTestClass
+            {
+                public TestContext TestContext { get; set; }
             }
             """;
 
-        await VerifyCS.VerifyAnalyzerAsync(
+        await VerifyCS.VerifyCodeFixAsync(
             code,
-            VerifyCS.Diagnostic(TestContextShouldBeValidAnalyzer.NotReadonlyRule)
-                .WithLocation(0));
+            fixedCode);
     }
 
-    [Arguments("TestContext", "private")]
-    [Arguments("TestContext", "public")]
-    [Arguments("TestContext", "internal")]
-    [Arguments("TestContext", "protected")]
-    [Arguments("testcontext", "private")]
-    [Arguments("testcontext", "public")]
-    [Arguments("testcontext", "internal")]
-    [Arguments("testcontext", "protected")]
-    [Arguments("TESTCONTEXT", "private")]
-    [Arguments("TESTCONTEXT", "public")]
-    [Arguments("TESTCONTEXT", "internal")]
-    [Arguments("TESTCONTEXT", "protected")]
-    [Arguments("TeStCoNtExT", "private")]
-    [Arguments("TeStCoNtExT", "public")]
-    [Arguments("TeStCoNtExT", "internal")]
-    [Arguments("TeStCoNtExT", "protected")]
+    [TestMethod]
+    public async Task WhenTestContextPropertyIsNotCasedCorrectly_Diagnostic()
+    {
+        string code =
+            """
+            using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+            [TestClass]
+            public class MyTestClass
+            {
+                public TestContext [|testContext|] { get; set; }
+            }
+            """;
+        string fixedCode =
+            """
+            using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+            [TestClass]
+            public class MyTestClass
+            {
+                public TestContext TestContext { get; set; }
+            }
+            """;
+
+        await VerifyCS.VerifyCodeFixAsync(
+            code,
+            fixedCode);
+    }
+
+    [TestMethod]
+    public async Task WhenTestContextPropertyIsReadonly_AssignedInConstructor_NoDiagnostic()
+    {
+        string code =
+            """
+            using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+            [TestClass]
+            public class MyTestClass
+            {
+                public MyTestClass(TestContext testContext)
+                {
+                    TestContext = testContext;
+                }
+                public TestContext TestContext { get; }
+            }
+            """;
+
+        await VerifyCS.VerifyCodeFixAsync(code, code);
+    }
+
+    [TestMethod]
+    public async Task WhenTestContextPropertyIsReadonly_AssignedInConstructorViaField_NoDiagnostic()
+    {
+        string code =
+            """
+            using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+            [TestClass]
+            public class MyTestClass
+            {
+                private readonly TestContext _testContext;
+                public MyTestClass(TestContext testContext)
+                {
+                    _testContext = testContext;
+                }
+                public TestContext TestContext => _testContext;
+            }
+            """;
+
+        await VerifyCS.VerifyCodeFixAsync(code, code);
+    }
+
+    [DataRow("TestContext", "private")]
+    [DataRow("TestContext", "public")]
+    [DataRow("TestContext", "internal")]
+    [DataRow("TestContext", "protected")]
+    [DataRow("testcontext", "private")]
+    [DataRow("testcontext", "public")]
+    [DataRow("testcontext", "internal")]
+    [DataRow("testcontext", "protected")]
+    [DataRow("TESTCONTEXT", "private")]
+    [DataRow("TESTCONTEXT", "public")]
+    [DataRow("TESTCONTEXT", "internal")]
+    [DataRow("TESTCONTEXT", "protected")]
+    [DataRow("TeStCoNtExT", "private")]
+    [DataRow("TeStCoNtExT", "public")]
+    [DataRow("TeStCoNtExT", "internal")]
+    [DataRow("TeStCoNtExT", "protected")]
+    [TestMethod]
     public async Task WhenTestContextIsFieldNotOnTestClass_NoDiagnostic(string fieldName, string accessibility)
     {
-        var code = $$"""
+        string code = $$"""
             using Microsoft.VisualStudio.TestTools.UnitTesting;
 
             public class MyTestClass
@@ -189,6 +468,52 @@ public sealed class TestContextShouldBeValidAnalyzerTests(ITestExecutionContext 
             }
             """;
 
-        await VerifyCS.VerifyAnalyzerAsync(code);
+        await VerifyCS.VerifyCodeFixAsync(code, code);
+    }
+
+    [TestMethod]
+    public async Task WhenTestContextAssignedInConstructorWithNullCheck_NoDiagnostic()
+    {
+        string code = """
+            using System;
+            using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+            [TestClass]
+            public class MyTestClass
+            {
+                private readonly TestContext _testContext;
+                
+                public MyTestClass(TestContext testContext)
+                {
+                    _testContext = testContext ?? throw new ArgumentNullException(nameof(testContext));
+                }
+                
+                public TestContext TestContext => _testContext;
+            }
+            """;
+
+        await VerifyCS.VerifyCodeFixAsync(code, code);
+    }
+
+    [TestMethod]
+    public async Task WhenTestContextPropertyAssignedInConstructorWithNullCheck_NoDiagnostic()
+    {
+        string code = """
+            using System;
+            using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+            [TestClass]
+            public class MyTestClass
+            {
+                public MyTestClass(TestContext testContext)
+                {
+                    TestContext = testContext ?? throw new ArgumentNullException(nameof(testContext));
+                }
+                
+                public TestContext TestContext { get; }
+            }
+            """;
+
+        await VerifyCS.VerifyCodeFixAsync(code, code);
     }
 }
